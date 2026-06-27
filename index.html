@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Territory Manager</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body style="margin:0;padding:0;overflow:hidden;background:#1a1a1a;">
+<div id="tmRoot" style="position:relative;width:100%;height:100vh;height:100dvh;overflow:hidden;background:#1a1a1a;"></div>
+<script>
+(function(){
+var root=document.getElementById("tmRoot");
+root.innerHTML='<style>\
+:root{--bar-h:52px;--nav-h:56px;--safe-b:env(safe-area-inset-bottom,0px);}\
+#tmRoot *,#tmRoot *::before,#tmRoot *::after{box-sizing:border-box;margin:0;padding:0;}\
+#tmRoot{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;color:#222;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;}\
+#tmMap{width:100%;height:100%;}\
+\
+#tmTopBar{position:absolute;top:0;left:0;right:0;z-index:500;background:#1a1a1a;padding:0 16px;height:var(--bar-h);display:flex;align-items:center;justify-content:space-between;gap:8px;box-shadow:0 2px 16px rgba(0,0,0,0.5);}\
+.tm-top-left{display:flex;align-items:center;gap:10px;}\
+.tm-app-title{font-size:17px;font-weight:700;color:#fff;letter-spacing:-.3px;}\
+.tm-count-badge{background:#e53935;color:#fff;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;}\
+.tm-top-right{display:flex;align-items:center;gap:8px;}\
+.tm-icon-btn{background:rgba(255,255,255,.12);color:#fff;border:none;border-radius:10px;width:38px;height:38px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;}\
+.tm-icon-btn:active{background:rgba(255,255,255,.25);}\
+.tm-add-btn{background:#fff;color:#1a1a1a;border:none;border-radius:10px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;letter-spacing:-.2px;}\
+.tm-add-btn:active{background:#e0e0e0;}\
+\
+#tmBottomNav{position:absolute;bottom:0;left:0;right:0;z-index:500;background:#1a1a1a;padding:0 8px calc(4px + var(--safe-b));box-shadow:0 -2px 16px rgba(0,0,0,0.4);}\
+.tm-nav-row{display:flex;justify-content:space-around;align-items:stretch;height:var(--nav-h);}\
+.tm-nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;background:none;border:none;color:rgba(255,255,255,.45);font-size:10px;font-weight:600;cursor:pointer;font-family:inherit;padding:4px;transition:color .15s;}\
+.tm-nav-btn.active{color:#fff;}\
+.tm-nav-icon{font-size:20px;line-height:1;}\
+\
+#tmSearchWrap{position:absolute;top:calc(var(--bar-h) + 8px);left:12px;right:12px;z-index:500;}\
+#tmSearchBox{width:100%;padding:12px 16px 12px 40px;font-size:15px;border:none;border-radius:14px;background:rgba(255,255,255,0.95);box-shadow:0 4px 20px rgba(0,0,0,0.3);outline:none;font-family:inherit;color:#1a1a1a;-webkit-appearance:none;}\
+#tmSearchBox::placeholder{color:#aaa;}\
+.tm-search-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:16px;color:#999;pointer-events:none;}\
+#tmSearchClear{position:absolute;right:10px;top:50%;transform:translateY(-50%);width:28px;height:28px;border-radius:50%;border:none;background:#e0e0e0;color:#666;font-size:14px;cursor:pointer;display:none;align-items:center;justify-content:center;}\
+\
+#tmFilterFloat{position:absolute;bottom:calc(var(--nav-h) + var(--safe-b) + 10px);left:12px;right:12px;z-index:500;display:flex;flex-direction:row;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:2px;}\
+#tmFilterFloat::-webkit-scrollbar{display:none;}\
+.tm-filter-btn{display:flex;align-items:center;gap:5px;padding:8px 14px;border-radius:24px;font-size:13px;font-weight:600;border:2px solid transparent;cursor:pointer;font-family:inherit;background:rgba(20,20,20,0.88);color:#fff;box-shadow:0 2px 12px rgba(0,0,0,0.4);white-space:nowrap;flex-shrink:0;min-height:40px;transition:transform .1s;}\
+.tm-filter-btn:active{transform:scale(.96);}\
+.tm-filter-btn.tm-active-all{background:#1a1a1a;border-color:rgba(255,255,255,.5);}\
+.tm-filter-btn.tm-active-recent{background:#2e7d32;border-color:#66bb6a;}\
+.tm-filter-btn.tm-active-due{background:#ef6c00;border-color:#ffaa44;}\
+.tm-filter-btn.tm-active-overdue{background:#c62828;border-color:#ff6b6b;}\
+.tm-filter-btn.tm-active-never{background:#555;border-color:#999;}\
+.tm-filter-btn .tm-dot{display:inline-block;width:8px;height:8px;border-radius:50%;flex-shrink:0;}\
+.tm-filter-btn[data-f="all"] .tm-dot{background:#fff;}\
+.tm-filter-btn[data-f="recent"] .tm-dot{background:#66bb6a;}\
+.tm-filter-btn[data-f="due"] .tm-dot{background:#ffaa44;}\
+.tm-filter-btn[data-f="overdue"] .tm-dot{background:#ff6b6b;}\
+.tm-filter-btn[data-f="never"] .tm-dot{background:#999;}\
+.tm-filter-count{background:rgba(255,255,255,0.25);color:#fff;border-radius:20px;padding:2px 8px;font-size:11px;font-weight:700;}\
+\
+#tmSidePanel{position:absolute;left:0;top:0;bottom:0;z-index:600;width:min(300px,85vw);background:#1a1a1a;transform:translateX(-100%);transition:transform .3s cubic-bezier(.4,0,.2,1);overflow-y:auto;-webkit-overflow-scrolling:touch;padding:calc(var(--bar-h) + 16px) 16px calc(var(--nav-h) + var(--safe-b) + 16px);box-shadow:4px 0 24px rgba(0,0,0,0.5);}\
+#tmSidePanel.open{transform:translateX(0);}\
+.tm-side-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#666;margin-bottom:12px;}\
+.tm-terr-chip{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:14px 16px;font-size:14px;cursor:pointer;margin-bottom:8px;color:#fff;min-height:48px;transition:background .15s;}\
+.tm-terr-chip:active{background:rgba(255,255,255,.18);}\
+.tm-terr-count{margin-left:auto;font-size:11px;opacity:.5;}\
+#tmSideOverlay{display:none;position:absolute;inset:0;z-index:590;background:rgba(0,0,0,0.4);}\
+#tmSideOverlay.open{display:block;}\
+button#tmPullTab{display:none;position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:610;background:#1a1a1a;border:none;border-radius:0 8px 8px 0;padding:18px 12px;cursor:pointer;box-shadow:3px 0 14px rgba(0,0,0,0.30);flex-direction:column;gap:5px;align-items:center;}\
+#tmPullTab span{display:block;width:18px;height:2px;background:#fff;border-radius:2px;}\
+\
+@keyframes tmFadeIn{from{opacity:0;}to{opacity:1;}}\
+@keyframes tmSlideUp{from{transform:translateY(100%);}to{transform:translateY(0);}}\
+.tm-overlay{position:absolute;inset:0;z-index:700;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:none;align-items:flex-end;justify-content:center;padding:0;}\
+.tm-overlay.open{display:flex;animation:tmFadeIn .2s ease;}\
+.tm-drawer{background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:540px;max-height:85%;display:flex;flex-direction:column;box-shadow:0 -8px 40px rgba(0,0,0,0.25);overflow:hidden;animation:tmSlideUp .3s cubic-bezier(.4,0,.2,1);}\
+.tm-drawer-handle{width:36px;height:4px;border-radius:4px;background:rgba(0,0,0,0.15);margin:10px auto 0;flex-shrink:0;}\
+.tm-drawer-header{padding:14px 20px 0;flex-shrink:0;}\
+.tm-drawer-header-row{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;}\
+.tm-drawer-title{font-size:18px;font-weight:700;color:#1a1a1a;line-height:1.3;}\
+.tm-drawer-sub{font-size:13px;color:#999;margin-top:4px;}\
+.tm-close-btn{width:32px;height:32px;border-radius:50%;flex-shrink:0;border:none;background:#f0f0ee;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;color:#666;line-height:1;}\
+.tm-close-btn:active{background:#e0e0de;}\
+.tm-drawer-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 20px calc(28px + var(--safe-b));}\
+\
+.tm-house-card{border:1px solid rgba(0,0,0,0.07);border-radius:14px;padding:14px 16px;background:#fff;cursor:pointer;margin-bottom:8px;transition:background .1s;}\
+.tm-house-card:active{background:#f5f5f3;}\
+.tm-hc-top{display:flex;align-items:center;gap:12px;}\
+.tm-visit-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}\
+.tm-visit-green{background:#2e7d32;}\
+.tm-visit-yellow{background:#ef6c00;}\
+.tm-visit-red{background:#c62828;}\
+.tm-visit-gray{background:#999;}\
+.tm-hc-info{flex:1;min-width:0;}\
+.tm-hc-addr{font-size:15px;font-weight:600;color:#1a1a1a;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}\
+.tm-hc-meta{font-size:12px;color:#999;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}\
+.tm-hc-actions{display:flex;gap:6px;margin-top:10px;padding-left:22px;}\
+.tm-btn-sm{padding:7px 14px;border-radius:10px;font-size:12px;font-weight:600;border:1px solid rgba(0,0,0,0.12);background:#fff;color:#333;cursor:pointer;font-family:inherit;min-height:34px;transition:background .1s;}\
+.tm-btn-sm:active{background:#f0f0ee;}\
+.tm-btn-log{border-color:#2e7d32;color:#2e7d32;background:#f0faf0;}\
+.tm-btn-log:active{background:#2e7d32;color:#fff;}\
+.tm-btn-dir{border-color:#1565c0;color:#1565c0;background:#f0f4ff;}\
+.tm-btn-dir:active{background:#1565c0;color:#fff;}\
+\
+.tm-form-overlay .tm-drawer{max-height:92%;}\
+.tm-form-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 20px calc(28px + var(--safe-b));}\
+.tm-field{margin-bottom:14px;}\
+.tm-field label{display:block;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#888;margin-bottom:6px;}\
+.tm-field input,.tm-field textarea,.tm-field select{width:100%;padding:12px 14px;font-size:15px;border:2px solid #e8e8e8;border-radius:12px;outline:none;font-family:inherit;color:#1a1a1a;background:#fafafa;-webkit-appearance:none;transition:border-color .2s;}\
+.tm-field input:focus,.tm-field textarea:focus,.tm-field select:focus{border-color:#1a1a1a;background:#fff;}\
+.tm-field textarea{min-height:80px;resize:vertical;}\
+.tm-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 14px;}\
+.tm-gps-row{display:flex;gap:8px;}\
+.tm-gps-row input{flex:1;}\
+.tm-gps-btn{flex-shrink:0;width:44px;height:44px;border-radius:12px;border:2px solid #e8e8e8;background:#fafafa;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;margin-top:0;}\
+.tm-gps-btn:active{background:#e8e8e8;}\
+.tm-gps-btn.locating{animation:tmPulse 1s infinite;}\
+@keyframes tmPulse{0%,100%{opacity:1;}50%{opacity:.4;}}\
+.tm-save-btn{width:100%;padding:14px;background:#1a1a1a;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;min-height:48px;margin-top:8px;transition:background .15s;}\
+.tm-save-btn:active{background:#333;}\
+.tm-delete-btn{width:100%;padding:14px;background:#fff;color:#c62828;border:2px solid #fdd;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;min-height:48px;margin-top:8px;}\
+.tm-delete-btn:active{background:#fff0f0;}\
+.tm-section-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#bbb;margin:20px 0 12px;display:flex;align-items:center;gap:8px;}\
+.tm-section-label::after{content:"";flex:1;height:1px;background:rgba(0,0,0,0.06);}\
+\
+.tm-detail-row{display:flex;align-items:center;gap:10px;font-size:14px;color:#555;margin-bottom:10px;min-height:28px;}\
+.tm-detail-icon{font-size:16px;color:#bbb;flex-shrink:0;width:22px;text-align:center;}\
+.tm-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:8px;font-size:13px;font-weight:700;margin-bottom:14px;}\
+.tm-badge-green{background:#f0faf0;color:#2e7d32;}\
+.tm-badge-yellow{background:#fff4ee;color:#ef6c00;}\
+.tm-badge-red{background:#fff0f0;color:#c62828;}\
+.tm-badge-gray{background:#f0f0f0;color:#666;}\
+.tm-visit-block{background:#f5f5f3;border:1px solid rgba(0,0,0,0.06);border-radius:12px;padding:12px 14px;margin-bottom:8px;}\
+.tm-visit-label{font-size:11px;color:#aaa;font-weight:700;text-transform:uppercase;letter-spacing:.04em;}\
+.tm-visit-text{font-size:14px;color:#333;margin-top:4px;line-height:1.5;}\
+.tm-dir-btn{width:100%;padding:12px;border-radius:12px;border:none;background:#1a1a1a;color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;min-height:48px;margin:14px 0 8px;}\
+.tm-dir-btn:active{background:#333;}\
+.tm-edit-btn{width:100%;padding:12px;border-radius:12px;border:2px solid #1a1a1a;background:#fff;color:#1a1a1a;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;min-height:48px;}\
+.tm-edit-btn:active{background:#f0f0ee;}\
+.tm-notes-wrap{white-space:pre-wrap;font-size:14px;color:#444;line-height:1.65;background:#f8f8f6;border-radius:10px;padding:12px 14px;}\
+\
+.tm-confirm-overlay{display:none;position:absolute;inset:0;z-index:1100;background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);align-items:flex-end;justify-content:center;padding:0;}\
+.tm-confirm-overlay.open{display:flex;animation:tmFadeIn .2s ease;}\
+.tm-confirm-modal{background:#fff;border-radius:20px 20px 0 0;padding:24px 20px calc(24px + var(--safe-b));max-width:380px;width:100%;text-align:center;box-shadow:0 -8px 40px rgba(0,0,0,0.25);animation:tmSlideUp .3s cubic-bezier(.4,0,.2,1);}\
+.tm-confirm-btns{display:flex;gap:10px;margin-top:4px;}\
+.tm-confirm-btns button{flex:1;padding:14px;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;min-height:48px;}\
+\
+.tm-log-overlay .tm-drawer{max-height:60%;}\
+.tm-log-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 20px calc(28px + var(--safe-b));}\
+\
+#tmGeocodeStatus{position:absolute;bottom:calc(var(--nav-h) + var(--safe-b) + 56px);left:50%;transform:translateX(-50%);z-index:500;font-size:12px;color:#fff;background:rgba(0,0,0,0.75);border-radius:24px;padding:8px 18px;pointer-events:none;display:none;}\
+.tm-toast{position:absolute;top:calc(var(--bar-h) + 52px);left:50%;transform:translateX(-50%);z-index:900;border-radius:24px;padding:10px 22px;font-size:14px;font-weight:600;color:#fff;display:none;pointer-events:none;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,0.3);background:#2e7d32;}\
+.tm-empty{color:#aaa;font-size:15px;padding:32px;text-align:center;}\
+\
+@media(min-width:601px){\
+.tm-overlay{align-items:center;padding:20px;}\
+.tm-drawer{border-radius:16px;max-height:82%;animation:tmFadeIn .25s ease;}\
+.tm-drawer-handle{display:none;}\
+.tm-confirm-overlay{align-items:center;padding:20px;}\
+.tm-confirm-modal{border-radius:16px;}\
+.tm-log-overlay .tm-drawer{max-height:55%;border-radius:16px;}\
+#tmBottomNav{display:none!important;}\
+#tmFilterFloat{bottom:36px;left:14px;right:auto;}\
+#tmPullTab{display:flex!important;}\
+#tmGeocodeStatus{bottom:14px;}\
+}\
+@media(max-width:600px){\
+#tmPullTab{display:none!important;}\
+.tm-hc-actions{flex-wrap:wrap;}\
+}\
+</style>\
+\
+<div id="tmMap"></div>\
+\
+<div id="tmTopBar">\
+<div class="tm-top-left">\
+<span class="tm-app-title">Territory</span>\
+<span class="tm-count-badge" id="tmCountBadge" style="display:none"></span>\
+</div>\
+<div class="tm-top-right">\
+<button class="tm-add-btn" id="tmAddBtn">+ Add</button>\
+</div>\
+</div>\
+\
+<div id="tmSearchWrap">\
+<span class="tm-search-icon">\u{1F50D}</span>\
+<input type="text" id="tmSearchBox" placeholder="Search address, territory, language...">\
+<button id="tmSearchClear">✕</button>\
+</div>\
+\
+<div id="tmBottomNav"><div class="tm-nav-row">\
+<button class="tm-nav-btn active" data-nav="map"><span class="tm-nav-icon">\u{1F5FA}</span><span>Map</span></button>\
+<button class="tm-nav-btn" data-nav="list"><span class="tm-nav-icon">\u{1F4CB}</span><span>Houses</span></button>\
+<button class="tm-nav-btn" data-nav="territories"><span class="tm-nav-icon">\u{1F4C1}</span><span>Territories</span></button>\
+</div></div>\
+\
+<div id="tmFilterFloat">\
+<button class="tm-filter-btn tm-active-all" data-f="all"><span class="tm-dot"></span> All <span class="tm-filter-count" id="tmCntAll"></span></button>\
+<button class="tm-filter-btn" data-f="recent"><span class="tm-dot"></span> Recent <span class="tm-filter-count" id="tmCntRecent"></span></button>\
+<button class="tm-filter-btn" data-f="due"><span class="tm-dot"></span> Due <span class="tm-filter-count" id="tmCntDue"></span></button>\
+<button class="tm-filter-btn" data-f="overdue"><span class="tm-dot"></span> Overdue <span class="tm-filter-count" id="tmCntOverdue"></span></button>\
+<button class="tm-filter-btn" data-f="never"><span class="tm-dot"></span> Never <span class="tm-filter-count" id="tmCntNever"></span></button>\
+</div>\
+\
+<button id="tmPullTab" aria-label="Menu"><span></span><span></span><span></span></button>\
+<div id="tmSideOverlay"></div>\
+<div id="tmSidePanel"><p class="tm-side-label">Territories</p><div id="tmTerrList"></div></div>\
+<div id="tmGeocodeStatus"></div>\
+<div class="tm-toast" id="tmToast"></div>\
+\
+<!-- List Drawer -->\
+<div class="tm-overlay" id="tmListOverlay"><div class="tm-drawer"><div class="tm-drawer-handle"></div>\
+<div class="tm-drawer-header"><div class="tm-drawer-header-row"><div style="flex:1;min-width:0"><div class="tm-drawer-title" id="tmListTitle">All Houses</div><div class="tm-drawer-sub" id="tmListSub"></div></div><button class="tm-close-btn" id="tmListClose">✕</button></div></div>\
+<div class="tm-drawer-body" id="tmListBody"></div>\
+</div></div>\
+\
+<!-- Detail Drawer -->\
+<div class="tm-overlay" id="tmDetailOverlay" style="z-index:800"><div class="tm-drawer"><div class="tm-drawer-handle"></div>\
+<div class="tm-drawer-header"><div class="tm-drawer-header-row"><div style="flex:1;min-width:0"><div class="tm-drawer-title" id="tmDetTitle"></div><div class="tm-drawer-sub" id="tmDetSub"></div></div><button class="tm-close-btn" id="tmDetClose">✕</button></div></div>\
+<div class="tm-drawer-body" id="tmDetBody"></div>\
+</div></div>\
+\
+<!-- Form Drawer -->\
+<div class="tm-overlay tm-form-overlay" id="tmFormOverlay" style="z-index:900"><div class="tm-drawer"><div class="tm-drawer-handle"></div>\
+<div class="tm-drawer-header"><div class="tm-drawer-header-row"><div style="flex:1;min-width:0"><div class="tm-drawer-title" id="tmFormTitle">Add House</div></div><button class="tm-close-btn" id="tmFormClose">✕</button></div></div>\
+<div class="tm-form-body" id="tmFormBody">\
+<input type="hidden" id="tmItemID">\
+<div class="tm-grid">\
+<div class="tm-field"><label>Address</label><input id="fAddr" autocomplete="street-address"></div>\
+<div class="tm-field"><label>City</label><input id="fCity" autocomplete="address-level2"></div>\
+<div class="tm-field"><label>State</label><input id="fState" value="CA"></div>\
+<div class="tm-field"><label>ZIP</label><input id="fZip" inputmode="numeric" autocomplete="postal-code"></div>\
+<div class="tm-field"><label>Territory #</label><input id="fTerrNum"></div>\
+<div class="tm-field"><label>Assigned To</label><input id="fAssigned"></div>\
+<div class="tm-field"><label>Language</label><input id="fLang"></div>\
+<div class="tm-field"><label>Last Visit</label><input id="fLastVisit" type="date"></div>\
+</div>\
+<div class="tm-field"><label>GPS Coordinates</label><div class="tm-gps-row"><input id="fGPS" placeholder="35.6266, -120.6910"><button type="button" class="tm-gps-btn" id="tmGPSBtn" title="Use my location">\u{1F4CD}</button></div></div>\
+<div class="tm-field"><label>House Notes</label><textarea id="fNotes" placeholder="Dog in yard, gate code, etc."></textarea></div>\
+<div class="tm-field"><label>Personal Notes</label><textarea id="fPersonal" placeholder="Interested in Bible study, speaks Spanish..."></textarea></div>\
+<div class="tm-section-label">Visit Results</div>\
+<div class="tm-grid">\
+<div class="tm-field"><label>Visit 1</label><input id="fV1" placeholder="NH / Spoke with..."></div>\
+<div class="tm-field"><label>Visit 2</label><input id="fV2"></div>\
+<div class="tm-field"><label>Visit 3</label><input id="fV3"></div>\
+<div class="tm-field"><label>Visit 4</label><input id="fV4"></div>\
+<div class="tm-field"><label>Visit 5</label><input id="fV5"></div>\
+</div>\
+<button class="tm-save-btn" id="tmSaveBtn">Save House</button>\
+<button class="tm-delete-btn" id="tmDeleteBtn" style="display:none">Delete House</button>\
+</div></div></div>\
+\
+<!-- Quick Log Visit Drawer -->\
+<div class="tm-overlay tm-log-overlay" id="tmLogOverlay" style="z-index:950"><div class="tm-drawer"><div class="tm-drawer-handle"></div>\
+<div class="tm-drawer-header"><div class="tm-drawer-header-row"><div style="flex:1;min-width:0"><div class="tm-drawer-title" id="tmLogTitle">Log Visit</div><div class="tm-drawer-sub" id="tmLogSub"></div></div><button class="tm-close-btn" id="tmLogClose">✕</button></div></div>\
+<div class="tm-log-body" id="tmLogBody">\
+<div class="tm-field"><label>Visit Date</label><input id="fLogDate" type="date"></div>\
+<div class="tm-field"><label>Result</label><textarea id="fLogResult" placeholder="NH, Not home, Spoke with John about..., Left tract, Started Bible study..." style="min-height:100px"></textarea></div>\
+<button class="tm-save-btn" id="tmLogSave">Save Visit</button>\
+</div></div></div>\
+\
+<!-- Confirm Modal -->\
+<div class="tm-confirm-overlay" id="tmConfirm"><div class="tm-confirm-modal">\
+<div class="tm-drawer-handle" style="margin-bottom:16px"></div>\
+<div style="font-size:36px;margin:8px 0 12px" id="tmConfirmIcon">⚠️</div>\
+<h3 style="font-size:18px;margin-bottom:6px" id="tmConfirmTitle">Delete this house?</h3>\
+<p style="font-size:13px;color:#aaa;margin-bottom:22px;line-height:1.5" id="tmConfirmMsg">This cannot be undone.</p>\
+<div class="tm-confirm-btns">\
+<button id="tmConfirmNo" style="border:1px solid #e0e0e0;background:#fff;color:#555">Cancel</button>\
+<button id="tmConfirmYes" style="border:none;background:#c62828;color:#fff">Delete</button>\
+</div></div></div>\
+';
+
+/* ── Config ── */
+var API="https://share-point-api.vercel.app/api/territory";
+var records=[],allRecords=[],map=null,mapMarkers=[],markerMap={},filter="all",searchTerm="";
+var currentLogId="";
+
+/* ── Helpers ── */
+function esc(v){if(!v)return"";return String(v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;");}
+function cleanDate(v){if(!v)return"";return String(v).substring(0,10);}
+function fmtDate(v){if(!v)return"Never";var d=new Date(v);if(isNaN(d))return v;return d.toLocaleDateString("en-US",{month:"short",day:"2-digit",year:"numeric"});}
+function todayStr(){var d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
+
+function visitStatus(v){
+  if(!v)return"never";
+  var diff=Math.floor((Date.now()-new Date(v))/86400000);
+  if(diff<=30)return"recent";
+  if(diff<=90)return"due";
+  return"overdue";
+}
+function visitLabel(v){
+  if(!v)return"Never visited";
+  var diff=Math.floor((Date.now()-new Date(v))/86400000);
+  if(diff<=0)return"Visited today";
+  if(diff===1)return"Yesterday";
+  if(diff<=30)return diff+"d ago";
+  if(diff<=90)return diff+"d ago – Due soon";
+  return diff+"d ago – Overdue";
+}
+function dotClass(s){return"tm-visit-"+({recent:"green",due:"yellow",overdue:"red",never:"gray"}[s]||"gray");}
+function badgeClass(s){return"tm-badge-"+({recent:"green",due:"yellow",overdue:"red",never:"gray"}[s]||"gray");}
+function pinColor(s){return{recent:"#2e7d32",due:"#ef6c00",overdue:"#c62828",never:"#888"}[s]||"#888";}
+function fullAddr(r){return[r.HouseAddress,r.HouseCity,r.HouseState,r.HouseZIP].filter(Boolean).join(", ");}
+function parseGPS(v){if(!v)return null;var p=v.split(",").map(function(s){return parseFloat(s.trim());});if(p.length===2&&!isNaN(p[0])&&!isNaN(p[1])&&Math.abs(p[0])<=90&&Math.abs(p[1])<=180)return{lat:p[0],lng:p[1]};return null;}
+
+function applyFilters(){
+  var r=allRecords.slice();
+  if(filter!=="all")r=r.filter(function(h){return visitStatus(h.HouseLastVisitDate)===filter;});
+  if(searchTerm){var q=searchTerm.toLowerCase();r=r.filter(function(h){return[h.HouseAddress,h.HouseCity,h.HouseState,h.HouseZIP,h.HouseTerritoryNumber,h.HouseTerritoryAssingnedTo,h.HouseLanguage,h.HouseNotes,h.HousePersonalNotes,h.HouseGPSCoordinates,h.HouseResutsOnVisit1,h.HouseResutsOnVisit2,h.HouseResutsOnVisit3,h.HouseResutsOnVisit4,h.HouseResutsOnVisit5].filter(Boolean).join(" ").toLowerCase().includes(q);});}
+  records=r;
+}
+
+function updateCounts(){
+  var el=document.getElementById("tmCountBadge");
+  el.textContent=allRecords.length;el.style.display=allRecords.length?"inline-block":"none";
+  var sc=function(id,n){var e=document.getElementById(id);if(e)e.textContent=n>0?n:"";};
+  sc("tmCntAll",allRecords.length);
+  sc("tmCntRecent",allRecords.filter(function(h){return visitStatus(h.HouseLastVisitDate)==="recent";}).length);
+  sc("tmCntDue",allRecords.filter(function(h){return visitStatus(h.HouseLastVisitDate)==="due";}).length);
+  sc("tmCntOverdue",allRecords.filter(function(h){return visitStatus(h.HouseLastVisitDate)==="overdue";}).length);
+  sc("tmCntNever",allRecords.filter(function(h){return visitStatus(h.HouseLastVisitDate)==="never";}).length);
+}
+
+function toast(msg,bg){var t=document.getElementById("tmToast");t.textContent=msg;t.style.background=bg||"#2e7d32";t.style.display="block";clearTimeout(window._tmTT);window._tmTT=setTimeout(function(){t.style.display="none";},2500);}
+
+/* ── Geocoding ── */
+function geocodeAddr(address,city){
+  var q=[address,city].filter(Boolean).join(", ");
+  return fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&q="+encodeURIComponent(q),{headers:{"Accept-Language":"en","User-Agent":"TerritoryMgr/1.0"}})
+  .then(function(r){return r.json();})
+  .then(function(d){return d&&d.length?{lat:parseFloat(d[0].lat),lng:parseFloat(d[0].lon)}:null;})
+  .catch(function(){return null;});
+}
+
+/* ── Map Pin Icon ── */
+function colorIcon(color){
+  return L.divIcon({className:"",html:'<div style="width:22px;height:22px;border-radius:50%;background:'+color+';border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.4);transition:opacity .3s;"></div>',iconSize:[22,22],iconAnchor:[11,11],popupAnchor:[0,-13]});
+}
+
+/* ── Build Map ── */
+function buildMap(){
+  var statusEl=document.getElementById("tmGeocodeStatus");
+  if(map){map.remove();map=null;}
+  mapMarkers=[];markerMap={};
+  map=L.map("tmMap",{zoomControl:false});
+  L.control.zoom({position:"bottomright"}).addTo(map);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OSM"}).addTo(map);
+  map.setView([36.7,-119.7],6);
+  if(!allRecords.length)return;
+
+  statusEl.style.display="block";
+  var idx=0;
+
+  function addNext(){
+    if(idx>=allRecords.length){
+      statusEl.style.display="none";
+      if(mapMarkers.length===1)map.setView(mapMarkers[0].getLatLng(),14);
+      else if(mapMarkers.length>1)map.fitBounds(L.featureGroup(mapMarkers).getBounds().pad(0.25),{maxZoom:14});
+      updatePinOpacity();
+      return;
+    }
+    var h=allRecords[idx];
+    var gps=parseGPS(h.HouseGPSCoordinates);
+    statusEl.textContent="Locating "+(idx+1)+"/"+allRecords.length+"…";
+
+    function placePin(loc){
+      if(loc){
+        var s=visitStatus(h.HouseLastVisitDate);
+        var mk=L.marker([loc.lat,loc.lng],{icon:colorIcon(pinColor(s))}).addTo(map);
+        var popup=document.createElement("div");popup.style.minWidth="180px";
+        popup.innerHTML='<strong style="font-size:14px;display:block;margin-bottom:2px">'+esc(h.HouseAddress||"No Address")+'</strong>'+
+          '<span style="color:#666;font-size:12px">'+esc([h.HouseCity,h.HouseState].filter(Boolean).join(", "))+'</span><br>'+
+          '<span style="font-size:12px;color:#888">'+visitLabel(h.HouseLastVisitDate)+'</span>'+
+          '<div style="display:flex;gap:8px;margin-top:10px">'+
+          '<button style="flex:1;padding:9px;background:#1a1a1a;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer" class="pp-det">Details</button>'+
+          '<button style="flex:1;padding:9px;background:#2e7d32;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer" class="pp-log">Log Visit</button>'+
+          '<button style="flex:1;padding:9px;background:#1565c0;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer" class="pp-dir">Directions</button>'+
+          '</div>';
+        popup.querySelector(".pp-det").addEventListener("click",function(){openDetail(h.id);});
+        popup.querySelector(".pp-log").addEventListener("click",function(){openLogVisit(h.id);});
+        popup.querySelector(".pp-dir").addEventListener("click",function(){var q=h.HouseGPSCoordinates||fullAddr(h);window.open("https://www.google.com/maps/dir/?api=1&destination="+encodeURIComponent(q),"_blank");});
+        mk.bindPopup(popup);
+        mapMarkers.push(mk);
+        markerMap[h.id]=mk;
+      }
+      idx++;
+      if(gps||idx>=allRecords.length){addNext();}
+      else{setTimeout(addNext,1100);}
+    }
+
+    if(gps){placePin(gps);}
+    else if(h.HouseAddress){geocodeAddr(h.HouseAddress,h.HouseCity).then(placePin);}
+    else{idx++;addNext();}
+  }
+  addNext();
+}
+
+function updatePinOpacity(){
+  var visIds=new Set(records.map(function(h){return h.id;}));
+  Object.entries(markerMap).forEach(function(e){
+    var el=e[1].getElement();
+    if(el)el.style.opacity=visIds.has(e[0])?"1":"0.18";
+  });
+}
+
+/* ── Filter ── */
+function setFilter(f){
+  filter=f;
+  document.querySelectorAll(".tm-filter-btn").forEach(function(b){
+    b.className="tm-filter-btn";
+    if(b.dataset.f===f)b.classList.add("tm-active-"+f);
+  });
+  applyFilters();updatePinOpacity();
+
+  if(map&&f!=="all"){
+    var fIds=new Set(records.map(function(h){return h.id;}));
+    var fm=Object.entries(markerMap).filter(function(e){return fIds.has(e[0]);}).map(function(e){return e[1];});
+    if(!fm.length){toast("No "+f+" houses","#555");}
+    else if(fm.length===1)map.flyTo(fm[0].getLatLng(),15,{animate:true,duration:1});
+    else map.flyToBounds(L.featureGroup(fm).getBounds().pad(0.3),{animate:true,duration:1,maxZoom:14});
+  } else if(map&&f==="all"&&mapMarkers.length>1){
+    map.flyToBounds(L.featureGroup(mapMarkers).getBounds().pad(0.3),{animate:true,duration:1,maxZoom:13});
+  }
+}
+document.querySelectorAll(".tm-filter-btn").forEach(function(b){b.addEventListener("click",function(){setFilter(this.dataset.f);});});
+
+/* ── Search ── */
+var searchBox=document.getElementById("tmSearchBox");
+var searchClear=document.getElementById("tmSearchClear");
+var searchTimer;
+searchBox.addEventListener("input",function(){
+  searchClear.style.display=this.value?"flex":"none";
+  clearTimeout(searchTimer);
+  searchTimer=setTimeout(function(){searchTerm=searchBox.value.trim();applyFilters();updatePinOpacity();},250);
+});
+searchClear.addEventListener("click",function(){searchBox.value="";searchClear.style.display="none";searchTerm="";applyFilters();updatePinOpacity();});
+
+/* ── Load Data ── */
+function loadRecords(){
+  fetch(API+"?_t="+Date.now(),{cache:"no-store"})
+  .then(function(r){return r.json();})
+  .then(function(data){
+    allRecords=Array.isArray(data)?data:[];
+    applyFilters();updateCounts();buildMap();buildTerrList();
+  })
+  .catch(function(e){toast("Error loading data","#c62828");console.error(e);});
+}
+
+/* ── Territory Side Panel ── */
+function buildTerrList(){
+  var terrMap={};
+  allRecords.forEach(function(h){
+    var t=h.HouseTerritoryNumber||"Unassigned";
+    if(!terrMap[t])terrMap[t]=[];
+    terrMap[t].push(h);
+  });
+  var el=document.getElementById("tmTerrList");
+  var keys=Object.keys(terrMap).sort(function(a,b){
+    var na=parseInt(a),nb=parseInt(b);
+    if(!isNaN(na)&&!isNaN(nb))return na-nb;
+    return a.localeCompare(b);
+  });
+  el.innerHTML=keys.map(function(t){
+    return'<div class="tm-terr-chip" data-terr="'+esc(t)+'">'+
+      (t==="Unassigned"?t:"Territory "+esc(t))+
+      '<span class="tm-terr-count">'+terrMap[t].length+'</span></div>';
+  }).join("")+
+  '<div class="tm-terr-chip" data-terr="__all__" style="margin-top:12px;justify-content:center;border-top:1px solid rgba(255,255,255,.08);padding-top:16px">View All Houses</div>';
+
+  el.onclick=function(e){
+    var chip=e.target.closest(".tm-terr-chip");if(!chip)return;
+    var t=chip.dataset.terr;closeSide();
+    if(t==="__all__"){openList("All Houses",allRecords);}
+    else{openList((t==="Unassigned"?t:"Territory "+t),terrMap[t]||[]);}
+  };
+}
+
+/* ── House List Drawer ── */
+function makeHouseCard(h){
+  var s=visitStatus(h.HouseLastVisitDate);
+  return'<div class="tm-house-card" data-id="'+h.id+'">'+
+    '<div class="tm-hc-top">'+
+    '<span class="tm-visit-dot '+dotClass(s)+'"></span>'+
+    '<div class="tm-hc-info">'+
+    '<div class="tm-hc-addr">'+esc(h.HouseAddress||"No Address")+'</div>'+
+    '<div class="tm-hc-meta">'+esc(h.HouseCity||"")+
+    (h.HouseTerritoryNumber?" · T-"+esc(h.HouseTerritoryNumber):"")+
+    (h.HouseLanguage?" · "+esc(h.HouseLanguage):"")+
+    " · "+visitLabel(h.HouseLastVisitDate)+'</div>'+
+    '</div></div>'+
+    '<div class="tm-hc-actions">'+
+    '<button class="tm-btn-sm" data-act="detail" data-id="'+h.id+'">Details</button>'+
+    '<button class="tm-btn-sm tm-btn-log" data-act="log" data-id="'+h.id+'">Log Visit</button>'+
+    '<button class="tm-btn-sm tm-btn-dir" data-act="dir" data-id="'+h.id+'">Directions</button>'+
+    '</div></div>';
+}
+
+function openList(title,houses){
+  document.getElementById("tmListTitle").textContent=title;
+  document.getElementById("tmListSub").textContent=houses.length+" house"+(houses.length===1?"":"s");
+  var body=document.getElementById("tmListBody");
+  if(!houses.length){body.innerHTML='<div class="tm-empty">No houses found</div>';}
+  else{
+    var sorted=houses.slice().sort(function(a,b){
+      var oa={overdue:0,due:1,never:2,recent:3},sa=visitStatus(a.HouseLastVisitDate),sb=visitStatus(b.HouseLastVisitDate);
+      return(oa[sa]||2)-(oa[sb]||2);
+    });
+    body.innerHTML=sorted.map(makeHouseCard).join("");
+  }
+  document.getElementById("tmListOverlay").classList.add("open");
+}
+function closeList(){document.getElementById("tmListOverlay").classList.remove("open");}
+document.getElementById("tmListClose").addEventListener("click",closeList);
+document.getElementById("tmListOverlay").addEventListener("click",function(e){if(e.target===this)closeList();});
+
+document.getElementById("tmListBody").addEventListener("click",function(e){
+  var btn=e.target.closest("[data-act]");
+  if(!btn)return;
+  var act=btn.dataset.act,id=btn.dataset.id;
+  if(act==="detail")openDetail(id);
+  else if(act==="log")openLogVisit(id);
+  else if(act==="dir"){var h=allRecords.find(function(r){return r.id===id;});if(h){var q=h.HouseGPSCoordinates||fullAddr(h);window.open("https://www.google.com/maps/dir/?api=1&destination="+encodeURIComponent(q),"_blank");}}
+});
+
+/* ── Detail Drawer ── */
+function openDetail(id){
+  var h=allRecords.find(function(r){return r.id===id;});if(!h)return;
+  var s=visitStatus(h.HouseLastVisitDate);
+  var mapQ=h.HouseGPSCoordinates||fullAddr(h);
+  var visits=[{l:"Visit 1",v:h.HouseResutsOnVisit1},{l:"Visit 2",v:h.HouseResutsOnVisit2},{l:"Visit 3",v:h.HouseResutsOnVisit3},{l:"Visit 4",v:h.HouseResutsOnVisit4},{l:"Visit 5",v:h.HouseResutsOnVisit5}].filter(function(x){return x.v;});
+
+  document.getElementById("tmDetTitle").textContent=h.HouseAddress||"No Address";
+  document.getElementById("tmDetSub").textContent=[h.HouseCity,h.HouseState,h.HouseZIP].filter(Boolean).join(", ");
+
+  document.getElementById("tmDetBody").innerHTML=
+    '<span class="tm-badge '+badgeClass(s)+'">● '+visitLabel(h.HouseLastVisitDate)+'</span>'+
+    (h.HouseTerritoryNumber?'<div class="tm-detail-row"><span class="tm-detail-icon">\u{1F4CD}</span>Territory '+esc(h.HouseTerritoryNumber)+'</div>':'')+
+    (h.HouseTerritoryAssingnedTo?'<div class="tm-detail-row"><span class="tm-detail-icon">\u{1F464}</span>'+esc(h.HouseTerritoryAssingnedTo)+'</div>':'')+
+    (h.HouseLanguage?'<div class="tm-detail-row"><span class="tm-detail-icon">\u{1F310}</span>'+esc(h.HouseLanguage)+'</div>':'')+
+    (h.HouseGPSCoordinates?'<div class="tm-detail-row"><span class="tm-detail-icon">\u{1F4F1}</span>'+esc(h.HouseGPSCoordinates)+'</div>':'')+
+    '<button class="tm-dir-btn" id="tmDetDir">\u{1F697} Get Directions</button>'+
+    (h.HouseNotes?'<div class="tm-section-label">House Notes</div><div class="tm-notes-wrap">'+esc(h.HouseNotes)+'</div>':'')+
+    (h.HousePersonalNotes?'<div class="tm-section-label">Personal Notes</div><div class="tm-notes-wrap">'+esc(h.HousePersonalNotes)+'</div>':'')+
+    '<div class="tm-section-label">Visit Results</div>'+
+    (visits.length?visits.map(function(x){return'<div class="tm-visit-block"><div class="tm-visit-label">'+x.l+'</div><div class="tm-visit-text">'+esc(x.v)+'</div></div>';}).join(""):'<div class="tm-empty" style="padding:16px 0">No visits recorded</div>')+
+    '<div style="display:flex;gap:8px;margin-top:18px">'+
+    '<button class="tm-save-btn" id="tmDetLog" style="flex:1;background:#2e7d32">Log Visit</button>'+
+    '<button class="tm-edit-btn" id="tmDetEdit" style="flex:1">✏️ Edit</button>'+
+    '</div>';
+
+  document.getElementById("tmDetDir").addEventListener("click",function(){window.open("https://www.google.com/maps/dir/?api=1&destination="+encodeURIComponent(mapQ),"_blank");});
+  document.getElementById("tmDetEdit").addEventListener("click",function(){closeDetail();openForm(h);});
+  document.getElementById("tmDetLog").addEventListener("click",function(){openLogVisit(id);});
+  document.getElementById("tmDetailOverlay").classList.add("open");
+}
+function closeDetail(){document.getElementById("tmDetailOverlay").classList.remove("open");}
+document.getElementById("tmDetClose").addEventListener("click",closeDetail);
+document.getElementById("tmDetailOverlay").addEventListener("click",function(e){if(e.target===this)closeDetail();});
+
+/* ── Quick Log Visit ── */
+function openLogVisit(id){
+  var h=allRecords.find(function(r){return r.id===id;});if(!h)return;
+  currentLogId=id;
+  document.getElementById("tmLogTitle").textContent="Log Visit";
+  document.getElementById("tmLogSub").textContent=h.HouseAddress||"No Address";
+  document.getElementById("fLogDate").value=todayStr();
+  document.getElementById("fLogResult").value="";
+
+  var nextSlot="";
+  if(!h.HouseResutsOnVisit1)nextSlot="Visit 1";
+  else if(!h.HouseResutsOnVisit2)nextSlot="Visit 2";
+  else if(!h.HouseResutsOnVisit3)nextSlot="Visit 3";
+  else if(!h.HouseResutsOnVisit4)nextSlot="Visit 4";
+  else if(!h.HouseResutsOnVisit5)nextSlot="Visit 5";
+  else nextSlot="Visit 5 (will overwrite)";
+
+  document.getElementById("fLogResult").placeholder="What happened? (saves to "+nextSlot+")";
+  document.getElementById("tmLogOverlay").classList.add("open");
+  setTimeout(function(){document.getElementById("fLogResult").focus();},350);
+}
+function closeLog(){document.getElementById("tmLogOverlay").classList.remove("open");currentLogId="";}
+document.getElementById("tmLogClose").addEventListener("click",closeLog);
+document.getElementById("tmLogOverlay").addEventListener("click",function(e){if(e.target===this)closeLog();});
+
+document.getElementById("tmLogSave").addEventListener("click",function(){
+  if(!currentLogId)return;
+  var h=allRecords.find(function(r){return r.id===currentLogId;});if(!h)return;
+  var result=document.getElementById("fLogResult").value.trim();
+  var date=document.getElementById("fLogDate").value;
+  if(!result){toast("Please enter a result","#ef6c00");return;}
+
+  var body={id:currentLogId,HouseLastVisitDate:date||todayStr()};
+  if(!h.HouseResutsOnVisit1)body.HouseResutsOnVisit1=result;
+  else if(!h.HouseResutsOnVisit2)body.HouseResutsOnVisit2=result;
+  else if(!h.HouseResutsOnVisit3)body.HouseResutsOnVisit3=result;
+  else if(!h.HouseResutsOnVisit4)body.HouseResutsOnVisit4=result;
+  else body.HouseResutsOnVisit5=result;
+
+  var btn=document.getElementById("tmLogSave");
+  btn.textContent="Saving…";btn.disabled=true;
+
+  fetch(API,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})
+  .then(function(r){if(!r.ok)throw new Error("Server error");return r.json();})
+  .then(function(){
+    btn.textContent="Save Visit";btn.disabled=false;
+    closeLog();closeDetail();
+    toast("Visit logged ✓");
+    loadRecords();
+  })
+  .catch(function(e){btn.textContent="Save Visit";btn.disabled=false;toast("Error: "+e.message,"#c62828");});
+});
+
+/* ── Form Drawer ── */
+function openForm(h){
+  if(h){
+    document.getElementById("tmFormTitle").textContent="Edit House";
+    document.getElementById("tmDeleteBtn").style.display="block";
+    document.getElementById("tmItemID").value=h.id||"";
+    document.getElementById("fAddr").value=h.HouseAddress||"";
+    document.getElementById("fCity").value=h.HouseCity||"";
+    document.getElementById("fState").value=h.HouseState||"CA";
+    document.getElementById("fZip").value=h.HouseZIP||"";
+    document.getElementById("fTerrNum").value=h.HouseTerritoryNumber||"";
+    document.getElementById("fAssigned").value=h.HouseTerritoryAssingnedTo||"";
+    document.getElementById("fLang").value=h.HouseLanguage||"";
+    document.getElementById("fLastVisit").value=cleanDate(h.HouseLastVisitDate);
+    document.getElementById("fGPS").value=h.HouseGPSCoordinates||"";
+    document.getElementById("fNotes").value=h.HouseNotes||"";
+    document.getElementById("fPersonal").value=h.HousePersonalNotes||"";
+    document.getElementById("fV1").value=h.HouseResutsOnVisit1||"";
+    document.getElementById("fV2").value=h.HouseResutsOnVisit2||"";
+    document.getElementById("fV3").value=h.HouseResutsOnVisit3||"";
+    document.getElementById("fV4").value=h.HouseResutsOnVisit4||"";
+    document.getElementById("fV5").value=h.HouseResutsOnVisit5||"";
+  } else {
+    document.getElementById("tmFormTitle").textContent="Add House";
+    document.getElementById("tmDeleteBtn").style.display="none";
+    document.getElementById("tmItemID").value="";
+    ["fAddr","fCity","fZip","fTerrNum","fAssigned","fLang","fLastVisit","fGPS","fNotes","fPersonal","fV1","fV2","fV3","fV4","fV5"].forEach(function(id){document.getElementById(id).value="";});
+    document.getElementById("fState").value="CA";
+  }
+  document.getElementById("tmFormOverlay").classList.add("open");
+}
+function closeForm(){document.getElementById("tmFormOverlay").classList.remove("open");}
+document.getElementById("tmFormClose").addEventListener("click",closeForm);
+document.getElementById("tmFormOverlay").addEventListener("click",function(e){if(e.target===this)closeForm();});
+document.getElementById("tmAddBtn").addEventListener("click",function(){openForm(null);});
+
+/* GPS auto-detect */
+document.getElementById("tmGPSBtn").addEventListener("click",function(){
+  var btn=this;
+  if(!navigator.geolocation){toast("GPS not supported","#c62828");return;}
+  btn.classList.add("locating");
+  navigator.geolocation.getCurrentPosition(
+    function(pos){btn.classList.remove("locating");document.getElementById("fGPS").value=pos.coords.latitude.toFixed(6)+", "+pos.coords.longitude.toFixed(6);toast("Location captured ✓");},
+    function(err){btn.classList.remove("locating");toast("Could not get location","#c62828");console.error(err);},
+    {enableHighAccuracy:true,timeout:15000}
+  );
+});
+
+/* Save */
+document.getElementById("tmSaveBtn").addEventListener("click",function(){
+  var id=document.getElementById("tmItemID").value;
+  var body={
+    HouseAddress:document.getElementById("fAddr").value,
+    HouseCity:document.getElementById("fCity").value,
+    HouseState:document.getElementById("fState").value,
+    HouseZIP:document.getElementById("fZip").value,
+    HouseTerritoryNumber:document.getElementById("fTerrNum").value,
+    HouseTerritoryAssingnedTo:document.getElementById("fAssigned").value,
+    HouseLanguage:document.getElementById("fLang").value,
+    HouseLastVisitDate:document.getElementById("fLastVisit").value||null,
+    HouseGPSCoordinates:document.getElementById("fGPS").value,
+    HouseNotes:document.getElementById("fNotes").value,
+    HousePersonalNotes:document.getElementById("fPersonal").value,
+    HouseResutsOnVisit1:document.getElementById("fV1").value,
+    HouseResutsOnVisit2:document.getElementById("fV2").value,
+    HouseResutsOnVisit3:document.getElementById("fV3").value,
+    HouseResutsOnVisit4:document.getElementById("fV4").value,
+    HouseResutsOnVisit5:document.getElementById("fV5").value
+  };
+  if(id)body.id=id;
+  var method=id?"PATCH":"POST";
+  var btn=this;btn.textContent="Saving…";btn.disabled=true;
+
+  fetch(API,{method:method,headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})
+  .then(function(r){if(!r.ok)throw new Error("Server error");return r.json();})
+  .then(function(){btn.textContent="Save House";btn.disabled=false;closeForm();closeList();toast("House saved ✓");loadRecords();})
+  .catch(function(e){btn.textContent="Save House";btn.disabled=false;toast("Error: "+e.message,"#c62828");});
+});
+
+/* Delete */
+document.getElementById("tmDeleteBtn").addEventListener("click",function(){
+  var id=document.getElementById("tmItemID").value;if(!id)return;
+  document.getElementById("tmConfirmTitle").textContent="Delete this house?";
+  document.getElementById("tmConfirmMsg").textContent="This action cannot be undone.";
+  document.getElementById("tmConfirmIcon").textContent="⚠️";
+  document.getElementById("tmConfirmYes").textContent="Delete";
+  document.getElementById("tmConfirmYes").style.background="#c62828";
+  document.getElementById("tmConfirm").classList.add("open");
+  document.getElementById("tmConfirmYes").onclick=function(){
+    document.getElementById("tmConfirm").classList.remove("open");
+    fetch(API,{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:id})})
+    .then(function(r){if(!r.ok)throw new Error("Server error");closeForm();closeDetail();closeList();toast("House deleted");loadRecords();})
+    .catch(function(e){toast("Error: "+e.message,"#c62828");});
+  };
+  document.getElementById("tmConfirmNo").onclick=function(){document.getElementById("tmConfirm").classList.remove("open");};
+});
+document.getElementById("tmConfirm").addEventListener("click",function(e){if(e.target===this)this.classList.remove("open");});
+
+/* ── Side Panel ── */
+function toggleSide(){document.getElementById("tmSidePanel").classList.toggle("open");document.getElementById("tmSideOverlay").classList.toggle("open");}
+function closeSide(){document.getElementById("tmSidePanel").classList.remove("open");document.getElementById("tmSideOverlay").classList.remove("open");}
+document.getElementById("tmPullTab").addEventListener("click",toggleSide);
+document.getElementById("tmSideOverlay").addEventListener("click",closeSide);
+
+/* ── Bottom Nav ── */
+document.querySelectorAll("[data-nav]").forEach(function(b){b.addEventListener("click",function(){
+  var tab=this.dataset.nav;
+  document.querySelectorAll(".tm-nav-btn").forEach(function(x){x.classList.remove("active");});
+  this.classList.add("active");
+  if(tab==="map"){closeList();closeSide();if(map&&mapMarkers.length>1)map.flyToBounds(L.featureGroup(mapMarkers).getBounds().pad(0.3),{animate:true,duration:1,maxZoom:13});}
+  else if(tab==="list"){closeSide();applyFilters();openList("All Houses",records);}
+  else if(tab==="territories"){closeList();toggleSide();}
+});});
+
+/* ── Swipe to dismiss ── */
+(function(){
+  function addSwipe(oid,fn){
+    var el=document.getElementById(oid);if(!el)return;
+    var sy=0;
+    el.addEventListener("touchstart",function(e){sy=e.touches[0].clientY;},{passive:true});
+    el.addEventListener("touchend",function(e){if(e.changedTouches[0].clientY-sy>80)fn();},{passive:true});
+  }
+  addSwipe("tmListOverlay",closeList);
+  addSwipe("tmFormOverlay",closeForm);
+  addSwipe("tmDetailOverlay",closeDetail);
+  addSwipe("tmLogOverlay",closeLog);
+  addSwipe("tmConfirm",function(){document.getElementById("tmConfirm").classList.remove("open");});
+})();
+
+/* ── Keyboard ── */
+document.addEventListener("keydown",function(e){
+  if(e.key!=="Escape")return;
+  if(document.getElementById("tmConfirm").classList.contains("open")){document.getElementById("tmConfirm").classList.remove("open");return;}
+  if(document.getElementById("tmLogOverlay").classList.contains("open")){closeLog();return;}
+  if(document.getElementById("tmFormOverlay").classList.contains("open")){closeForm();return;}
+  if(document.getElementById("tmDetailOverlay").classList.contains("open")){closeDetail();return;}
+  if(document.getElementById("tmListOverlay").classList.contains("open")){closeList();return;}
+});
+
+/* ── Init ── */
+loadRecords();
+})();
+</script>
+</body>
+</html>
