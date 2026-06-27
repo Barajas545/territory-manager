@@ -155,10 +155,10 @@ button#tmPullTab{display:none;position:absolute;left:0;top:50%;transform:transla
 \
 #tmLongPressTimer{position:absolute;z-index:1200;pointer-events:none;display:none;transform:translate(-50%,-50%);}\
 #tmLongPressTimer.active{display:block;}\
-.tm-timer-ring{width:72px;height:72px;}\
-.tm-timer-bg{fill:none;stroke:rgba(255,255,255,0.2);stroke-width:4;}\
-.tm-timer-fg{fill:none;stroke:#fff;stroke-width:4;stroke-linecap:round;stroke-dasharray:188.5;stroke-dashoffset:188.5;transition:stroke-dashoffset .15s linear;}\
-.tm-timer-text{font-size:22px;font-weight:700;fill:#fff;text-anchor:middle;dominant-baseline:central;}\
+.tm-timer-ring{width:144px;height:144px;}\
+.tm-timer-bg{fill:none;stroke:rgba(255,255,255,0.2);stroke-width:5;}\
+.tm-timer-fg{fill:none;stroke:#fff;stroke-width:5;stroke-linecap:round;stroke-dasharray:377;stroke-dashoffset:377;transition:stroke-dashoffset .15s linear;}\
+.tm-timer-text{font-size:40px;font-weight:700;fill:#fff;text-anchor:middle;dominant-baseline:central;}\
 .tm-timer-label{position:absolute;bottom:-28px;left:50%;transform:translateX(-50%);white-space:nowrap;font-size:12px;font-weight:600;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,0.8);}\
 \
 .tm-verify-overlay .tm-drawer{max-height:80%;}\
@@ -276,7 +276,7 @@ button#tmPullTab{display:none;position:absolute;left:0;top:50%;transform:transla
 </div></div></div>\
 \
 <!-- Long Press Timer -->\
-<div id="tmLongPressTimer"><svg class="tm-timer-ring" viewBox="0 0 72 72"><circle class="tm-timer-bg" cx="36" cy="36" r="30"/><circle class="tm-timer-fg" id="tmTimerFG" cx="36" cy="36" r="30" transform="rotate(-90 36 36)"/><text class="tm-timer-text" id="tmTimerText" x="36" y="36">5</text></svg><div class="tm-timer-label">Hold to add house</div></div>\
+<div id="tmLongPressTimer"><svg class="tm-timer-ring" viewBox="0 0 144 144"><circle class="tm-timer-bg" cx="72" cy="72" r="60"/><circle class="tm-timer-fg" id="tmTimerFG" cx="72" cy="72" r="60" transform="rotate(-90 72 72)"/><text class="tm-timer-text" id="tmTimerText" x="72" y="72">5</text></svg><div class="tm-timer-label">Hold to add house</div></div>\
 \
 <!-- Verify Address Drawer -->\
 <div class="tm-overlay tm-verify-overlay" id="tmVerifyOverlay" style="z-index:960"><div class="tm-drawer"><div class="tm-drawer-handle"></div>\
@@ -452,16 +452,19 @@ function setFilter(f){
     b.className="tm-filter-btn";
     if(b.dataset.f===f)b.classList.add("tm-active-"+f);
   });
-  applyFilters();updatePinOpacity();
+  applyFilters();
 
-  if(map&&f!=="all"){
+  if(map&&f==="all"){
+    Object.values(markerMap).forEach(function(mk){var el=mk.getElement();if(el)el.style.opacity="1";});
+    if(mapMarkers.length===1)map.flyTo(mapMarkers[0].getLatLng(),14,{animate:true,duration:1});
+    else if(mapMarkers.length>1)map.flyToBounds(L.featureGroup(mapMarkers).getBounds().pad(0.3),{animate:true,duration:1,maxZoom:13});
+  } else if(map){
+    updatePinOpacity();
     var fIds=new Set(records.map(function(h){return h.id;}));
     var fm=Object.entries(markerMap).filter(function(e){return fIds.has(e[0]);}).map(function(e){return e[1];});
     if(!fm.length){toast("No "+f+" houses","#555");}
     else if(fm.length===1)map.flyTo(fm[0].getLatLng(),15,{animate:true,duration:1});
     else map.flyToBounds(L.featureGroup(fm).getBounds().pad(0.3),{animate:true,duration:1,maxZoom:14});
-  } else if(map&&f==="all"&&mapMarkers.length>1){
-    map.flyToBounds(L.featureGroup(mapMarkers).getBounds().pad(0.3),{animate:true,duration:1,maxZoom:13});
   }
 }
 document.querySelectorAll(".tm-filter-btn").forEach(function(b){b.addEventListener("click",function(){setFilter(this.dataset.f);});});
@@ -798,7 +801,7 @@ var LP_DURATION=5;
 var timerEl=document.getElementById("tmLongPressTimer");
 var timerFG=document.getElementById("tmTimerFG");
 var timerText=document.getElementById("tmTimerText");
-var CIRCUMFERENCE=2*Math.PI*30; // 188.5
+var CIRCUMFERENCE=2*Math.PI*60; // 377
 
 function lpStart(e){
   if(lpActive)return;
