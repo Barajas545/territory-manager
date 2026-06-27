@@ -153,6 +153,21 @@ button#tmPullTab{display:none;position:absolute;left:0;top:50%;transform:transla
 .tm-toast{position:absolute;top:calc(var(--bar-h) + 52px);left:50%;transform:translateX(-50%);z-index:900;border-radius:24px;padding:10px 22px;font-size:14px;font-weight:600;color:#fff;display:none;pointer-events:none;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,0.3);background:#2e7d32;}\
 .tm-empty{color:#aaa;font-size:15px;padding:32px;text-align:center;}\
 \
+#tmLongPressTimer{position:absolute;z-index:1200;pointer-events:none;display:none;transform:translate(-50%,-50%);}\
+#tmLongPressTimer.active{display:block;}\
+.tm-timer-ring{width:72px;height:72px;}\
+.tm-timer-bg{fill:none;stroke:rgba(255,255,255,0.2);stroke-width:4;}\
+.tm-timer-fg{fill:none;stroke:#fff;stroke-width:4;stroke-linecap:round;stroke-dasharray:188.5;stroke-dashoffset:188.5;transition:stroke-dashoffset .15s linear;}\
+.tm-timer-text{font-size:22px;font-weight:700;fill:#fff;text-anchor:middle;dominant-baseline:central;}\
+.tm-timer-label{position:absolute;bottom:-28px;left:50%;transform:translateX(-50%);white-space:nowrap;font-size:12px;font-weight:600;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,0.8);}\
+\
+.tm-verify-overlay .tm-drawer{max-height:80%;}\
+.tm-verify-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 20px calc(28px + var(--safe-b));}\
+.tm-verify-map{width:100%;height:160px;border-radius:12px;margin-bottom:16px;overflow:hidden;border:2px solid #e8e8e8;}\
+.tm-verify-addr{font-size:18px;font-weight:700;color:#1a1a1a;line-height:1.3;margin-bottom:4px;}\
+.tm-verify-coords{font-size:13px;color:#999;margin-bottom:16px;font-family:monospace;}\
+.tm-verify-note{font-size:12px;color:#aaa;text-align:center;margin-bottom:14px;line-height:1.5;}\
+\
 @media(min-width:601px){\
 .tm-overlay{align-items:center;padding:20px;}\
 .tm-drawer{border-radius:16px;max-height:82%;animation:tmFadeIn .25s ease;}\
@@ -258,6 +273,31 @@ button#tmPullTab{display:none;position:absolute;left:0;top:50%;transform:transla
 <div class="tm-field"><label>Visit Date</label><input id="fLogDate" type="date"></div>\
 <div class="tm-field"><label>Result</label><textarea id="fLogResult" placeholder="NH, Not home, Spoke with John about..., Left tract, Started Bible study..." style="min-height:100px"></textarea></div>\
 <button class="tm-save-btn" id="tmLogSave">Save Visit</button>\
+</div></div></div>\
+\
+<!-- Long Press Timer -->\
+<div id="tmLongPressTimer"><svg class="tm-timer-ring" viewBox="0 0 72 72"><circle class="tm-timer-bg" cx="36" cy="36" r="30"/><circle class="tm-timer-fg" id="tmTimerFG" cx="36" cy="36" r="30" transform="rotate(-90 36 36)"/><text class="tm-timer-text" id="tmTimerText" x="36" y="36">5</text></svg><div class="tm-timer-label">Hold to add house</div></div>\
+\
+<!-- Verify Address Drawer -->\
+<div class="tm-overlay tm-verify-overlay" id="tmVerifyOverlay" style="z-index:960"><div class="tm-drawer"><div class="tm-drawer-handle"></div>\
+<div class="tm-drawer-header"><div class="tm-drawer-header-row"><div style="flex:1;min-width:0"><div class="tm-drawer-title">New House</div><div class="tm-drawer-sub">Verify the address and fill in details</div></div><button class="tm-close-btn" id="tmVerifyClose">✕</button></div></div>\
+<div class="tm-verify-body" id="tmVerifyBody">\
+<div class="tm-verify-map" id="tmVerifyMap"></div>\
+<div class="tm-verify-note">Address detected from map pin. Please verify and correct if needed.</div>\
+<div class="tm-grid">\
+<div class="tm-field"><label>Address</label><input id="vAddr"></div>\
+<div class="tm-field"><label>City</label><input id="vCity"></div>\
+<div class="tm-field"><label>State</label><input id="vState" value="CA"></div>\
+<div class="tm-field"><label>ZIP</label><input id="vZip" inputmode="numeric"></div>\
+<div class="tm-field"><label>Territory #</label><input id="vTerrNum"></div>\
+<div class="tm-field"><label>Assigned To</label><input id="vAssigned"></div>\
+<div class="tm-field"><label>Language</label><input id="vLang"></div>\
+<div class="tm-field"><label>Last Visit</label><input id="vLastVisit" type="date"></div>\
+</div>\
+<div class="tm-field"><label>GPS Coordinates</label><input id="vGPS" readonly style="background:#f0f0ee;color:#666"></div>\
+<div class="tm-field"><label>House Notes</label><textarea id="vNotes" placeholder="Dog in yard, gate code, etc."></textarea></div>\
+<div class="tm-field"><label>Personal Notes</label><textarea id="vPersonal" placeholder="Interested in Bible study, speaks Spanish..."></textarea></div>\
+<button class="tm-save-btn" id="tmVerifyCreate" style="background:#2e7d32">Create House</button>\
 </div></div></div>\
 \
 <!-- Confirm Modal -->\
@@ -745,11 +785,143 @@ document.querySelectorAll("[data-nav]").forEach(function(b){b.addEventListener("
 document.addEventListener("keydown",function(e){
   if(e.key!=="Escape")return;
   if(document.getElementById("tmConfirm").classList.contains("open")){document.getElementById("tmConfirm").classList.remove("open");return;}
+  if(document.getElementById("tmVerifyOverlay").classList.contains("open")){closeVerify();return;}
   if(document.getElementById("tmLogOverlay").classList.contains("open")){closeLog();return;}
   if(document.getElementById("tmFormOverlay").classList.contains("open")){closeForm();return;}
   if(document.getElementById("tmDetailOverlay").classList.contains("open")){closeDetail();return;}
   if(document.getElementById("tmListOverlay").classList.contains("open")){closeList();return;}
 });
+
+/* ── Long Press to Add ── */
+var lpTimer=null,lpInterval=null,lpCount=0,lpLatLng=null,lpActive=false;
+var LP_DURATION=5;
+var timerEl=document.getElementById("tmLongPressTimer");
+var timerFG=document.getElementById("tmTimerFG");
+var timerText=document.getElementById("tmTimerText");
+var CIRCUMFERENCE=2*Math.PI*30; // 188.5
+
+function lpStart(e){
+  if(lpActive)return;
+  var point=e.touches?e.touches[0]:e;
+  var containerRect=document.getElementById("tmMap").getBoundingClientRect();
+  var px=point.clientX-containerRect.left;
+  var py=point.clientY-containerRect.top;
+  lpLatLng=map.containerPointToLatLng(L.point(px,py));
+  lpCount=0;lpActive=true;
+  timerEl.style.left=point.clientX+"px";
+  timerEl.style.top=point.clientY+"px";
+  timerFG.style.strokeDashoffset=CIRCUMFERENCE;
+  timerText.textContent=LP_DURATION;
+  timerEl.classList.add("active");
+
+  lpInterval=setInterval(function(){
+    lpCount++;
+    var remaining=LP_DURATION-lpCount;
+    timerText.textContent=remaining;
+    timerFG.style.strokeDashoffset=CIRCUMFERENCE-(CIRCUMFERENCE*(lpCount/LP_DURATION));
+    if(lpCount>=LP_DURATION){
+      lpCancel();
+      reverseGeocodeAndVerify(lpLatLng);
+    }
+  },1000);
+}
+
+function lpCancel(){
+  lpActive=false;
+  clearInterval(lpInterval);lpInterval=null;
+  timerEl.classList.remove("active");
+}
+
+function attachLongPress(){
+  var mapEl=document.getElementById("tmMap");
+  mapEl.addEventListener("mousedown",function(e){if(e.button===0)lpStart(e);});
+  mapEl.addEventListener("mouseup",lpCancel);
+  mapEl.addEventListener("mouseleave",lpCancel);
+  mapEl.addEventListener("mousemove",function(e){if(lpActive){var dx=e.clientX-parseInt(timerEl.style.left);var dy=e.clientY-parseInt(timerEl.style.top);if(Math.abs(dx)>15||Math.abs(dy)>15)lpCancel();}});
+  mapEl.addEventListener("touchstart",function(e){if(e.touches.length===1)lpStart(e);},{passive:true});
+  mapEl.addEventListener("touchend",lpCancel,{passive:true});
+  mapEl.addEventListener("touchcancel",lpCancel,{passive:true});
+  mapEl.addEventListener("touchmove",function(e){if(lpActive&&e.touches.length){var t=e.touches[0];var dx=t.clientX-parseInt(timerEl.style.left);var dy=t.clientY-parseInt(timerEl.style.top);if(Math.abs(dx)>15||Math.abs(dy)>15)lpCancel();}},{passive:true});
+}
+
+function reverseGeocodeAndVerify(latlng){
+  toast("Looking up address…","#555");
+  fetch("https://nominatim.openstreetmap.org/reverse?format=json&lat="+latlng.lat+"&lon="+latlng.lng+"&addressdetails=1&zoom=18",{headers:{"Accept-Language":"en","User-Agent":"TerritoryMgr/1.0"}})
+  .then(function(r){return r.json();})
+  .then(function(data){
+    var addr=data.address||{};
+    var houseNum=addr.house_number||"";
+    var road=addr.road||"";
+    var street=(houseNum&&road)?houseNum+" "+road:road||data.display_name||"";
+    var city=addr.city||addr.town||addr.village||addr.hamlet||"";
+    var state=addr.state||"CA";
+    var zip=addr.postcode||"";
+    if(state.length>2){var stateMap={"California":"CA","Texas":"TX","Arizona":"AZ","Nevada":"NV","Oregon":"OR","Washington":"WA","New York":"NY","Florida":"FL"};state=stateMap[state]||state;}
+    openVerifyDrawer(latlng,street,city,state,zip);
+  })
+  .catch(function(){
+    openVerifyDrawer(latlng,"","","CA","");
+  });
+}
+
+var verifyMiniMap=null;
+function openVerifyDrawer(latlng,street,city,state,zip){
+  document.getElementById("vAddr").value=street;
+  document.getElementById("vCity").value=city;
+  document.getElementById("vState").value=state;
+  document.getElementById("vZip").value=zip;
+  document.getElementById("vGPS").value=latlng.lat.toFixed(6)+", "+latlng.lng.toFixed(6);
+  document.getElementById("vTerrNum").value="";
+  document.getElementById("vAssigned").value="";
+  document.getElementById("vLang").value="";
+  document.getElementById("vLastVisit").value="";
+  document.getElementById("vNotes").value="";
+  document.getElementById("vPersonal").value="";
+  document.getElementById("tmVerifyOverlay").classList.add("open");
+
+  setTimeout(function(){
+    if(verifyMiniMap){verifyMiniMap.remove();verifyMiniMap=null;}
+    verifyMiniMap=L.map("tmVerifyMap",{zoomControl:false,dragging:false,scrollWheelZoom:false,doubleClickZoom:false,touchZoom:false,attributionControl:false});
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(verifyMiniMap);
+    verifyMiniMap.setView([latlng.lat,latlng.lng],17);
+    L.marker([latlng.lat,latlng.lng],{icon:colorIcon("#c62828")}).addTo(verifyMiniMap);
+    verifyMiniMap.invalidateSize();
+  },350);
+}
+
+function closeVerify(){
+  document.getElementById("tmVerifyOverlay").classList.remove("open");
+  if(verifyMiniMap){setTimeout(function(){verifyMiniMap.remove();verifyMiniMap=null;},300);}
+}
+document.getElementById("tmVerifyClose").addEventListener("click",closeVerify);
+document.getElementById("tmVerifyOverlay").addEventListener("click",function(e){if(e.target===this)closeVerify();});
+
+document.getElementById("tmVerifyCreate").addEventListener("click",function(){
+  var body={
+    HouseAddress:document.getElementById("vAddr").value,
+    HouseCity:document.getElementById("vCity").value,
+    HouseState:document.getElementById("vState").value,
+    HouseZIP:document.getElementById("vZip").value,
+    HouseGPSCoordinates:document.getElementById("vGPS").value,
+    HouseTerritoryNumber:document.getElementById("vTerrNum").value,
+    HouseTerritoryAssingnedTo:document.getElementById("vAssigned").value,
+    HouseLanguage:document.getElementById("vLang").value,
+    HouseLastVisitDate:document.getElementById("vLastVisit").value||null,
+    HouseNotes:document.getElementById("vNotes").value,
+    HousePersonalNotes:document.getElementById("vPersonal").value,
+    HouseResutsOnVisit1:"",HouseResutsOnVisit2:"",HouseResutsOnVisit3:"",HouseResutsOnVisit4:"",HouseResutsOnVisit5:""
+  };
+  var btn=this;btn.textContent="Creating…";btn.disabled=true;
+  fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})
+  .then(function(r){if(!r.ok)throw new Error("Server error");return r.json();})
+  .then(function(){btn.textContent="Create House";btn.disabled=false;closeVerify();toast("House created ✓");loadRecords();})
+  .catch(function(e){btn.textContent="Create House";btn.disabled=false;toast("Error: "+e.message,"#c62828");});
+});
+
+/* Add swipe dismiss for verify drawer */
+(function(){var el=document.getElementById("tmVerifyOverlay");var sy=0;el.addEventListener("touchstart",function(e){sy=e.touches[0].clientY;},{passive:true});el.addEventListener("touchend",function(e){if(e.changedTouches[0].clientY-sy>80)closeVerify();},{passive:true});})();
+
+attachLongPress();
 
 /* ── Init ── */
 loadRecords();
