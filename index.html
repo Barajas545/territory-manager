@@ -440,8 +440,7 @@ function buildMap(){
 function updatePinOpacity(){
   var visIds=new Set(records.map(function(h){return h.id;}));
   Object.entries(markerMap).forEach(function(e){
-    var el=e[1].getElement();
-    if(el)el.style.opacity=visIds.has(e[0])?"1":"0.18";
+    e[1].setOpacity(visIds.has(e[0])?1:0.18);
   });
 }
 
@@ -460,7 +459,7 @@ function setFilter(f){
     document.getElementById("tmSearchClear").style.display="none";
     applyFilters();
     closeList();closeSide();closeDetail();
-    Object.values(markerMap).forEach(function(mk){var el=mk.getElement();if(el)el.style.opacity="1";});
+    Object.values(markerMap).forEach(function(mk){mk.setOpacity(1);});
     if(mapMarkers.length===1)map.flyTo(mapMarkers[0].getLatLng(),14,{animate:true,duration:1});
     else if(mapMarkers.length>1)map.flyToBounds(L.featureGroup(mapMarkers).getBounds().pad(0.3),{animate:true,duration:1,maxZoom:13});
     document.querySelectorAll(".tm-nav-btn").forEach(function(x){x.classList.remove("active");});
