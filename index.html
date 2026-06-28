@@ -8,6 +8,7 @@
 <title>Territory Manager</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 </head>
 <body style="margin:0;padding:0;overflow:hidden;background:#1a1a1a;">
 <div id="tmRoot" style="position:relative;width:100%;height:100vh;height:100dvh;overflow:hidden;background:#1a1a1a;"></div>
@@ -197,6 +198,7 @@ button#tmPullTab{display:none;position:absolute;left:0;top:50%;transform:transla
 <span class="tm-count-badge" id="tmCountBadge" style="display:none"></span>\
 </div>\
 <div class="tm-top-right">\
+<button class="tm-icon-btn" id="tmExportBtn" title="Export PDF">&#x1F4C4;</button>\
 <button class="tm-add-btn" id="tmAddBtn">+ Add</button>\
 </div>\
 </div>\
@@ -846,6 +848,221 @@ document.addEventListener("keydown",function(e){
   if(document.getElementById("tmDetailOverlay").classList.contains("open")){closeDetail();return;}
   if(document.getElementById("tmListOverlay").classList.contains("open")){closeList();return;}
 });
+
+/* ── PDF Export ── */
+document.getElementById("tmExportBtn").addEventListener("click",function(){
+  if(!allRecords.length){toast("No houses to export","#555");return;}
+
+  var terrMap={};
+  allRecords.forEach(function(h){
+    var t=h.HouseTerritoryNumber||"Unassigned";
+    if(!terrMap[t])terrMap[t]=[];
+    terrMap[t].push(h);
+  });
+
+  var terrKeys=Object.keys(terrMap).sort(function(a,b){
+    var na=parseInt(a),nb=parseInt(b);
+    if(!isNaN(na)&&!isNaN(nb))return na-nb;
+    return a.localeCompare(b);
+  });
+
+  if(terrKeys.length>1){
+    var html='<div class="tm-drawer-handle"></div><div class="tm-drawer-header"><div class="tm-drawer-header-row"><div style="flex:1"><div class="tm-drawer-title">Export PDF</div><div class="tm-drawer-sub">Select a territory to export</div></div><button class="tm-close-btn" id="tmExpClose">✕</button></div></div><div class="tm-drawer-body">';
+    html+='<button class="tm-save-btn" data-exp="__all__" style="margin-bottom:10px;background:#2e7d32">Export All Territories</button>';
+    terrKeys.forEach(function(t){
+      html+='<button class="tm-edit-btn" data-exp="'+esc(t)+'" style="margin-bottom:8px">'+(t==="Unassigned"?t:"Territory "+esc(t))+' ('+terrMap[t].length+' houses)</button>';
+    });
+    html+='</div>';
+    document.getElementById("tmListDrawer").innerHTML=html;
+    document.getElementById("tmExpClose").addEventListener("click",closeList);
+    document.getElementById("tmListDrawer").addEventListener("click",function(e){
+      var btn=e.target.closest("[data-exp]");if(!btn)return;
+      var key=btn.dataset.exp;
+      closeList();
+      if(key==="__all__"){terrKeys.forEach(function(t){generateTerritoryPDF(t,terrMap[t]);});}
+      else{generateTerritoryPDF(key,terrMap[key]);}
+    });
+    document.getElementById("tmListOverlay").classList.add("open");
+  } else {
+    generateTerritoryPDF(terrKeys[0],terrMap[terrKeys[0]]);
+  }
+});
+
+function extractStreet(addr){
+  if(!addr)return"Unknown Street";
+  var parts=addr.trim().split(/\s+/);
+  if(parts.length<=1)return addr;
+  var first=parts[0];
+  if(/^\d+[A-Za-z]?$/.test(first))return parts.slice(1).join(" ");
+  return addr;
+}
+
+function extractNumber(addr){
+  if(!addr)return"";
+  var m=addr.trim().match(/^(\d+[A-Za-z]?)\s/);
+  return m?m[1]:addr;
+}
+
+function generateTerritoryPDF(terrNum,houses){
+  var jsPDF=window.jspdf.jsPDF;
+  var pw=215.9,ph=279.4;
+  var ml=14,mr=14,mt=14;
+  var cw=pw-ml-mr;
+
+  var streetMap={};
+  houses.forEach(function(h){
+    var st=extractStreet(h.HouseAddress);
+    if(!streetMap[st])streetMap[st]=[];
+    streetMap[st].push(h);
+  });
+  var streets=Object.keys(streetMap).sort();
+
+  var totalHouses=houses.length;
+  var ROWS_PER_HOUSE=4;
+  var rowH=5.2;
+  var colWidths=[cw*0.22,cw*0.15,cw*0.13,cw*0.50];
+  var headerH=8;
+  var streetHeaderH=7;
+
+  var doc=new jsPDF({unit:"mm",format:"letter"});
+  var pageNum=1,totalPages=1;
+
+  function drawHeader(pg){
+    var y=mt;
+    doc.setFontSize(11);doc.setFont("helvetica","underline");
+    doc.text(totalHouses+" Casas",ml,y);
+    y+=6;
+    doc.setFont("helvetica","bold");doc.setFontSize(13);
+    doc.text("REGISTRO DE CASA EN CASA",ml+10,y);
+    y+=7;
+    doc.setFontSize(12);
+    doc.setFont("helvetica","bold");
+    doc.text(streets[0]?extractStreet(houses[0].HouseAddress)||"":"",ml,y);
+    doc.text("Terr. No:  "+terrNum,pw-mr-50,y);
+    doc.setFont("helvetica","underline");
+    doc.text(terrNum,pw-mr-22,y);
+    doc.setFont("helvetica","normal");
+    y+=5;
+    doc.setFontSize(9);
+    doc.text("Page "+pg,pw/2-8,y);
+    y+=5;
+    doc.setFont("helvetica","bold");doc.setFontSize(8);
+    doc.text("Simbolos",ml,y);
+    doc.setFont("helvetica","normal");
+    y+=4;
+    doc.text("V -- vuelva",ml,y);
+    doc.text("O -- ocupado",ml+35,y);
+    doc.text("H -- hombre",ml+75,y);
+    y+=4;
+    doc.text("NC -- no en casa",ml,y);
+    doc.text("N -- niño",ml+35,y);
+    doc.text("M -- mujer",ml+75,y);
+    y+=5;
+    return y;
+  }
+
+  function drawTableHeader(y){
+    doc.setFillColor(230,230,230);
+    doc.rect(ml,y,cw,headerH,"F");
+    doc.setDrawColor(0);doc.setLineWidth(0.3);
+    doc.rect(ml,y,cw,headerH,"S");
+    var x=ml;
+    doc.setFont("helvetica","bold");doc.setFontSize(8);
+    var headers=["Domicilios","Fecha","Simbolo","Nombre y observaciones"];
+    for(var i=0;i<4;i++){
+      doc.rect(x,y,colWidths[i],headerH,"S");
+      doc.text(headers[i],x+2,y+5.5);
+      x+=colWidths[i];
+    }
+    doc.setFont("helvetica","normal");
+    return y+headerH;
+  }
+
+  function drawStreetHeader(y,streetName){
+    doc.setFont("helvetica","bold");doc.setFontSize(9);
+    doc.setDrawColor(0);doc.setLineWidth(0.3);
+    doc.rect(ml,y,cw,streetHeaderH,"S");
+    doc.text(streetName,ml+2,y+5);
+    doc.setFont("helvetica","normal");
+    return y+streetHeaderH;
+  }
+
+  function drawHouseRows(y,h){
+    var num=extractNumber(h.HouseAddress);
+    doc.setFontSize(8);
+    for(var r=0;r<ROWS_PER_HOUSE;r++){
+      var x=ml;
+      for(var c=0;c<4;c++){
+        doc.setDrawColor(180);doc.setLineWidth(0.2);
+        doc.rect(x,y,colWidths[c],rowH,"S");
+        x+=colWidths[c];
+      }
+      if(r===0){
+        doc.setTextColor(0,128,0);
+        doc.text("  "+num,ml,y+3.8);
+        doc.setTextColor(0);
+      }
+      y+=rowH;
+    }
+    return y;
+  }
+
+  var pageY=drawHeader(pageNum);
+  pageY=drawTableHeader(pageY);
+
+  streets.forEach(function(st){
+    var stHouses=streetMap[st].slice().sort(function(a,b){
+      var na=extractNumber(a.HouseAddress),nb=extractNumber(b.HouseAddress);
+      var ia=parseInt(na),ib=parseInt(nb);
+      if(!isNaN(ia)&&!isNaN(ib))return ia-ib;
+      return na.localeCompare(nb);
+    });
+
+    var neededForHeader=streetHeaderH+(ROWS_PER_HOUSE*rowH);
+    if(pageY+neededForHeader>ph-20){
+      doc.addPage();pageNum++;
+      pageY=drawHeader(pageNum);
+      pageY=drawTableHeader(pageY);
+    }
+
+    pageY=drawStreetHeader(pageY,st);
+
+    stHouses.forEach(function(h){
+      if(pageY+(ROWS_PER_HOUSE*rowH)>ph-20){
+        doc.addPage();pageNum++;
+        pageY=drawHeader(pageNum);
+        pageY=drawTableHeader(pageY);
+      }
+      pageY=drawHouseRows(pageY,h);
+    });
+
+    pageY+=2;
+  });
+
+  doc.setFontSize(8);doc.setFont("helvetica","normal");
+  var dateStr=new Date().toLocaleDateString("en-US",{weekday:"long",year:"numeric",month:"long",day:"numeric"});
+  for(var p=1;p<=pageNum;p++){
+    doc.setPage(p);
+    doc.text(dateStr,ml,ph-10);
+  }
+
+  totalPages=pageNum;
+  for(var p2=1;p2<=totalPages;p2++){
+    doc.setPage(p2);
+    var oldText="Page "+p2;
+    if(totalPages>1){
+      doc.setFontSize(9);
+      doc.setTextColor(255,255,255);
+      doc.text(oldText,pw/2-8,mt+22);
+      doc.setTextColor(0);
+      doc.text("Page "+p2+" of "+totalPages,pw/2-12,mt+22);
+    }
+  }
+
+  var filename="Territory_"+(terrNum==="Unassigned"?"Unassigned":terrNum)+".pdf";
+  doc.save(filename);
+  toast("PDF exported ✓");
+}
 
 /* ── Long Press to Add ── */
 var lpTimer=null,lpInterval=null,lpCount=0,lpLatLng=null,lpActive=false;
