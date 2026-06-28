@@ -455,9 +455,16 @@ function setFilter(f){
   applyFilters();
 
   if(map&&f==="all"){
+    searchTerm="";
+    document.getElementById("tmSearchBox").value="";
+    document.getElementById("tmSearchClear").style.display="none";
+    applyFilters();
+    closeList();closeSide();closeDetail();
     Object.values(markerMap).forEach(function(mk){var el=mk.getElement();if(el)el.style.opacity="1";});
     if(mapMarkers.length===1)map.flyTo(mapMarkers[0].getLatLng(),14,{animate:true,duration:1});
     else if(mapMarkers.length>1)map.flyToBounds(L.featureGroup(mapMarkers).getBounds().pad(0.3),{animate:true,duration:1,maxZoom:13});
+    document.querySelectorAll(".tm-nav-btn").forEach(function(x){x.classList.remove("active");});
+    document.querySelector("[data-nav=\\"map\\"]").classList.add("active");
   } else if(map){
     updatePinOpacity();
     var fIds=new Set(records.map(function(h){return h.id;}));
