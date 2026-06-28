@@ -156,6 +156,8 @@ button#tmPullTab{display:none;position:absolute;left:0;top:50%;transform:transla
 \
 #tmVisitSelect{position:absolute;top:calc(var(--bar-h) + 56px);right:12px;z-index:500;padding:9px 14px;border-radius:12px;border:none;background:rgba(20,20,20,0.88);color:#fff;font-size:13px;font-weight:600;font-family:inherit;box-shadow:0 2px 12px rgba(0,0,0,0.4);-webkit-appearance:none;appearance:none;cursor:pointer;padding-right:32px;background-image:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%278%27%3E%3Cpath d=%27M1 1l5 5 5-5%27 stroke=%27white%27 stroke-width=%272%27 fill=%27none%27/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;}\
 #tmVisitSelect option{background:#1a1a1a;color:#fff;}\
+#tmTerrSelect{position:absolute;top:calc(var(--bar-h) + 56px);left:12px;z-index:500;padding:9px 14px;border-radius:12px;border:none;background:rgba(20,20,20,0.88);color:#fff;font-size:13px;font-weight:600;font-family:inherit;box-shadow:0 2px 12px rgba(0,0,0,0.4);-webkit-appearance:none;appearance:none;cursor:pointer;padding-right:32px;background-image:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%278%27%3E%3Cpath d=%27M1 1l5 5 5-5%27 stroke=%27white%27 stroke-width=%272%27 fill=%27none%27/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;}\
+#tmTerrSelect option{background:#1a1a1a;color:#fff;}\
 \
 #tmLongPressTimer{position:absolute;z-index:1200;pointer-events:none;display:none;transform:translate(-50%,-50%);}\
 #tmLongPressTimer.active{display:block;}\
@@ -208,6 +210,10 @@ button#tmPullTab{display:none;position:absolute;left:0;top:50%;transform:transla
 <input type="text" id="tmSearchBox" placeholder="Search address, territory, language...">\
 <button id="tmSearchClear">✕</button>\
 </div>\
+\
+<select id="tmTerrSelect">\
+<option value="all">All Territories</option>\
+</select>\
 \
 <select id="tmVisitSelect">\
 <option value="all">All Visits</option>\
@@ -359,6 +365,7 @@ function fullAddr(r){return[r.HouseAddress,r.HouseCity,r.HouseState,r.HouseZIP].
 function parseGPS(v){if(!v)return null;var p=v.split(",").map(function(s){return parseFloat(s.trim());});if(p.length===2&&!isNaN(p[0])&&!isNaN(p[1])&&Math.abs(p[0])<=90&&Math.abs(p[1])<=180)return{lat:p[0],lng:p[1]};return null;}
 
 var visitFilter="all";
+var terrFilter="all";
 
 function daysSinceVisit(v){
   if(!v)return Infinity;
@@ -367,6 +374,7 @@ function daysSinceVisit(v){
 
 function applyFilters(){
   var r=allRecords.slice();
+  if(terrFilter!=="all")r=r.filter(function(h){return(h.HouseTerritoryNumber||"Unassigned")===terrFilter;});
   if(filter!=="all")r=r.filter(function(h){return visitStatus(h.HouseLastVisitDate)===filter;});
   if(visitFilter!=="all"){
     r=r.filter(function(h){
@@ -488,10 +496,11 @@ function setFilter(f){
   applyFilters();
 
   if(map&&f==="all"){
-    searchTerm="";visitFilter="all";
+    searchTerm="";visitFilter="all";terrFilter="all";
     document.getElementById("tmSearchBox").value="";
     document.getElementById("tmSearchClear").style.display="none";
     document.getElementById("tmVisitSelect").value="all";
+    document.getElementById("tmTerrSelect").value="all";
     applyFilters();
     closeList();closeSide();closeDetail();
     Object.values(markerMap).forEach(function(mk){mk.setOpacity(1);var el=mk.getElement();if(el){el.style.opacity="1";el.style.pointerEvents="auto";}});
@@ -521,6 +530,29 @@ searchBox.addEventListener("input",function(){
 });
 searchClear.addEventListener("click",function(){searchBox.value="";searchClear.style.display="none";searchTerm="";applyFilters();updatePinOpacity();});
 
+/* ── Territory Dropdown ── */
+function populateTerrSelect(){
+  var sel=document.getElementById("tmTerrSelect");
+  var old=sel.value;
+  var terrSet={};
+  allRecords.forEach(function(h){var t=h.HouseTerritoryNumber||"Unassigned";terrSet[t]=true;});
+  var keys=Object.keys(terrSet).sort(function(a,b){var na=parseInt(a),nb=parseInt(b);if(!isNaN(na)&&!isNaN(nb))return na-nb;return a.localeCompare(b);});
+  sel.innerHTML='<option value="all">All Territories</option>';
+  keys.forEach(function(t){sel.innerHTML+='<option value="'+esc(t)+'">'+(t==="Unassigned"?t:"Territory "+esc(t))+'</option>';});
+  sel.value=old in terrSet||old==="all"?old:"all";
+}
+document.getElementById("tmTerrSelect").addEventListener("change",function(){
+  terrFilter=this.value;
+  applyFilters();updatePinOpacity();updateCounts();
+  var fIds=new Set(records.map(function(h){return h.id;}));
+  var fm=Object.entries(markerMap).filter(function(e){return fIds.has(e[0]);}).map(function(e){return e[1];});
+  if(map){
+    if(!fm.length){toast("No houses in this territory","#555");}
+    else if(fm.length===1)map.flyTo(fm[0].getLatLng(),15,{animate:true,duration:1});
+    else map.flyToBounds(L.featureGroup(fm).getBounds().pad(0.3),{animate:true,duration:1,maxZoom:14});
+  }
+});
+
 /* ── Visit Timing Dropdown ── */
 document.getElementById("tmVisitSelect").addEventListener("change",function(){
   visitFilter=this.value;
@@ -540,7 +572,7 @@ function loadRecords(){
   .then(function(r){return r.json();})
   .then(function(data){
     allRecords=Array.isArray(data)?data:[];
-    applyFilters();updateCounts();buildMap();buildTerrList();
+    applyFilters();updateCounts();buildMap();buildTerrList();populateTerrSelect();
   })
   .catch(function(e){toast("Error loading data","#c62828");console.error(e);});
 }
