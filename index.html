@@ -1002,6 +1002,17 @@ function generateTerritoryPDF(terrNum,houses){
     return y+streetHeaderH;
   }
 
+  var fieldIdx=0;
+  function addTextField(x,y,w,h,fontSize){
+    var tf=new doc.AcroFormTextField();
+    tf.Rect=[x,y,w,h];
+    tf.fieldName="f_"+fieldIdx++;
+    tf.fontSize=fontSize||6;
+    tf.textAlign="left";
+    tf.maxFontSize=fontSize||6;
+    doc.addField(tf);
+  }
+
   function drawHouseRows(y,h){
     var num=extractNumber(h.HouseAddress);
     doc.setFontSize(8);
@@ -1010,6 +1021,7 @@ function generateTerritoryPDF(terrNum,houses){
       for(var c=0;c<7;c++){
         doc.setDrawColor(180);doc.setLineWidth(0.2);
         doc.rect(x,y,colWidths[c],rowH,"S");
+        if(c>=1){addTextField(x+0.3,y+0.3,colWidths[c]-0.6,rowH-0.6,c>=2&&c<=5?5:6);}
         x+=colWidths[c];
       }
       if(r===0){
