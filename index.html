@@ -906,8 +906,13 @@ function extractNumber(addr){
 function generateTerritoryPDF(terrNum,houses){
   var jsPDF=window.jspdf.jsPDF;
   var pw=215.9,ph=279.4;
-  var ml=14,mr=14,mt=14;
-  var cw=pw-ml-mr;
+  var ml=6,mt=14;
+  var cw=95.25;
+  var numW=cw*0.22;
+  var fechaW=cw*0.18;
+  var tickW=cw*0.05;
+  var notesW=cw-(numW+fechaW+tickW*4);
+  var colWidths=[numW,fechaW,tickW,tickW,tickW,tickW,notesW];
 
   var streetMap={};
   houses.forEach(function(h){
@@ -920,7 +925,6 @@ function generateTerritoryPDF(terrNum,houses){
   var totalHouses=houses.length;
   var ROWS_PER_HOUSE=4;
   var rowH=5.2;
-  var colWidths=[cw*0.22,cw*0.15,cw*0.13,cw*0.50];
   var headerH=8;
   var streetHeaderH=7;
 
@@ -938,13 +942,14 @@ function generateTerritoryPDF(terrNum,houses){
     doc.setFontSize(12);
     doc.setFont("helvetica","bold");
     doc.text(streets[0]?extractStreet(houses[0].HouseAddress)||"":"",ml,y);
-    doc.text("Terr. No:  "+terrNum,pw-mr-50,y);
+    var terrLabel="Terr. No:  ";
+    doc.text(terrLabel,ml+cw-45,y);
     doc.setFont("helvetica","underline");
-    doc.text(terrNum,pw-mr-22,y);
+    doc.text(terrNum,ml+cw-18,y);
     doc.setFont("helvetica","normal");
     y+=5;
     doc.setFontSize(9);
-    doc.text("Page "+pg,pw/2-8,y);
+    doc.text("Page "+pg,ml+(cw/2)-8,y);
     y+=5;
     doc.setFont("helvetica","bold");doc.setFontSize(8);
     doc.text("Simbolos",ml,y);
@@ -968,10 +973,11 @@ function generateTerritoryPDF(terrNum,houses){
     doc.rect(ml,y,cw,headerH,"S");
     var x=ml;
     doc.setFont("helvetica","bold");doc.setFontSize(8);
-    var headers=["Domicilios","Fecha","Simbolo","Nombre y observaciones"];
-    for(var i=0;i<4;i++){
+    var headers=["Domicilios","Fecha","1","2","3","4","Nombre y observaciones"];
+    for(var i=0;i<7;i++){
       doc.rect(x,y,colWidths[i],headerH,"S");
-      doc.text(headers[i],x+2,y+5.5);
+      if(i>=2&&i<=5){doc.text(headers[i],x+colWidths[i]/2-1.5,y+5.5);}
+      else{doc.text(headers[i],x+2,y+5.5);}
       x+=colWidths[i];
     }
     doc.setFont("helvetica","normal");
@@ -992,7 +998,7 @@ function generateTerritoryPDF(terrNum,houses){
     doc.setFontSize(8);
     for(var r=0;r<ROWS_PER_HOUSE;r++){
       var x=ml;
-      for(var c=0;c<4;c++){
+      for(var c=0;c<7;c++){
         doc.setDrawColor(180);doc.setLineWidth(0.2);
         doc.rect(x,y,colWidths[c],rowH,"S");
         x+=colWidths[c];
