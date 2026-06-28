@@ -153,6 +153,9 @@ button#tmPullTab{display:none;position:absolute;left:0;top:50%;transform:transla
 .tm-toast{position:absolute;top:calc(var(--bar-h) + 52px);left:50%;transform:translateX(-50%);z-index:900;border-radius:24px;padding:10px 22px;font-size:14px;font-weight:600;color:#fff;display:none;pointer-events:none;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,0.3);background:#2e7d32;}\
 .tm-empty{color:#aaa;font-size:15px;padding:32px;text-align:center;}\
 \
+#tmVisitSelect{position:absolute;top:calc(var(--bar-h) + 56px);right:12px;z-index:500;padding:9px 14px;border-radius:12px;border:none;background:rgba(20,20,20,0.88);color:#fff;font-size:13px;font-weight:600;font-family:inherit;box-shadow:0 2px 12px rgba(0,0,0,0.4);-webkit-appearance:none;appearance:none;cursor:pointer;padding-right:32px;background-image:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%278%27%3E%3Cpath d=%27M1 1l5 5 5-5%27 stroke=%27white%27 stroke-width=%272%27 fill=%27none%27/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;}\
+#tmVisitSelect option{background:#1a1a1a;color:#fff;}\
+\
 #tmLongPressTimer{position:absolute;z-index:1200;pointer-events:none;display:none;transform:translate(-50%,-50%);}\
 #tmLongPressTimer.active{display:block;}\
 .tm-timer-ring{width:144px;height:144px;}\
@@ -203,6 +206,14 @@ button#tmPullTab{display:none;position:absolute;left:0;top:50%;transform:transla
 <input type="text" id="tmSearchBox" placeholder="Search address, territory, language...">\
 <button id="tmSearchClear">✕</button>\
 </div>\
+\
+<select id="tmVisitSelect">\
+<option value="all">All Visits</option>\
+<option value="today">Not visited today</option>\
+<option value="yesterday">Not visited since yesterday</option>\
+<option value="week">Not visited this week</option>\
+<option value="2weeks">Not visited in 2+ weeks</option>\
+</select>\
 \
 <div id="tmBottomNav"><div class="tm-nav-row">\
 <button class="tm-nav-btn active" data-nav="map"><span class="tm-nav-icon">\u{1F5FA}</span><span>Map</span></button>\
@@ -345,9 +356,26 @@ function pinColor(s){return{recent:"#2e7d32",due:"#ef6c00",overdue:"#c62828",nev
 function fullAddr(r){return[r.HouseAddress,r.HouseCity,r.HouseState,r.HouseZIP].filter(Boolean).join(", ");}
 function parseGPS(v){if(!v)return null;var p=v.split(",").map(function(s){return parseFloat(s.trim());});if(p.length===2&&!isNaN(p[0])&&!isNaN(p[1])&&Math.abs(p[0])<=90&&Math.abs(p[1])<=180)return{lat:p[0],lng:p[1]};return null;}
 
+var visitFilter="all";
+
+function daysSinceVisit(v){
+  if(!v)return Infinity;
+  return Math.floor((Date.now()-new Date(v))/86400000);
+}
+
 function applyFilters(){
   var r=allRecords.slice();
   if(filter!=="all")r=r.filter(function(h){return visitStatus(h.HouseLastVisitDate)===filter;});
+  if(visitFilter!=="all"){
+    r=r.filter(function(h){
+      var d=daysSinceVisit(h.HouseLastVisitDate);
+      if(visitFilter==="today")return d>=1||d===Infinity;
+      if(visitFilter==="yesterday")return d>=2||d===Infinity;
+      if(visitFilter==="week")return d>=7||d===Infinity;
+      if(visitFilter==="2weeks")return d>=14||d===Infinity;
+      return true;
+    });
+  }
   if(searchTerm){var q=searchTerm.toLowerCase();r=r.filter(function(h){return[h.HouseAddress,h.HouseCity,h.HouseState,h.HouseZIP,h.HouseTerritoryNumber,h.HouseTerritoryAssingnedTo,h.HouseLanguage,h.HouseNotes,h.HousePersonalNotes,h.HouseGPSCoordinates,h.HouseResutsOnVisit1,h.HouseResutsOnVisit2,h.HouseResutsOnVisit3,h.HouseResutsOnVisit4,h.HouseResutsOnVisit5].filter(Boolean).join(" ").toLowerCase().includes(q);});}
   records=r;
 }
@@ -440,7 +468,11 @@ function buildMap(){
 function updatePinOpacity(){
   var visIds=new Set(records.map(function(h){return h.id;}));
   Object.entries(markerMap).forEach(function(e){
-    e[1].setOpacity(visIds.has(e[0])?1:0.18);
+    var mk=e[1];
+    var show=visIds.has(e[0]);
+    mk.setOpacity(show?1:0.15);
+    var el=mk.getElement();
+    if(el){el.style.opacity=show?"1":"0.15";el.style.pointerEvents=show?"auto":"none";}
   });
 }
 
@@ -454,12 +486,13 @@ function setFilter(f){
   applyFilters();
 
   if(map&&f==="all"){
-    searchTerm="";
+    searchTerm="";visitFilter="all";
     document.getElementById("tmSearchBox").value="";
     document.getElementById("tmSearchClear").style.display="none";
+    document.getElementById("tmVisitSelect").value="all";
     applyFilters();
     closeList();closeSide();closeDetail();
-    Object.values(markerMap).forEach(function(mk){mk.setOpacity(1);});
+    Object.values(markerMap).forEach(function(mk){mk.setOpacity(1);var el=mk.getElement();if(el){el.style.opacity="1";el.style.pointerEvents="auto";}});
     if(mapMarkers.length===1)map.flyTo(mapMarkers[0].getLatLng(),14,{animate:true,duration:1});
     else if(mapMarkers.length>1)map.flyToBounds(L.featureGroup(mapMarkers).getBounds().pad(0.3),{animate:true,duration:1,maxZoom:13});
     document.querySelectorAll(".tm-nav-btn").forEach(function(x){x.classList.remove("active");});
@@ -485,6 +518,19 @@ searchBox.addEventListener("input",function(){
   searchTimer=setTimeout(function(){searchTerm=searchBox.value.trim();applyFilters();updatePinOpacity();},250);
 });
 searchClear.addEventListener("click",function(){searchBox.value="";searchClear.style.display="none";searchTerm="";applyFilters();updatePinOpacity();});
+
+/* ── Visit Timing Dropdown ── */
+document.getElementById("tmVisitSelect").addEventListener("change",function(){
+  visitFilter=this.value;
+  applyFilters();updatePinOpacity();
+  var fIds=new Set(records.map(function(h){return h.id;}));
+  var fm=Object.entries(markerMap).filter(function(e){return fIds.has(e[0]);}).map(function(e){return e[1];});
+  if(map){
+    if(!fm.length){toast("No matching houses","#555");}
+    else if(fm.length===1)map.flyTo(fm[0].getLatLng(),15,{animate:true,duration:1});
+    else map.flyToBounds(L.featureGroup(fm).getBounds().pad(0.3),{animate:true,duration:1,maxZoom:14});
+  }
+});
 
 /* ── Load Data ── */
 function loadRecords(){
