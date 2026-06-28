@@ -890,17 +890,15 @@ document.getElementById("tmExportBtn").addEventListener("click",function(){
 
 function extractStreet(addr){
   if(!addr)return"Unknown Street";
-  var parts=addr.trim().split(/\s+/);
-  if(parts.length<=1)return addr;
-  var first=parts[0];
-  if(/^\d+[A-Za-z]?$/.test(first))return parts.slice(1).join(" ");
-  return addr;
+  var cleaned=addr.trim().replace(/^[\d,\s]+/,"").trim();
+  return cleaned||addr;
 }
 
 function extractNumber(addr){
   if(!addr)return"";
-  var m=addr.trim().match(/^(\d+[A-Za-z]?)\s/);
-  return m?m[1]:addr;
+  var m=addr.trim().match(/^([\d,\s]+[A-Za-z]?)\s/);
+  if(m){var n=m[1].replace(/\s+$/,"");return n;}
+  return addr;
 }
 
 function generateTerritoryPDF(terrNum,houses){
@@ -941,7 +939,8 @@ function generateTerritoryPDF(terrNum,houses){
     y+=7;
     doc.setFontSize(12);
     doc.setFont("helvetica","bold");
-    doc.text(streets[0]?extractStreet(houses[0].HouseAddress)||"":"",ml,y);
+    var firstStreet=houses.length?extractStreet(houses[0].HouseAddress):"";
+    doc.text(firstStreet,ml,y);
     var terrLabel="Terr. No:  ";
     doc.text(terrLabel,ml+cw-45,y);
     doc.setFont("helvetica","underline");
@@ -967,21 +966,28 @@ function generateTerritoryPDF(terrNum,houses){
   }
 
   function drawTableHeader(y){
+    var row1H=headerH/2;var row2H=headerH/2;var totalH=row1H+row2H;
+    var simW=tickW*4;
     doc.setFillColor(230,230,230);
-    doc.rect(ml,y,cw,headerH,"F");
+    doc.rect(ml,y,cw,totalH,"F");
     doc.setDrawColor(0);doc.setLineWidth(0.3);
-    doc.rect(ml,y,cw,headerH,"S");
-    var x=ml;
     doc.setFont("helvetica","bold");doc.setFontSize(8);
-    var headers=["Domicilios","Fecha","1","2","3","4","Nombre y observaciones"];
-    for(var i=0;i<7;i++){
-      doc.rect(x,y,colWidths[i],headerH,"S");
-      if(i>=2&&i<=5){doc.text(headers[i],x+colWidths[i]/2-1.5,y+5.5);}
-      else{doc.text(headers[i],x+2,y+5.5);}
-      x+=colWidths[i];
+    doc.rect(ml,y,numW,totalH,"S");
+    doc.text("Domicilios",ml+2,y+totalH/2+1.5);
+    doc.rect(ml+numW,y,fechaW,totalH,"S");
+    doc.text("Fecha",ml+numW+2,y+totalH/2+1.5);
+    var simX=ml+numW+fechaW;
+    doc.rect(simX,y,simW,row1H,"S");
+    doc.text("Simbolo",simX+(simW/2)-6,y+row1H-0.8);
+    for(var i=0;i<4;i++){
+      doc.rect(simX+i*tickW,y+row1H,tickW,row2H,"S");
+      doc.text(String(i+1),simX+i*tickW+tickW/2-1.5,y+row1H+row2H-0.8);
     }
+    var notesX=simX+simW;
+    doc.rect(notesX,y,notesW,totalH,"S");
+    doc.text("Nombre y observaciones",notesX+2,y+totalH/2+1.5);
     doc.setFont("helvetica","normal");
-    return y+headerH;
+    return y+totalH;
   }
 
   function drawStreetHeader(y,streetName){
