@@ -532,11 +532,14 @@ searchBox.addEventListener("input",function(){
     if(searchTerm&&records.length===0){
       geocodeAddr(searchTerm,"").then(function(loc){
         if(loc&&map){
+          if(window._tmSearchMarker){map.removeLayer(window._tmSearchMarker);window._tmSearchMarker=null;}
+          window._tmSearchMarker=L.marker([loc.lat,loc.lng],{icon:L.divIcon({className:"",html:'<div style="width:26px;height:26px;border-radius:50%;background:#ef6c00;border:3px solid #fff;box-shadow:0 2px 10px rgba(0,0,0,0.5);"></div>',iconSize:[26,26],iconAnchor:[13,13],popupAnchor:[0,-15]})}).addTo(map);
+          window._tmSearchMarker.bindPopup('<strong style="font-size:14px">'+esc(searchTerm)+'</strong><br><span style="color:#ef6c00;font-size:12px">Not in territory</span>').openPopup();
           map.flyTo([loc.lat,loc.lng],17,{animate:true,duration:1.2});
           toast("Address not in territory","#ef6c00");
         }
       });
-    }
+    } else if(window._tmSearchMarker){map.removeLayer(window._tmSearchMarker);window._tmSearchMarker=null;}
   },500);
 });
 searchClear.addEventListener("click",function(){searchBox.value="";searchClear.style.display="none";searchTerm="";applyFilters();updatePinOpacity();});
