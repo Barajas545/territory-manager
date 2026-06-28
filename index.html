@@ -526,7 +526,18 @@ var searchTimer;
 searchBox.addEventListener("input",function(){
   searchClear.style.display=this.value?"flex":"none";
   clearTimeout(searchTimer);
-  searchTimer=setTimeout(function(){searchTerm=searchBox.value.trim();applyFilters();updatePinOpacity();},250);
+  searchTimer=setTimeout(function(){
+    searchTerm=searchBox.value.trim();
+    applyFilters();updatePinOpacity();
+    if(searchTerm&&records.length===0){
+      geocodeAddr(searchTerm,"").then(function(loc){
+        if(loc&&map){
+          map.flyTo([loc.lat,loc.lng],17,{animate:true,duration:1.2});
+          toast("Address not in territory","#ef6c00");
+        }
+      });
+    }
+  },500);
 });
 searchClear.addEventListener("click",function(){searchBox.value="";searchClear.style.display="none";searchTerm="";applyFilters();updatePinOpacity();});
 
