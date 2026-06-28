@@ -155,10 +155,10 @@ button#tmPullTab{display:none;position:absolute;left:0;top:50%;transform:transla
 \
 #tmLongPressTimer{position:absolute;z-index:1200;pointer-events:none;display:none;transform:translate(-50%,-50%);}\
 #tmLongPressTimer.active{display:block;}\
-.tm-timer-ring{width:144px;height:144px;}\
-.tm-timer-bg{fill:none;stroke:rgba(255,255,255,0.2);stroke-width:5;}\
-.tm-timer-fg{fill:none;stroke:#fff;stroke-width:5;stroke-linecap:round;stroke-dasharray:377;stroke-dashoffset:377;transition:stroke-dashoffset .15s linear;}\
-.tm-timer-text{font-size:40px;font-weight:700;fill:#fff;text-anchor:middle;dominant-baseline:central;}\
+.tm-timer-ring{width:288px;height:288px;}\
+.tm-timer-bg{fill:none;stroke:rgba(255,255,255,0.2);stroke-width:6;}\
+.tm-timer-fg{fill:none;stroke:#fff;stroke-width:6;stroke-linecap:round;stroke-dasharray:754;stroke-dashoffset:754;transition:stroke-dashoffset .15s linear;}\
+.tm-timer-text{font-size:80px;font-weight:700;fill:#fff;text-anchor:middle;dominant-baseline:central;}\
 .tm-timer-label{position:absolute;bottom:-28px;left:50%;transform:translateX(-50%);white-space:nowrap;font-size:12px;font-weight:600;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,0.8);}\
 \
 .tm-verify-overlay .tm-drawer{max-height:80%;}\
@@ -276,7 +276,7 @@ button#tmPullTab{display:none;position:absolute;left:0;top:50%;transform:transla
 </div></div></div>\
 \
 <!-- Long Press Timer -->\
-<div id="tmLongPressTimer"><svg class="tm-timer-ring" viewBox="0 0 144 144"><circle class="tm-timer-bg" cx="72" cy="72" r="60"/><circle class="tm-timer-fg" id="tmTimerFG" cx="72" cy="72" r="60" transform="rotate(-90 72 72)"/><text class="tm-timer-text" id="tmTimerText" x="72" y="72">5</text></svg><div class="tm-timer-label">Hold to add house</div></div>\
+<div id="tmLongPressTimer"><svg class="tm-timer-ring" viewBox="0 0 288 288"><circle class="tm-timer-bg" cx="144" cy="144" r="120"/><circle class="tm-timer-fg" id="tmTimerFG" cx="144" cy="144" r="120" transform="rotate(-90 144 144)"/><text class="tm-timer-text" id="tmTimerText" x="144" y="144">5</text></svg><div class="tm-timer-label">Hold to add house</div></div>\
 \
 <!-- Verify Address Drawer -->\
 <div class="tm-overlay tm-verify-overlay" id="tmVerifyOverlay" style="z-index:960"><div class="tm-drawer"><div class="tm-drawer-handle"></div>\
@@ -801,7 +801,7 @@ var LP_DURATION=5;
 var timerEl=document.getElementById("tmLongPressTimer");
 var timerFG=document.getElementById("tmTimerFG");
 var timerText=document.getElementById("tmTimerText");
-var CIRCUMFERENCE=2*Math.PI*60; // 377
+var CIRCUMFERENCE=2*Math.PI*120; // 754
 
 function lpStart(e){
   if(lpActive)return;
