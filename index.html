@@ -1181,8 +1181,9 @@ function generateTerritoryPDF(terrNum,houses){
     doc.addField(tf);
   }
 
-  function drawHouseRows(y,h){
-    var num=extractNumber(h.HouseAddress);
+  var aptHeaderH=5.5;
+
+  function drawHouseRows(y,label,indent){
     doc.setFontSize(8);
     for(var r=0;r<ROWS_PER_HOUSE;r++){
       var x=ml;
@@ -1194,7 +1195,7 @@ function generateTerritoryPDF(terrNum,houses){
       }
       if(r===0){
         doc.setTextColor(0,128,0);
-        doc.text("  "+num,ml,y+3.8);
+        doc.text((indent?"      ":"  ")+label,ml,y+3.8);
         doc.setTextColor(0);
       }
       y+=rowH;
@@ -1202,33 +1203,65 @@ function generateTerritoryPDF(terrNum,houses){
     return y;
   }
 
+  function drawAptHeader(y,baseNum){
+    doc.setFontSize(7);doc.setFont("helvetica","bold");
+    doc.setDrawColor(180);doc.setLineWidth(0.2);
+    doc.rect(ml,y,cw,aptHeaderH,"S");
+    doc.setFillColor(245,245,243);
+    doc.rect(ml+0.2,y+0.2,cw-0.4,aptHeaderH-0.4,"F");
+    doc.setTextColor(0);
+    doc.text("  "+baseNum+" (Apts)",ml,y+3.8);
+    doc.setFont("helvetica","normal");
+    return y+aptHeaderH;
+  }
+
+  function checkPageBreak(needed){
+    if(pageY+needed>ph-20){
+      doc.addPage();pageNum++;
+      pageY=drawHeader(pageNum);
+      pageY=drawTableHeader(pageY);
+    }
+  }
+
   var pageY=drawHeader(pageNum);
   pageY=drawTableHeader(pageY);
 
   streets.forEach(function(st){
     var stHouses=streetMap[st].slice().sort(function(a,b){
-      var na=extractNumber(a.HouseAddress),nb=extractNumber(b.HouseAddress);
+      var na=extractBaseNum(a.HouseAddress),nb=extractBaseNum(b.HouseAddress);
       var ia=parseInt(na),ib=parseInt(nb);
-      if(!isNaN(ia)&&!isNaN(ib))return ia-ib;
-      return na.localeCompare(nb);
+      if(!isNaN(ia)&&!isNaN(ib)){if(ia!==ib)return ia-ib;}
+      var aa=extractApt(a.HouseAddress),ab=extractApt(b.HouseAddress);
+      return aa.localeCompare(ab);
     });
 
-    var neededForHeader=streetHeaderH+(ROWS_PER_HOUSE*rowH);
-    if(pageY+neededForHeader>ph-20){
-      doc.addPage();pageNum++;
-      pageY=drawHeader(pageNum);
-      pageY=drawTableHeader(pageY);
-    }
-
+    checkPageBreak(streetHeaderH+(ROWS_PER_HOUSE*rowH));
     pageY=drawStreetHeader(pageY,st);
 
+    var numGroups=[];var curNum=null,curGroup=[];
     stHouses.forEach(function(h){
-      if(pageY+(ROWS_PER_HOUSE*rowH)>ph-20){
-        doc.addPage();pageNum++;
-        pageY=drawHeader(pageNum);
-        pageY=drawTableHeader(pageY);
+      var bn=extractBaseNum(h.HouseAddress);
+      if(bn!==curNum){if(curGroup.length)numGroups.push({num:curNum,items:curGroup});curNum=bn;curGroup=[h];}
+      else{curGroup.push(h);}
+    });
+    if(curGroup.length)numGroups.push({num:curNum,items:curGroup});
+
+    numGroups.forEach(function(g){
+      var isApts=g.items.some(function(h){return hasApt(h.HouseAddress);})&&g.items.length>1;
+      if(isApts){
+        checkPageBreak(aptHeaderH+(ROWS_PER_HOUSE*rowH));
+        pageY=drawAptHeader(pageY,g.num);
+        g.items.forEach(function(h){
+          checkPageBreak(ROWS_PER_HOUSE*rowH);
+          var apt=extractApt(h.HouseAddress);
+          pageY=drawHouseRows(pageY,apt||g.num,true);
+        });
+      } else {
+        g.items.forEach(function(h){
+          checkPageBreak(ROWS_PER_HOUSE*rowH);
+          pageY=drawHouseRows(pageY,extractNumber(h.HouseAddress),false);
+        });
       }
-      pageY=drawHouseRows(pageY,h);
     });
 
     pageY+=2;
