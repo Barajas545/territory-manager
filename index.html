@@ -1130,37 +1130,25 @@ function generateTerritoryPDF(terrNum,houses){
   }
 
   function drawTableHeader(y){
-    var row1H=5;var row2H=4;var row3H=10;var fechaLblW=3.5;
+    var row1H=headerH/2;var row2H=headerH/2;var totalH=row1H+row2H;
     var simW=tickW*4;
-    var totalH=row1H+row2H+row3H;
     doc.setFillColor(230,230,230);
     doc.rect(ml,y,cw,totalH,"F");
     doc.setDrawColor(0);doc.setLineWidth(0.3);
     doc.setFont("helvetica","bold");doc.setFontSize(7);
     doc.rect(ml,y,numW,totalH,"S");
-    doc.text("Domicilios",ml+1,y+totalH/2+1);
+    doc.text("Domicilios",ml+1,y+totalH/2+1.5);
     var simX=ml+numW;
-    doc.rect(simX,y,simW,row1H+row2H,"S");
     doc.rect(simX,y,simW,row1H,"S");
     doc.text("Simbolo",simX+(simW/2)-6,y+row1H-0.8);
-    doc.setFontSize(6);
     for(var i=0;i<4;i++){
       doc.rect(simX+i*tickW,y+row1H,tickW,row2H,"S");
-      doc.text(String(i+1),simX+i*tickW+tickW/2-1,y+row1H+row2H-0.8);
-    }
-    var fechaY=y+row1H+row2H;
-    doc.rect(simX,fechaY,fechaLblW,row3H,"S");
-    doc.setFontSize(6);
-    doc.save();
-    doc.text("Fecha",simX+2.8,fechaY+row3H-1.5,{angle:90});
-    doc.restore();
-    for(var i=0;i<4;i++){
-      doc.rect(simX+fechaLblW+i*((simW-fechaLblW)/4),fechaY,(simW-fechaLblW)/4,row3H,"S");
+      doc.text(String(i+1),simX+i*tickW+tickW/2-1.5,y+row1H+row2H-0.8);
     }
     var notesX=simX+simW;
     doc.rect(notesX,y,notesW,totalH,"S");
     doc.setFontSize(6);
-    doc.text("Nombre y",notesX+1,y+totalH/2);
+    doc.text("Nombre y",notesX+1,y+totalH/2-0.5);
     doc.text("observaciones",notesX+1,y+totalH/2+2.5);
     doc.setFontSize(8);
     doc.setFont("helvetica","normal");
@@ -1201,11 +1189,11 @@ function generateTerritoryPDF(terrNum,houses){
   function drawHouseRows(y,label,indent,h){
     var thisRowH=calcRowH(h);
     doc.setFontSize(8);
-    doc.setDrawColor(180);doc.setLineWidth(0.2);
     var x=ml;
     for(var c=0;c<6;c++){
+      doc.setDrawColor(180);doc.setLineWidth(0.2);
       doc.rect(x,y,colWidths[c],thisRowH,"S");
-      if(c>=1&&c<=4){addTextField(x+0.2,y+0.2,colWidths[c]-0.4,thisRowH-0.4,5);}
+      if(c>=1&&c<=4){addTextField(x+0.3,y+0.3,colWidths[c]-0.6,thisRowH-0.6,5);}
       x+=colWidths[c];
     }
     doc.setTextColor(0,128,0);
@@ -1254,7 +1242,7 @@ function generateTerritoryPDF(terrNum,houses){
       return aa.localeCompare(ab);
     });
 
-    checkPageBreak(streetHeaderH+rowH);
+    checkPageBreak(streetHeaderH+(ROWS_PER_HOUSE*rowH));
     pageY=drawStreetHeader(pageY,st);
 
     var numGroups=[];var curNum=null,curGroup=[];
