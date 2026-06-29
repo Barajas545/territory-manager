@@ -1130,26 +1130,29 @@ function generateTerritoryPDF(terrNum,houses){
   }
 
   function drawTableHeader(y){
-    var row1H=headerH/2;var row2H=headerH/2;var totalH=row1H+row2H;
+    var row1H=6;var row2H=5;var totalH=row1H+row2H;
     var simW=tickW*4;
     doc.setFillColor(230,230,230);
     doc.rect(ml,y,cw,totalH,"F");
-    doc.setDrawColor(0);doc.setLineWidth(0.3);
-    doc.setFont("helvetica","bold");doc.setFontSize(7);
+    doc.setDrawColor(0);doc.setLineWidth(0.4);
+    doc.rect(ml,y,cw,totalH,"S");
+    doc.setFont("helvetica","bold");doc.setFontSize(8);
     doc.rect(ml,y,numW,totalH,"S");
     doc.text("Domicilios",ml+1,y+totalH/2+1.5);
     var simX=ml+numW;
+    doc.rect(simX,y,simW,totalH,"S");
     doc.rect(simX,y,simW,row1H,"S");
-    doc.text("Simbolo",simX+(simW/2)-6,y+row1H-0.8);
+    doc.text("Simbolo",simX+(simW/2)-6,y+row1H-1);
+    doc.setFontSize(7);
     for(var i=0;i<4;i++){
       doc.rect(simX+i*tickW,y+row1H,tickW,row2H,"S");
-      doc.text(String(i+1),simX+i*tickW+tickW/2-1.5,y+row1H+row2H-0.8);
+      doc.text(String(i+1),simX+i*tickW+tickW/2-1.5,y+row1H+row2H-1);
     }
     var notesX=simX+simW;
     doc.rect(notesX,y,notesW,totalH,"S");
-    doc.setFontSize(6);
-    doc.text("Nombre y",notesX+1,y+totalH/2-0.5);
-    doc.text("observaciones",notesX+1,y+totalH/2+2.5);
+    doc.setFontSize(7);
+    doc.text("Nombre y",notesX+2,y+totalH/2);
+    doc.text("observaciones",notesX+2,y+totalH/2+3);
     doc.setFontSize(8);
     doc.setFont("helvetica","normal");
     return y+totalH;
