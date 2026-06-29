@@ -1075,10 +1075,9 @@ function generateTerritoryPDF(terrNum,houses){
   var ml=6,mt=14;
   var cw=82.55;
   var numW=cw*0.22;
-  var fechaW=cw*0.18;
   var tickW=cw*0.05;
-  var notesW=cw-(numW+fechaW+tickW*4);
-  var colWidths=[numW,fechaW,tickW,tickW,tickW,tickW,notesW];
+  var notesW=cw-(numW+tickW*4);
+  var colWidths=[numW,tickW,tickW,tickW,tickW,notesW];
 
   var streetMap={};
   houses.forEach(function(h){
@@ -1139,9 +1138,7 @@ function generateTerritoryPDF(terrNum,houses){
     doc.setFont("helvetica","bold");doc.setFontSize(7);
     doc.rect(ml,y,numW,totalH,"S");
     doc.text("Domicilios",ml+1,y+totalH/2+1.5);
-    doc.rect(ml+numW,y,fechaW,totalH,"S");
-    doc.text("Fecha",ml+numW+1,y+totalH/2+1.5);
-    var simX=ml+numW+fechaW;
+    var simX=ml+numW;
     doc.rect(simX,y,simW,row1H,"S");
     doc.text("Simbolo",simX+(simW/2)-6,y+row1H-0.8);
     for(var i=0;i<4;i++){
@@ -1193,17 +1190,17 @@ function generateTerritoryPDF(terrNum,houses){
     var thisRowH=calcRowH(h);
     doc.setFontSize(8);
     var x=ml;
-    for(var c=0;c<7;c++){
+    for(var c=0;c<6;c++){
       doc.setDrawColor(180);doc.setLineWidth(0.2);
       doc.rect(x,y,colWidths[c],thisRowH,"S");
-      if(c>=1&&c<=5){addTextField(x+0.3,y+0.3,colWidths[c]-0.6,thisRowH-0.6,c>=2&&c<=5?5:6);}
+      if(c>=1&&c<=4){addTextField(x+0.3,y+0.3,colWidths[c]-0.6,thisRowH-0.6,5);}
       x+=colWidths[c];
     }
     doc.setTextColor(0,128,0);
     doc.text((indent?"      ":"  ")+label,ml,y+3.8);
     doc.setTextColor(0);
     if(h&&h.HouseNotes){
-      var notesX=ml+numW+fechaW+tickW*4;
+      var notesX=ml+numW+tickW*4;
       doc.setFontSize(7);doc.setTextColor(80);
       var lines=doc.splitTextToSize(h.HouseNotes.replace(/[\r\n]+/g," "),notesW-3);
       doc.text(lines,notesX+1.5,y+3.5);
