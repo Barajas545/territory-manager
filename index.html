@@ -1180,7 +1180,7 @@ function generateTerritoryPDF(terrNum,houses){
 
   var aptHeaderH=5.5;
 
-  function drawHouseRows(y,label,indent){
+  function drawHouseRows(y,label,indent,h){
     doc.setFontSize(8);
     for(var r=0;r<ROWS_PER_HOUSE;r++){
       var x=ml;
@@ -1194,6 +1194,13 @@ function generateTerritoryPDF(terrNum,houses){
         doc.setTextColor(0,128,0);
         doc.text((indent?"      ":"  ")+label,ml,y+3.8);
         doc.setTextColor(0);
+        if(h&&h.HouseNotes){
+          var notesX=ml+numW+fechaW+tickW*4;
+          doc.setFontSize(5);doc.setTextColor(100);
+          var noteText=h.HouseNotes.replace(/[\r\n]+/g," ").substring(0,40);
+          doc.text("  "+noteText,notesX,y+3.8);
+          doc.setFontSize(8);doc.setTextColor(0);
+        }
       }
       y+=rowH;
     }
@@ -1251,12 +1258,12 @@ function generateTerritoryPDF(terrNum,houses){
         g.items.forEach(function(h){
           checkPageBreak(ROWS_PER_HOUSE*rowH);
           var apt=extractApt(h.HouseAddress);
-          pageY=drawHouseRows(pageY,apt||g.num,true);
+          pageY=drawHouseRows(pageY,apt||g.num,true,h);
         });
       } else {
         g.items.forEach(function(h){
           checkPageBreak(ROWS_PER_HOUSE*rowH);
-          pageY=drawHouseRows(pageY,extractNumber(h.HouseAddress),false);
+          pageY=drawHouseRows(pageY,extractNumber(h.HouseAddress),false,h);
         });
       }
     });
