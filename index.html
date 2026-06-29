@@ -153,6 +153,9 @@ button#tmPullTab{display:none;position:absolute;left:0;top:50%;transform:transla
 #tmGeocodeStatus{position:absolute;bottom:calc(var(--nav-h) + var(--safe-b) + 56px);left:50%;transform:translateX(-50%);z-index:500;font-size:12px;color:#fff;background:rgba(0,0,0,0.75);border-radius:24px;padding:8px 18px;pointer-events:none;display:none;}\
 .tm-toast{position:absolute;top:calc(var(--bar-h) + 52px);left:50%;transform:translateX(-50%);z-index:900;border-radius:24px;padding:10px 22px;font-size:14px;font-weight:600;color:#fff;display:none;pointer-events:none;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,0.3);background:#2e7d32;}\
 .tm-empty{color:#aaa;font-size:15px;padding:32px;text-align:center;}\
+.tm-adjust-map{width:100%;height:200px;border-radius:12px;margin:12px 0;overflow:hidden;border:2px solid #e8e8e8;}\
+.tm-adjust-hint{font-size:12px;color:#999;text-align:center;margin-bottom:10px;}\
+.tm-adjust-coords{font-size:13px;color:#555;text-align:center;font-family:monospace;margin-bottom:10px;}\
 \
 #tmVisitSelect{position:absolute;top:calc(var(--bar-h) + 56px);right:12px;z-index:500;padding:9px 14px;border-radius:12px;border:none;background:rgba(20,20,20,0.88);color:#fff;font-size:13px;font-weight:600;font-family:inherit;box-shadow:0 2px 12px rgba(0,0,0,0.4);-webkit-appearance:none;appearance:none;cursor:pointer;padding-right:32px;background-image:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%278%27%3E%3Cpath d=%27M1 1l5 5 5-5%27 stroke=%27white%27 stroke-width=%272%27 fill=%27none%27/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;}\
 #tmVisitSelect option{background:#1a1a1a;color:#fff;}\
@@ -646,11 +649,25 @@ function openList(title,houses){
   var body=document.getElementById("tmListBody");
   if(!houses.length){body.innerHTML='<div class="tm-empty">No houses found</div>';}
   else{
-    var sorted=houses.slice().sort(function(a,b){
-      var oa={overdue:0,due:1,never:2,recent:3},sa=visitStatus(a.HouseLastVisitDate),sb=visitStatus(b.HouseLastVisitDate);
-      return(oa[sa]||2)-(oa[sb]||2);
+    var streetMap={};
+    houses.forEach(function(h){
+      var st=extractStreet(h.HouseAddress);
+      if(!streetMap[st])streetMap[st]=[];
+      streetMap[st].push(h);
     });
-    body.innerHTML=sorted.map(makeHouseCard).join("");
+    var streetKeys=Object.keys(streetMap).sort();
+    var html="";
+    streetKeys.forEach(function(st){
+      var stHouses=streetMap[st].slice().sort(function(a,b){
+        var na=extractNumber(a.HouseAddress),nb=extractNumber(b.HouseAddress);
+        var ia=parseInt(na),ib=parseInt(nb);
+        if(!isNaN(ia)&&!isNaN(ib))return ia-ib;
+        return na.localeCompare(nb);
+      });
+      html+='<div class="tm-section-label" style="margin:14px 0 8px">'+esc(st)+'</div>';
+      html+=stHouses.map(makeHouseCard).join("");
+    });
+    body.innerHTML=html;
   }
   document.getElementById("tmListOverlay").classList.add("open");
 }
@@ -690,12 +707,73 @@ function openDetail(id){
     (visits.length?visits.map(function(x){return'<div class="tm-visit-block"><div class="tm-visit-label">'+x.l+'</div><div class="tm-visit-text">'+esc(x.v)+'</div></div>';}).join(""):'<div class="tm-empty" style="padding:16px 0">No visits recorded</div>')+
     '<div style="display:flex;gap:8px;margin-top:18px">'+
     '<button class="tm-save-btn" id="tmDetLog" style="flex:1;background:#2e7d32">Log Visit</button>'+
-    '<button class="tm-edit-btn" id="tmDetEdit" style="flex:1">✏️ Edit</button>'+
+    '<button class="tm-edit-btn" id="tmDetEdit" style="flex:1">\u{270F}\u{FE0F} Edit</button>'+
+    '</div>'+
+    '<button class="tm-edit-btn" id="tmDetAdjust" style="margin-top:8px;width:100%">\u{1F4CD} Adjust Pin Location</button>'+
+    '<div id="tmAdjustWrap" style="display:none">'+
+    '<div class="tm-adjust-map" id="tmAdjustMap"></div>'+
+    '<div class="tm-adjust-hint">Drag the pin to the correct location</div>'+
+    '<div class="tm-adjust-coords" id="tmAdjustCoords"></div>'+
+    '<button class="tm-save-btn" id="tmAdjustSave">\u{1F4CD} Save Pin Location</button>'+
     '</div>';
 
   document.getElementById("tmDetDir").addEventListener("click",function(){window.open("https://www.google.com/maps/dir/?api=1&destination="+encodeURIComponent(mapQ),"_blank");});
   document.getElementById("tmDetEdit").addEventListener("click",function(){closeDetail();openForm(h);});
   document.getElementById("tmDetLog").addEventListener("click",function(){openLogVisit(id);});
+
+  var adjustMap=null,adjustMarker=null,adjustLat=null,adjustLng=null;
+  document.getElementById("tmDetAdjust").addEventListener("click",function(){
+    var wrap=document.getElementById("tmAdjustWrap");
+    if(wrap.style.display==="none"){
+      wrap.style.display="block";
+      this.style.display="none";
+      setTimeout(function(){
+        if(adjustMap){adjustMap.remove();adjustMap=null;}
+        var gps=parseGPS(h.HouseGPSCoordinates);
+        var startLat=gps?gps.lat:36.7;
+        var startLng=gps?gps.lng:-119.7;
+        var startZoom=gps?17:6;
+        adjustLat=startLat;adjustLng=startLng;
+        adjustMap=L.map("tmAdjustMap",{zoomControl:true});
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OSM"}).addTo(adjustMap);
+        adjustMap.setView([startLat,startLng],startZoom);
+        adjustMarker=L.marker([startLat,startLng],{draggable:true,icon:colorIcon("#c62828")}).addTo(adjustMap);
+        document.getElementById("tmAdjustCoords").textContent=startLat.toFixed(6)+", "+startLng.toFixed(6);
+        adjustMarker.on("dragend",function(){
+          var pos=adjustMarker.getLatLng();
+          adjustLat=pos.lat;adjustLng=pos.lng;
+          document.getElementById("tmAdjustCoords").textContent=pos.lat.toFixed(6)+", "+pos.lng.toFixed(6);
+        });
+        if(!gps&&h.HouseAddress){
+          geocodeAddr(h.HouseAddress,h.HouseCity).then(function(loc){
+            if(loc){
+              adjustLat=loc.lat;adjustLng=loc.lng;
+              adjustMap.setView([loc.lat,loc.lng],17);
+              adjustMarker.setLatLng([loc.lat,loc.lng]);
+              document.getElementById("tmAdjustCoords").textContent=loc.lat.toFixed(6)+", "+loc.lng.toFixed(6);
+            }
+          });
+        }
+        adjustMap.invalidateSize();
+      },300);
+    }
+  });
+
+  document.getElementById("tmAdjustSave").addEventListener("click",function(){
+    if(adjustLat===null)return;
+    var newGPS=adjustLat.toFixed(6)+", "+adjustLng.toFixed(6);
+    var btn=this;btn.textContent="Saving...";btn.disabled=true;
+    fetch(API,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:id,HouseGPSCoordinates:newGPS})})
+    .then(function(r){if(!r.ok)throw new Error("Server error");return r.json();})
+    .then(function(){
+      btn.textContent="\u{1F4CD} Save Pin Location";btn.disabled=false;
+      h.HouseGPSCoordinates=newGPS;
+      toast("Pin location saved ✓");
+      closeDetail();loadRecords();
+    })
+    .catch(function(e){btn.textContent="\u{1F4CD} Save Pin Location";btn.disabled=false;toast("Error: "+e.message,"#c62828");});
+  });
+
   document.getElementById("tmDetailOverlay").classList.add("open");
 }
 function closeDetail(){document.getElementById("tmDetailOverlay").classList.remove("open");}
