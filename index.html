@@ -1075,9 +1075,12 @@ function generateTerritoryPDF(terrNum,houses){
   var ml=6,mt=14;
   var cw=82.55;
   var numW=cw*0.22;
-  var tickW=cw*0.095;
-  var notesW=cw-(numW+tickW*4);
-  var colWidths=[numW,tickW,tickW,tickW,tickW,notesW];
+  var simW=cw*0.045;
+  var dateW=cw*0.055;
+  var fechaLabelW=3.5;
+  var simBlock=simW*4;
+  var dateBlock=dateW*4;
+  var notesW=cw-(numW+simBlock+dateBlock+fechaLabelW);
 
   var streetMap={};
   houses.forEach(function(h){
@@ -1131,7 +1134,6 @@ function generateTerritoryPDF(terrNum,houses){
 
   function drawTableHeader(y){
     var row1H=6;var row2H=5;var totalH=row1H+row2H;
-    var simW=tickW*4;
     doc.setFillColor(230,230,230);
     doc.rect(ml,y,cw,totalH,"F");
     doc.setDrawColor(0);doc.setLineWidth(0.4);
@@ -1140,19 +1142,35 @@ function generateTerritoryPDF(terrNum,houses){
     doc.rect(ml,y,numW,totalH,"S");
     doc.text("Domicilios",ml+1,y+totalH/2+1.5);
     var simX=ml+numW;
-    doc.rect(simX,y,simW,totalH,"S");
-    doc.rect(simX,y,simW,row1H,"S");
-    doc.text("Simbolo",simX+(simW/2)-6,y+row1H-1);
-    doc.setFontSize(7);
+    doc.rect(simX,y,simBlock,totalH,"S");
+    doc.rect(simX,y,simBlock,row1H,"S");
+    doc.text("Simbolo",simX+(simBlock/2)-6,y+row1H-1);
+    doc.setFontSize(6);
     for(var i=0;i<4;i++){
-      doc.rect(simX+i*tickW,y+row1H,tickW,row2H,"S");
-      doc.text(String(i+1),simX+i*tickW+tickW/2-1.5,y+row1H+row2H-1);
+      doc.rect(simX+i*simW,y+row1H,simW,row2H,"S");
+      doc.text(String(i+1),simX+i*simW+simW/2-1,y+row1H+row2H-1);
     }
-    var notesX=simX+simW;
+    var dateX=simX+simBlock;
+    doc.setFontSize(7);
+    doc.rect(dateX,y,dateBlock,totalH,"S");
+    doc.rect(dateX,y,dateBlock,row1H,"S");
+    doc.text("Fecha",dateX+(dateBlock/2)-4,y+row1H-1);
+    doc.setFontSize(6);
+    for(var i=0;i<4;i++){
+      doc.rect(dateX+i*dateW,y+row1H,dateW,row2H,"S");
+      doc.text(String(i+1),dateX+i*dateW+dateW/2-1,y+row1H+row2H-1);
+    }
+    var fechaX=dateX+dateBlock;
+    doc.rect(fechaX,y,fechaLabelW,totalH,"S");
+    doc.setFontSize(6);
+    doc.save();
+    doc.text("Fecha",fechaX+2.5,y+totalH/2+4,{angle:90});
+    doc.restore();
+    var notesX=fechaX+fechaLabelW;
     doc.rect(notesX,y,notesW,totalH,"S");
     doc.setFontSize(7);
-    doc.text("Nombre y",notesX+2,y+totalH/2);
-    doc.text("observaciones",notesX+2,y+totalH/2+3);
+    doc.text("Nombre y",notesX+1,y+totalH/2);
+    doc.text("observaciones",notesX+1,y+totalH/2+3);
     doc.setFontSize(8);
     doc.setFont("helvetica","normal");
     return y+totalH;
@@ -1189,21 +1207,50 @@ function generateTerritoryPDF(terrNum,houses){
     return Math.max(rowH,needed);
   }
 
+  function fmtShortDate(v){
+    if(!v)return"";
+    var d=new Date(v);if(isNaN(d))return"";
+    var months=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    return months[d.getMonth()]+"-"+d.getDate();
+  }
+
   function drawHouseRows(y,label,indent,h){
     var thisRowH=calcRowH(h);
+    var visits=[h?h.HouseResutsOnVisit1:"",h?h.HouseResutsOnVisit2:"",h?h.HouseResutsOnVisit3:"",h?h.HouseResutsOnVisit4:""];
     doc.setFontSize(8);
-    var x=ml;
-    for(var c=0;c<6;c++){
-      doc.setDrawColor(180);doc.setLineWidth(0.2);
-      doc.rect(x,y,colWidths[c],thisRowH,"S");
-      if(c>=1&&c<=4){addTextField(x+0.3,y+0.3,colWidths[c]-0.6,thisRowH-0.6,5);}
-      x+=colWidths[c];
+    doc.setDrawColor(180);doc.setLineWidth(0.2);
+    doc.rect(ml,y,numW,thisRowH,"S");
+    var simX=ml+numW;
+    for(var i=0;i<4;i++){
+      doc.rect(simX+i*simW,y,simW,thisRowH,"S");
+      if(visits[i]){
+        doc.setFontSize(5);doc.setTextColor(80);
+        doc.save();
+        doc.text(visits[i].substring(0,8),simX+i*simW+simW-1,y+thisRowH-1,{angle:90});
+        doc.restore();
+        doc.setFontSize(8);doc.setTextColor(0);
+      } else {
+        addTextField(simX+i*simW+0.2,y+0.2,simW-0.4,thisRowH-0.4,4);
+      }
     }
+    var dateX=simX+simBlock;
+    for(var i=0;i<4;i++){
+      doc.rect(dateX+i*dateW,y,dateW,thisRowH,"S");
+      addTextField(dateX+i*dateW+0.2,y+0.2,dateW-0.4,thisRowH-0.4,4);
+    }
+    var fechaX=dateX+dateBlock;
+    doc.rect(fechaX,y,fechaLabelW,thisRowH,"S");
+    doc.setFontSize(5);doc.setTextColor(150);
+    doc.save();
+    doc.text("Fecha",fechaX+2.5,y+thisRowH/2+4,{angle:90});
+    doc.restore();
+    doc.setTextColor(0);
+    var notesX=fechaX+fechaLabelW;
+    doc.rect(notesX,y,notesW,thisRowH,"S");
     doc.setTextColor(0,128,0);
     doc.text((indent?"      ":"  ")+label,ml,y+3.8);
     doc.setTextColor(0);
     if(h&&h.HouseNotes){
-      var notesX=ml+numW+tickW*4;
       doc.setFontSize(7);doc.setTextColor(80);
       var lines=doc.splitTextToSize(h.HouseNotes.replace(/[\r\n]+/g," "),notesW-3);
       doc.text(lines,notesX+1.5,y+3.5);
