@@ -156,6 +156,10 @@ button#tmPullTab{display:none;position:absolute;left:0;top:50%;transform:transla
 .tm-adjust-map{width:100%;height:200px;border-radius:12px;margin:12px 0;overflow:hidden;border:2px solid #e8e8e8;}\
 .tm-adjust-hint{font-size:12px;color:#999;text-align:center;margin-bottom:10px;}\
 .tm-adjust-coords{font-size:13px;color:#555;text-align:center;font-family:monospace;margin-bottom:10px;}\
+.tm-street-header{font-size:16px;font-weight:700;color:#c62828;margin:18px 0 8px;padding-bottom:6px;border-bottom:2px solid #fdd;}\
+.tm-street-header:first-child{margin-top:4px;}\
+.tm-apt-header{font-size:13px;font-weight:700;color:#555;margin:10px 0 4px;padding:8px 12px;background:#f5f5f3;border-radius:10px;}\
+.tm-apt-group{padding-left:16px;border-left:3px solid #eee;margin-left:8px;}\
 \
 #tmVisitSelect{position:absolute;top:calc(var(--bar-h) + 56px);right:12px;z-index:500;padding:9px 14px;border-radius:12px;border:none;background:rgba(20,20,20,0.88);color:#fff;font-size:13px;font-weight:600;font-family:inherit;box-shadow:0 2px 12px rgba(0,0,0,0.4);-webkit-appearance:none;appearance:none;cursor:pointer;padding-right:32px;background-image:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%278%27%3E%3Cpath d=%27M1 1l5 5 5-5%27 stroke=%27white%27 stroke-width=%272%27 fill=%27none%27/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;}\
 #tmVisitSelect option{background:#1a1a1a;color:#fff;}\
@@ -624,13 +628,14 @@ function buildTerrList(){
 }
 
 /* ── House List Drawer ── */
-function makeHouseCard(h){
+function makeHouseCard(h,displayLabel){
   var s=visitStatus(h.HouseLastVisitDate);
+  var label=displayLabel||h.HouseAddress||"No Address";
   return'<div class="tm-house-card" data-id="'+h.id+'">'+
     '<div class="tm-hc-top">'+
     '<span class="tm-visit-dot '+dotClass(s)+'"></span>'+
     '<div class="tm-hc-info">'+
-    '<div class="tm-hc-addr">'+esc(h.HouseAddress||"No Address")+'</div>'+
+    '<div class="tm-hc-addr">'+esc(label)+'</div>'+
     '<div class="tm-hc-meta">'+esc(h.HouseCity||"")+
     (h.HouseTerritoryNumber?" · T-"+esc(h.HouseTerritoryNumber):"")+
     (h.HouseLanguage?" · "+esc(h.HouseLanguage):"")+
@@ -659,13 +664,35 @@ function openList(title,houses){
     var html="";
     streetKeys.forEach(function(st){
       var stHouses=streetMap[st].slice().sort(function(a,b){
-        var na=extractNumber(a.HouseAddress),nb=extractNumber(b.HouseAddress);
+        var na=extractBaseNum(a.HouseAddress),nb=extractBaseNum(b.HouseAddress);
         var ia=parseInt(na),ib=parseInt(nb);
-        if(!isNaN(ia)&&!isNaN(ib))return ia-ib;
-        return na.localeCompare(nb);
+        if(!isNaN(ia)&&!isNaN(ib)){if(ia!==ib)return ia-ib;}
+        var aa=extractApt(a.HouseAddress),ab=extractApt(b.HouseAddress);
+        return aa.localeCompare(ab);
       });
-      html+='<div class="tm-section-label" style="margin:14px 0 8px">'+esc(st)+'</div>';
-      html+=stHouses.map(makeHouseCard).join("");
+      html+='<div class="tm-street-header">'+esc(st)+'</div>';
+      var numGroups=[];var curNum=null,curGroup=[];
+      stHouses.forEach(function(h){
+        var bn=extractBaseNum(h.HouseAddress);
+        if(bn!==curNum){if(curGroup.length)numGroups.push({num:curNum,items:curGroup});curNum=bn;curGroup=[h];}
+        else{curGroup.push(h);}
+      });
+      if(curGroup.length)numGroups.push({num:curNum,items:curGroup});
+      numGroups.forEach(function(g){
+        var hasApts=g.items.some(function(h){return hasApt(h.HouseAddress);});
+        if(hasApts&&g.items.length>1){
+          html+='<div class="tm-apt-header">'+esc(g.num)+' (Apts)</div>';
+          html+='<div class="tm-apt-group">';
+          g.items.forEach(function(h){
+            var apt=extractApt(h.HouseAddress);
+            html+=makeHouseCard(h,apt||g.num);
+          });
+          html+='</div>';
+        } else {
+          g.items.forEach(function(h){
+            html+=makeHouseCard(h,extractNumber(h.HouseAddress));
+          });
+        }
     });
     body.innerHTML=html;
   }
@@ -1014,16 +1041,32 @@ document.getElementById("tmExportBtn").addEventListener("click",function(){
 
 function extractStreet(addr){
   if(!addr)return"Unknown Street";
-  var cleaned=addr.trim().replace(/^[\d,\s]+/,"").trim();
+  var cleaned=addr.trim().replace(/\s+(APT|UNIT|STE|SUITE|#)\s*.*/i,"").replace(/^[\d,\s]+/,"").trim();
   return cleaned||addr;
 }
 
 function extractNumber(addr){
   if(!addr)return"";
-  var m=addr.trim().match(/^([\d,\s]+[A-Za-z]?)\s/);
+  var clean=addr.trim().replace(/\s+(APT|UNIT|STE|SUITE|#)\s*.*/i,"");
+  var m=clean.match(/^([\d,\s]+[A-Za-z]?)\s/);
   if(m){var n=m[1].replace(/\s+$/,"");return n;}
-  return addr;
+  return clean;
 }
+
+function extractBaseNum(addr){
+  if(!addr)return"";
+  var clean=addr.trim().replace(/\s+(APT|UNIT|STE|SUITE|#)\s*.*/i,"");
+  var m=clean.match(/^(\d+)/);
+  return m?m[1]:"";
+}
+
+function extractApt(addr){
+  if(!addr)return"";
+  var m=addr.match(/\s+(?:APT|UNIT|STE|SUITE|#)\s*(.*)/i);
+  return m?m[1].trim():"";
+}
+
+function hasApt(addr){return!!extractApt(addr);}
 
 function generateTerritoryPDF(terrNum,houses){
   var jsPDF=window.jspdf.jsPDF;
