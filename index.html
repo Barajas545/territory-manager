@@ -1114,9 +1114,6 @@ function generateTerritoryPDF(terrNum,houses){
     doc.setFont("helvetica","underline");
     doc.text(terrNum,ml+cw-10,y);
     doc.setFont("helvetica","normal");
-    y+=4;
-    doc.setFontSize(7);
-    doc.text("Page "+pg,ml+(cw/2)-6,y);
     y+=5;
     doc.setFont("helvetica","bold");doc.setFontSize(7);
     doc.text("Simbolos",ml,y);
@@ -1267,24 +1264,15 @@ function generateTerritoryPDF(terrNum,houses){
     pageY+=2;
   });
 
-  doc.setFontSize(8);doc.setFont("helvetica","normal");
+  totalPages=pageNum;
+  doc.setFontSize(7);doc.setFont("helvetica","normal");
   var dateStr=new Date().toLocaleDateString("en-US",{weekday:"long",year:"numeric",month:"long",day:"numeric"});
-  for(var p=1;p<=pageNum;p++){
+  for(var p=1;p<=totalPages;p++){
     doc.setPage(p);
     doc.text(dateStr,ml,ph-10);
-  }
-
-  totalPages=pageNum;
-  for(var p2=1;p2<=totalPages;p2++){
-    doc.setPage(p2);
-    var oldText="Page "+p2;
-    if(totalPages>1){
-      doc.setFontSize(9);
-      doc.setTextColor(255,255,255);
-      doc.text(oldText,pw/2-8,mt+22);
-      doc.setTextColor(0);
-      doc.text("Page "+p2+" of "+totalPages,pw/2-12,mt+22);
-    }
+    doc.setTextColor(0);
+    var pgText="Page "+p+" of "+totalPages;
+    doc.text(pgText,ml+cw-doc.getTextWidth(pgText),ph-10);
   }
 
   var filename="Territory_"+(terrNum==="Unassigned"?"Unassigned":terrNum)+".pdf";
