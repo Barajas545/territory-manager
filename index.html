@@ -1130,28 +1130,44 @@ function generateTerritoryPDF(terrNum,houses){
   }
 
   function drawTableHeader(y){
-    var row1H=headerH/2;var row2H=headerH/2;var totalH=row1H+row2H;
+    var row1H=5,row2H=4,row3H=12;
+    var totalH=row1H+row2H+row3H;
     var simW=tickW*4;
+    var fechaLblW=4;
+    // Gray background
     doc.setFillColor(230,230,230);
     doc.rect(ml,y,cw,totalH,"F");
     doc.setDrawColor(0);doc.setLineWidth(0.3);
+    // Domicilios - full height left column
     doc.setFont("helvetica","bold");doc.setFontSize(7);
     doc.rect(ml,y,numW,totalH,"S");
     doc.text("Domicilios",ml+1,y+totalH/2+1.5);
+    // "Fecha" sub-cell at bottom-right of Domicilios column
+    var fechaX=ml+numW-fechaLblW;
+    doc.rect(fechaX,y+row1H+row2H,fechaLblW,row3H,"S");
+    doc.setFontSize(5);
+    doc.text("Fecha",fechaX+fechaLblW-0.5,y+row1H+row2H+row3H-1.5,{angle:90});
     var simX=ml+numW;
+    // Row1: "Simbolo" label spanning all 4 tick columns
+    doc.setFont("helvetica","bold");doc.setFontSize(7);
     doc.rect(simX,y,simW,row1H,"S");
-    doc.text("Simbolo",simX+(simW/2)-6,y+row1H-0.8);
+    doc.text("Simbolo",simX+simW/2-5,y+row1H-0.8);
+    // Row2: numbers 1,2,3,4
     for(var i=0;i<4;i++){
       doc.rect(simX+i*tickW,y+row1H,tickW,row2H,"S");
-      doc.text(String(i+1),simX+i*tickW+tickW/2-1.5,y+row1H+row2H-0.8);
+      doc.text(String(i+1),simX+i*tickW+tickW/2-1,y+row1H+row2H-0.8);
     }
+    // Row3: 4 tall date boxes aligned with 1,2,3,4
+    for(var j=0;j<4;j++){
+      doc.rect(simX+j*tickW,y+row1H+row2H,tickW,row3H,"S");
+    }
+    // Nombre y observaciones - full height right column
     var notesX=simX+simW;
     doc.rect(notesX,y,notesW,totalH,"S");
     doc.setFontSize(6);
     doc.text("Nombre y",notesX+1,y+totalH/2-0.5);
     doc.text("observaciones",notesX+1,y+totalH/2+2.5);
-    doc.setFontSize(8);
-    doc.setFont("helvetica","normal");
+    doc.setFontSize(8);doc.setFont("helvetica","normal");
     return y+totalH;
   }
 
