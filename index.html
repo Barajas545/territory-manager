@@ -1138,13 +1138,12 @@ function generateTerritoryPDF(terrNum,houses){
     doc.setFillColor(230,230,230);
     doc.rect(ml,y,cw,totalH,"F");
     doc.setDrawColor(0);doc.setLineWidth(0.3);
-    // Domicilios - full height left column
+    // Domicilios - full height left column, text top-aligned
     doc.setFont("helvetica","bold");doc.setFontSize(7);
     doc.rect(ml,y,numW,totalH,"S");
-    doc.text("Domicilios",ml+1,y+totalH/2+1.5);
-    // "Fecha" sub-cell at bottom-right of Domicilios column
+    doc.text("Domicilios",ml+1,y+4);
+    // "Fecha" vertical label (no border) at bottom-right of Domicilios column
     var fechaX=ml+numW-fechaLblW;
-    doc.rect(fechaX,y+row1H+row2H,fechaLblW,row3H,"S");
     doc.setFontSize(5);
     doc.text("Fecha",fechaX+fechaLblW-0.5,y+row1H+row2H+row3H-1.5,{angle:90});
     var simX=ml+numW;
@@ -1161,12 +1160,12 @@ function generateTerritoryPDF(terrNum,houses){
     for(var j=0;j<4;j++){
       doc.rect(simX+j*tickW,y+row1H+row2H,tickW,row3H,"S");
     }
-    // Nombre y observaciones - full height right column
+    // Nombre y observaciones - full height right column, text top-aligned
     var notesX=simX+simW;
     doc.rect(notesX,y,notesW,totalH,"S");
     doc.setFontSize(6);
-    doc.text("Nombre y",notesX+1,y+totalH/2-0.5);
-    doc.text("observaciones",notesX+1,y+totalH/2+2.5);
+    doc.text("Nombre y",notesX+1,y+4);
+    doc.text("observaciones",notesX+1,y+7);
     doc.setFontSize(8);doc.setFont("helvetica","normal");
     return y+totalH;
   }
