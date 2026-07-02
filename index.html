@@ -1096,7 +1096,7 @@ function generateTerritoryPDF(terrNum,houses){
   var doc=new jsPDF({unit:"mm",format:"letter"});
   var pageNum=1,totalPages=1;
 
-  function drawHeader(pg){
+  function drawHeader(pg,streetName){
     var y=mt;
     var c3=cw/3;
     doc.setFontSize(9);doc.setFont("helvetica","underline");
@@ -1107,8 +1107,7 @@ function generateTerritoryPDF(terrNum,houses){
     y+=6;
     doc.setFontSize(9);
     doc.setFont("helvetica","bold");
-    var firstStreet=houses.length?extractStreet(houses[0].HouseAddress):"";
-    doc.text(firstStreet,ml,y);
+    doc.text(streetName||"",ml,y);
     doc.text("Terr. No:",ml+cw-28,y);
     doc.setFont("helvetica","underline");
     doc.text(terrNum,ml+cw-10,y);
@@ -1237,15 +1236,17 @@ function generateTerritoryPDF(terrNum,houses){
     return y+aptHeaderH;
   }
 
+  var currentPageStreet=streets.length?streets[0]:"";
+
   function checkPageBreak(needed){
     if(pageY+needed>ph-20){
       doc.addPage();pageNum++;
-      pageY=drawHeader(pageNum);
+      pageY=drawHeader(pageNum,currentPageStreet);
       pageY=drawTableHeader(pageY);
     }
   }
 
-  var pageY=drawHeader(pageNum);
+  var pageY=drawHeader(pageNum,currentPageStreet);
   pageY=drawTableHeader(pageY);
 
   streets.forEach(function(st){
@@ -1257,6 +1258,7 @@ function generateTerritoryPDF(terrNum,houses){
       return aa.localeCompare(ab);
     });
 
+    currentPageStreet=st;
     checkPageBreak(streetHeaderH+(ROWS_PER_HOUSE*rowH));
     pageY=drawStreetHeader(pageY,st);
 
