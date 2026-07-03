@@ -840,7 +840,7 @@ document.getElementById("tmDetClose").addEventListener("click",closeDetail);
 document.getElementById("tmDetailOverlay").addEventListener("click",function(e){if(e.target===this)closeDetail();});
 
 /* ── Quick Log Visit ── */
-function openLogVisit(id){
+function openLogVisit(id,slot){
   var h=allRecords.find(function(r){return r.id===id;});if(!h)return;
   currentLogId=id;
   currentLogSlot=slot||null;
