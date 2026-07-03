@@ -165,7 +165,9 @@ button#tmPullTab{display:none;position:absolute;left:0;top:50%;transform:transla
 .tm-pdf-row.tm-apt-unit{padding-left:32px;background:#fafafa;}\
 .tm-pdf-addr{min-width:72px;max-width:90px;color:#2e7d32;font-size:15px;font-weight:700;flex-shrink:0;}\
 .tm-pdf-visits{display:flex;gap:3px;flex-shrink:0;}\
-.tm-pdf-box{width:30px;height:30px;border:1px solid #c5cae9;border-radius:4px;background:#e8eaf6;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#333;}\
+.tm-pdf-box{width:30px;height:30px;border:1px solid #c5cae9;border-radius:4px;background:#e8eaf6;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#333;cursor:pointer;user-select:none;-webkit-user-select:none;}\
+.tm-pdf-box:active{background:#9fa8da;}\
+.tm-pdf-box-filled{background:#c5cae9;color:#1a237e;}\
 .tm-pdf-notes{flex:1;font-size:12px;color:#666;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}\
 \
 #tmVisitSelect{position:absolute;top:calc(var(--bar-h) + 56px);right:12px;z-index:500;padding:9px 14px;border-radius:12px;border:none;background:rgba(20,20,20,0.88);color:#fff;font-size:13px;font-weight:600;font-family:inherit;box-shadow:0 2px 12px rgba(0,0,0,0.4);-webkit-appearance:none;appearance:none;cursor:pointer;padding-right:32px;background-image:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%278%27%3E%3Cpath d=%27M1 1l5 5 5-5%27 stroke=%27white%27 stroke-width=%272%27 fill=%27none%27/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;}\
@@ -349,7 +351,7 @@ button#tmPullTab{display:none;position:absolute;left:0;top:50%;transform:transla
 var API="https://share-point-api.vercel.app/api/territory";
 var records=[],allRecords=[],map=null,mapMarkers=[],markerMap={},filter="all",searchTerm="";
 var currentLogId="";
-var currentListTitle="",currentListIds=null;
+var currentListTitle="",currentListIds=null,currentLogSlot=null;
 
 /* ── Helpers ── */
 function esc(v){if(!v)return"";return String(v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;");}
@@ -639,12 +641,14 @@ function buildTerrList(){
 function makeHouseRow(h,displayLabel,isAptUnit){
   var visits=[h.HouseResutsOnVisit1,h.HouseResutsOnVisit2,h.HouseResutsOnVisit3,h.HouseResutsOnVisit4];
   var label=displayLabel||extractNumber(h.HouseAddress)||h.HouseAddress||"";
-  return'<div class="tm-pdf-row'+(isAptUnit?' tm-apt-unit':'')+'" data-act="detail" data-id="'+h.id+'">'+
-    '<div class="tm-pdf-addr">'+esc(label)+'</div>'+
+  return'<div class="tm-pdf-row'+(isAptUnit?' tm-apt-unit':'')+'">'+
+    '<div class="tm-pdf-addr" data-act="detail" data-id="'+h.id+'">'+esc(label)+'</div>'+
     '<div class="tm-pdf-visits">'+
-    visits.map(function(v){return'<div class="tm-pdf-box">'+esc(v||'')+'</div>';}).join('')+
+    visits.map(function(v,i){
+      return'<div class="tm-pdf-box'+(v?' tm-pdf-box-filled':'')+'" data-act="visit" data-id="'+h.id+'" data-slot="'+(i+1)+'">'+esc(v||'')+'</div>';
+    }).join('')+
     '</div>'+
-    '<div class="tm-pdf-notes">'+esc(h.HouseNotes||'')+'</div>'+
+    '<div class="tm-pdf-notes" data-act="detail" data-id="'+h.id+'">'+esc(h.HouseNotes||'')+'</div>'+
     '</div>';
 }
 
@@ -734,7 +738,8 @@ document.getElementById("tmListBody").addEventListener("click",function(e){
   if(!btn)return;
   var act=btn.dataset.act,id=btn.dataset.id;
   if(act==="detail")openDetail(id);
-  else if(act==="log")openLogVisit(id);
+  else if(act==="log")openLogVisit(id,null);
+  else if(act==="visit")openLogVisit(id,parseInt(btn.dataset.slot));
   else if(act==="dir"){var h=allRecords.find(function(r){return r.id===id;});if(h){var q=h.HouseGPSCoordinates||fullAddr(h);window.open("https://www.google.com/maps/dir/?api=1&destination="+encodeURIComponent(q),"_blank");}}
 });
 
@@ -838,20 +843,27 @@ document.getElementById("tmDetailOverlay").addEventListener("click",function(e){
 function openLogVisit(id){
   var h=allRecords.find(function(r){return r.id===id;});if(!h)return;
   currentLogId=id;
-  document.getElementById("tmLogTitle").textContent="Log Visit";
+  currentLogSlot=slot||null;
   document.getElementById("tmLogSub").textContent=h.HouseAddress||"No Address";
   document.getElementById("fLogDate").value=todayStr();
-  document.getElementById("fLogResult").value="";
 
-  var nextSlot="";
-  if(!h.HouseResutsOnVisit1)nextSlot="Visit 1";
-  else if(!h.HouseResutsOnVisit2)nextSlot="Visit 2";
-  else if(!h.HouseResutsOnVisit3)nextSlot="Visit 3";
-  else if(!h.HouseResutsOnVisit4)nextSlot="Visit 4";
-  else if(!h.HouseResutsOnVisit5)nextSlot="Visit 5";
-  else nextSlot="Visit 5 (will overwrite)";
-
-  document.getElementById("fLogResult").placeholder="What happened? (saves to "+nextSlot+")";
+  if(slot){
+    document.getElementById("tmLogTitle").textContent="Visit "+slot;
+    var existing=h["HouseResutsOnVisit"+slot]||"";
+    document.getElementById("fLogResult").value=existing;
+    document.getElementById("fLogResult").placeholder="Result for visit "+slot+"…";
+  } else {
+    document.getElementById("tmLogTitle").textContent="Log Visit";
+    document.getElementById("fLogResult").value="";
+    var nextSlot="";
+    if(!h.HouseResutsOnVisit1)nextSlot="Visit 1";
+    else if(!h.HouseResutsOnVisit2)nextSlot="Visit 2";
+    else if(!h.HouseResutsOnVisit3)nextSlot="Visit 3";
+    else if(!h.HouseResutsOnVisit4)nextSlot="Visit 4";
+    else if(!h.HouseResutsOnVisit5)nextSlot="Visit 5";
+    else nextSlot="Visit 5 (will overwrite)";
+    document.getElementById("fLogResult").placeholder="What happened? (saves to "+nextSlot+")";
+  }
   document.getElementById("tmLogOverlay").classList.add("open");
   setTimeout(function(){document.getElementById("fLogResult").focus();},350);
 }
@@ -867,11 +879,15 @@ document.getElementById("tmLogSave").addEventListener("click",function(){
   if(!result){toast("Please enter a result","#ef6c00");return;}
 
   var body={id:currentLogId,HouseLastVisitDate:date||todayStr()};
-  if(!h.HouseResutsOnVisit1)body.HouseResutsOnVisit1=result;
-  else if(!h.HouseResutsOnVisit2)body.HouseResutsOnVisit2=result;
-  else if(!h.HouseResutsOnVisit3)body.HouseResutsOnVisit3=result;
-  else if(!h.HouseResutsOnVisit4)body.HouseResutsOnVisit4=result;
-  else body.HouseResutsOnVisit5=result;
+  if(currentLogSlot){
+    body["HouseResutsOnVisit"+currentLogSlot]=result;
+  } else {
+    if(!h.HouseResutsOnVisit1)body.HouseResutsOnVisit1=result;
+    else if(!h.HouseResutsOnVisit2)body.HouseResutsOnVisit2=result;
+    else if(!h.HouseResutsOnVisit3)body.HouseResutsOnVisit3=result;
+    else if(!h.HouseResutsOnVisit4)body.HouseResutsOnVisit4=result;
+    else body.HouseResutsOnVisit5=result;
+  }
 
   var btn=document.getElementById("tmLogSave");
   btn.textContent="Saving…";btn.disabled=true;
