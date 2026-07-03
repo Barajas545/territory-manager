@@ -628,7 +628,7 @@ function buildTerrList(){
 }
 
 /* ── House List Drawer ── */
-function makeHouseCard(h,displayLabel){
+function makeHouseCard(h,displayLabel,compact){
   var s=visitStatus(h.HouseLastVisitDate);
   var label=displayLabel||h.HouseAddress||"No Address";
   return'<div class="tm-house-card" data-id="'+h.id+'">'+
@@ -636,10 +636,10 @@ function makeHouseCard(h,displayLabel){
     '<span class="tm-visit-dot '+dotClass(s)+'"></span>'+
     '<div class="tm-hc-info">'+
     '<div class="tm-hc-addr">'+esc(label)+'</div>'+
-    '<div class="tm-hc-meta">'+esc(h.HouseCity||"")+
+    (compact?'':'<div class="tm-hc-meta">'+esc(h.HouseCity||"")+
     (h.HouseTerritoryNumber?" · T-"+esc(h.HouseTerritoryNumber):"")+
     (h.HouseLanguage?" · "+esc(h.HouseLanguage):"")+
-    " · "+visitLabel(h.HouseLastVisitDate)+'</div>'+
+    " · "+visitLabel(h.HouseLastVisitDate)+'</div>')+
     '</div></div>'+
     '<div class="tm-hc-actions">'+
     '<button class="tm-btn-sm" data-act="detail" data-id="'+h.id+'">Details</button>'+
@@ -685,7 +685,7 @@ function openList(title,houses){
           html+='<div class="tm-apt-group">';
           g.items.forEach(function(h){
             var apt=extractApt(h.HouseAddress);
-            html+=makeHouseCard(h,apt||g.num);
+            html+=makeHouseCard(h,apt||g.num,true);
           });
           html+='</div>';
         } else {
