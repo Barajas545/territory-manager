@@ -168,7 +168,8 @@ button#tmPullTab{display:none;position:absolute;left:0;top:50%;transform:transla
 .tm-pdf-box{width:38px;height:38px;border:1px solid #c5cae9;border-radius:6px;background:#e8eaf6;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#333;cursor:pointer;user-select:none;-webkit-user-select:none;}\
 .tm-pdf-box:active{background:#9fa8da;}\
 .tm-pdf-box-filled{background:#c5cae9;color:#1a237e;}\
-.tm-pdf-notes{flex:1;font-size:15px;color:#666;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}\
+.tm-pdf-notes{flex:1;font-size:15px;color:#666;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;cursor:pointer;}\
+.tm-pdf-notes-empty{color:#bbb;font-style:italic;}\
 \
 #tmVisitSelect{position:absolute;top:calc(var(--top-h) + 56px);right:12px;z-index:500;padding:9px 14px;border-radius:12px;border:none;background:rgba(20,20,20,0.88);color:#fff;font-size:13px;font-weight:600;font-family:inherit;box-shadow:0 2px 12px rgba(0,0,0,0.4);-webkit-appearance:none;appearance:none;cursor:pointer;padding-right:32px;background-image:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%278%27%3E%3Cpath d=%27M1 1l5 5 5-5%27 stroke=%27white%27 stroke-width=%272%27 fill=%27none%27/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;}\
 #tmVisitSelect option{background:#1a1a1a;color:#fff;}\
@@ -307,6 +308,14 @@ button#tmPullTab{display:none;position:absolute;left:0;top:50%;transform:transla
 <div class="tm-field"><label>Visit Date</label><input id="fLogDate" type="date"></div>\
 <div class="tm-field"><label>Result</label><textarea id="fLogResult" placeholder="NH, Not home, Spoke with John about..., Left tract, Started Bible study..." style="min-height:100px"></textarea></div>\
 <button class="tm-save-btn" id="tmLogSave">Save Visit</button>\
+</div></div></div>\
+\
+<!-- Edit Notes Drawer -->\
+<div class="tm-overlay tm-log-overlay" id="tmNotesOverlay" style="z-index:950"><div class="tm-drawer"><div class="tm-drawer-handle"></div>\
+<div class="tm-drawer-header"><div class="tm-drawer-header-row"><div style="flex:1;min-width:0"><div class="tm-drawer-title">Edit Notes</div><div class="tm-drawer-sub" id="tmNotesSub"></div></div><button class="tm-close-btn" id="tmNotesClose">✕</button></div></div>\
+<div class="tm-log-body">\
+<div class="tm-field"><label>House Notes</label><textarea id="fNotesText" placeholder="Add notes about this house…" style="min-height:120px"></textarea></div>\
+<button class="tm-save-btn" id="tmNotesSave">Save Notes</button>\
 </div></div></div>\
 \
 <!-- Long Press Timer -->\
@@ -646,7 +655,7 @@ function makeHouseRow(h,displayLabel,isAptUnit){
       return'<div class="tm-pdf-box'+(v?' tm-pdf-box-filled':'')+'" data-act="visit" data-id="'+h.id+'" data-slot="'+(i+1)+'">'+esc(v||'')+'</div>';
     }).join('')+
     '</div>'+
-    '<div class="tm-pdf-notes" data-act="detail" data-id="'+h.id+'">'+esc(h.HouseNotes||'')+'</div>'+
+    '<div class="tm-pdf-notes'+(h.HouseNotes?'':' tm-pdf-notes-empty')+'" data-act="notes" data-id="'+h.id+'">'+(h.HouseNotes?esc(h.HouseNotes):'Add notes…')+'</div>'+
     '</div>';
 }
 
@@ -738,6 +747,7 @@ document.getElementById("tmListBody").addEventListener("click",function(e){
   if(act==="detail")openDetail(id);
   else if(act==="log")openLogVisit(id,null);
   else if(act==="visit")openLogVisit(id,parseInt(btn.dataset.slot));
+  else if(act==="notes")openEditNotes(id);
   else if(act==="dir"){var h=allRecords.find(function(r){return r.id===id;});if(h){var q=h.HouseGPSCoordinates||fullAddr(h);window.open("https://www.google.com/maps/dir/?api=1&destination="+encodeURIComponent(q),"_blank");}}
 });
 
@@ -868,6 +878,37 @@ function openLogVisit(id,slot){
 function closeLog(){document.getElementById("tmLogOverlay").classList.remove("open");currentLogId="";}
 document.getElementById("tmLogClose").addEventListener("click",closeLog);
 document.getElementById("tmLogOverlay").addEventListener("click",function(e){if(e.target===this)closeLog();});
+
+/* ── Edit Notes ── */
+var currentNotesId="";
+function openEditNotes(id){
+  var h=allRecords.find(function(r){return r.id===id;});if(!h)return;
+  currentNotesId=id;
+  document.getElementById("tmNotesSub").textContent=h.HouseAddress||"No Address";
+  document.getElementById("fNotesText").value=h.HouseNotes||"";
+  document.getElementById("tmNotesOverlay").classList.add("open");
+  setTimeout(function(){document.getElementById("fNotesText").focus();},350);
+}
+function closeNotes(){document.getElementById("tmNotesOverlay").classList.remove("open");currentNotesId="";}
+document.getElementById("tmNotesClose").addEventListener("click",closeNotes);
+document.getElementById("tmNotesOverlay").addEventListener("click",function(e){if(e.target===this)closeNotes();});
+document.getElementById("tmNotesSave").addEventListener("click",function(){
+  if(!currentNotesId)return;
+  var h=allRecords.find(function(r){return r.id===currentNotesId;});if(!h)return;
+  var notes=document.getElementById("fNotesText").value.trim();
+  var btn=document.getElementById("tmNotesSave");
+  btn.textContent="Saving…";btn.disabled=true;
+  fetch(API,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:currentNotesId,HouseNotes:notes})})
+  .then(function(r){if(!r.ok)throw new Error("Server error");return r.json();})
+  .then(function(){
+    btn.textContent="Save Notes";btn.disabled=false;
+    h.HouseNotes=notes;
+    closeNotes();
+    refreshOpenList();
+    toast("Notes saved ✓");
+  })
+  .catch(function(e){btn.textContent="Save Notes";btn.disabled=false;toast("Error: "+e.message,"#c62828");});
+});
 
 document.getElementById("tmLogSave").addEventListener("click",function(){
   if(!currentLogId)return;
