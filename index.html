@@ -156,10 +156,17 @@ button#tmPullTab{display:none;position:absolute;left:0;top:50%;transform:transla
 .tm-adjust-map{width:100%;height:200px;border-radius:12px;margin:12px 0;overflow:hidden;border:2px solid #e8e8e8;}\
 .tm-adjust-hint{font-size:12px;color:#999;text-align:center;margin-bottom:10px;}\
 .tm-adjust-coords{font-size:13px;color:#555;text-align:center;font-family:monospace;margin-bottom:10px;}\
-.tm-street-header{font-size:20px;font-weight:700;color:#c62828;margin:22px 0 10px;padding-bottom:8px;border-bottom:2px solid #fdd;}\
-.tm-street-header:first-child{margin-top:4px;}\
-.tm-apt-header{font-size:14px;font-weight:700;color:#555;margin:12px 0 4px;padding:10px 14px;background:#f0f0ee;border-radius:10px;border-left:4px solid #999;}\
-.tm-apt-group{padding-left:24px;border-left:3px solid #ddd;margin-left:12px;}\
+.tm-street-header{font-size:17px;font-weight:700;color:#fff;background:#c62828;margin:10px 0 0;padding:8px 12px;}\
+.tm-street-header:first-child{margin-top:0;}\
+.tm-apt-header{font-size:13px;font-weight:700;color:#333;padding:7px 12px;background:#ebebeb;border-bottom:1px solid #ddd;}\
+.tm-apt-group{padding-left:20px;}\
+.tm-pdf-row{display:flex;align-items:center;min-height:46px;padding:6px 12px;border-bottom:1px solid #eee;cursor:pointer;gap:6px;background:#fff;}\
+.tm-pdf-row:active{background:#f5f5f5;}\
+.tm-pdf-row.tm-apt-unit{padding-left:32px;background:#fafafa;}\
+.tm-pdf-addr{min-width:72px;max-width:90px;color:#2e7d32;font-size:15px;font-weight:700;flex-shrink:0;}\
+.tm-pdf-visits{display:flex;gap:3px;flex-shrink:0;}\
+.tm-pdf-box{width:30px;height:30px;border:1px solid #c5cae9;border-radius:4px;background:#e8eaf6;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#333;}\
+.tm-pdf-notes{flex:1;font-size:12px;color:#666;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}\
 \
 #tmVisitSelect{position:absolute;top:calc(var(--bar-h) + 56px);right:12px;z-index:500;padding:9px 14px;border-radius:12px;border:none;background:rgba(20,20,20,0.88);color:#fff;font-size:13px;font-weight:600;font-family:inherit;box-shadow:0 2px 12px rgba(0,0,0,0.4);-webkit-appearance:none;appearance:none;cursor:pointer;padding-right:32px;background-image:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%278%27%3E%3Cpath d=%27M1 1l5 5 5-5%27 stroke=%27white%27 stroke-width=%272%27 fill=%27none%27/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;}\
 #tmVisitSelect option{background:#1a1a1a;color:#fff;}\
@@ -628,6 +635,18 @@ function buildTerrList(){
 }
 
 /* ── House List Drawer ── */
+function makeHouseRow(h,displayLabel,isAptUnit){
+  var visits=[h.HouseResutsOnVisit1,h.HouseResutsOnVisit2,h.HouseResutsOnVisit3,h.HouseResutsOnVisit4];
+  var label=displayLabel||extractNumber(h.HouseAddress)||h.HouseAddress||"";
+  return'<div class="tm-pdf-row'+(isAptUnit?' tm-apt-unit':'')+'" data-act="detail" data-id="'+h.id+'">'+
+    '<div class="tm-pdf-addr">'+esc(label)+'</div>'+
+    '<div class="tm-pdf-visits">'+
+    visits.map(function(v){return'<div class="tm-pdf-box">'+esc(v||'')+'</div>';}).join('')+
+    '</div>'+
+    '<div class="tm-pdf-notes">'+esc(h.HouseNotes||'')+'</div>'+
+    '</div>';
+}
+
 function makeHouseCard(h,displayLabel,compact){
   var s=visitStatus(h.HouseLastVisitDate);
   var label=displayLabel||h.HouseAddress||"No Address";
@@ -682,15 +701,13 @@ function openList(title,houses){
         var hasApts=g.items.some(function(h){return hasApt(h.HouseAddress);});
         if(hasApts&&g.items.length>1){
           html+='<div class="tm-apt-header">'+esc(g.num)+' (Apts)</div>';
-          html+='<div class="tm-apt-group">';
           g.items.forEach(function(h){
             var apt=extractApt(h.HouseAddress);
-            html+=makeHouseCard(h,apt||g.num,true);
+            html+=makeHouseRow(h,apt||g.num,true);
           });
-          html+='</div>';
         } else {
           g.items.forEach(function(h){
-            html+=makeHouseCard(h,extractNumber(h.HouseAddress));
+            html+=makeHouseRow(h,extractNumber(h.HouseAddress),false);
           });
         }
       });
