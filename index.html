@@ -349,6 +349,7 @@ button#tmPullTab{display:none;position:absolute;left:0;top:50%;transform:transla
 var API="https://share-point-api.vercel.app/api/territory";
 var records=[],allRecords=[],map=null,mapMarkers=[],markerMap={},filter="all",searchTerm="";
 var currentLogId="";
+var currentListTitle="",currentListIds=null;
 
 /* ── Helpers ── */
 function esc(v){if(!v)return"";return String(v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;");}
@@ -667,7 +668,15 @@ function makeHouseCard(h,displayLabel,compact){
     '</div></div>';
 }
 
+function refreshOpenList(){
+  if(!document.getElementById("tmListOverlay").classList.contains("open")||!currentListIds)return;
+  var houses=allRecords.filter(function(h){return currentListIds.indexOf(h.id)>=0;});
+  openList(currentListTitle,houses);
+}
+
 function openList(title,houses){
+  currentListTitle=title;
+  currentListIds=houses.map(function(h){return h.id;});
   document.getElementById("tmListTitle").textContent=title;
   document.getElementById("tmListSub").textContent=houses.length+" house"+(houses.length===1?"":"s");
   var body=document.getElementById("tmListBody");
@@ -871,8 +880,13 @@ document.getElementById("tmLogSave").addEventListener("click",function(){
   .then(function(r){if(!r.ok)throw new Error("Server error");return r.json();})
   .then(function(){
     btn.textContent="Save Visit";btn.disabled=false;
+    // Update in-memory record immediately so the list refreshes without waiting for reload
+    Object.keys(body).forEach(function(k){if(k!=="id")h[k]=body[k];});
+    var mk=markerMap[h.id];
+    if(mk)mk.setIcon(colorIcon(pinColor(visitStatus(h.HouseLastVisitDate))));
     closeLog();closeDetail();
     toast("Visit logged ✓");
+    refreshOpenList();
     loadRecords();
   })
   .catch(function(e){btn.textContent="Save Visit";btn.disabled=false;toast("Error: "+e.message,"#c62828");});
