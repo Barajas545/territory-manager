@@ -1111,9 +1111,9 @@ document.getElementById("tmExportBtn").addEventListener("click",function(){
       html+='<button class="tm-edit-btn" data-exp="'+esc(t)+'" style="margin-bottom:8px">'+(t==="Unassigned"?t:"Territory "+esc(t))+' ('+terrMap[t].length+' houses)</button>';
     });
     html+='</div>';
-    document.getElementById("tmListDrawer").innerHTML=html;
+    document.querySelector("#tmListOverlay .tm-drawer").innerHTML=html;
     document.getElementById("tmExpClose").addEventListener("click",closeList);
-    document.getElementById("tmListDrawer").addEventListener("click",function(e){
+    document.querySelector("#tmListOverlay .tm-drawer").addEventListener("click",function(e){
       var btn=e.target.closest("[data-exp]");if(!btn)return;
       var key=btn.dataset.exp;
       closeList();
