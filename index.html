@@ -265,6 +265,10 @@ button#tmPullTab{display:none;position:absolute;left:0;top:50%;transform:transla
 <div class="tm-drawer-header"><div class="tm-drawer-header-row"><div style="flex:1;min-width:0"><div class="tm-drawer-title" id="tmListTitle">All Houses</div><div class="tm-drawer-sub" id="tmListSub"></div></div><button class="tm-close-btn" id="tmListClose">✕</button></div></div>\
 <div class="tm-drawer-body" id="tmListBody"></div>\
 </div></div>\
+<div class="tm-overlay" id="tmExportOverlay" style="z-index:950"><div class="tm-drawer"><div class="tm-drawer-handle"></div>\
+<div class="tm-drawer-header"><div class="tm-drawer-header-row"><div style="flex:1;min-width:0"><div class="tm-drawer-title">Export PDF</div><div class="tm-drawer-sub">Select a territory to export</div></div><button class="tm-close-btn" id="tmExpClose">✕</button></div></div>\
+<div class="tm-drawer-body" id="tmExportBody"></div>\
+</div></div>\
 \
 <!-- Detail Drawer -->\
 <div class="tm-overlay" id="tmDetailOverlay" style="z-index:800"><div class="tm-drawer"><div class="tm-drawer-handle"></div>\
@@ -730,7 +734,10 @@ function openList(title,houses){
           });
         } else {
           g.items.forEach(function(h){
-            html+=makeHouseRow(h,extractNumber(h.HouseAddress),false);
+            // Lone unit at a number (e.g. "6400 Nacimiento Ave #3") skips the Apts
+            // grouping, so keep the unit in the label or the door number is lost.
+            var apt=extractApt(h.HouseAddress);
+            html+=makeHouseRow(h,extractNumber(h.HouseAddress)+(apt?" #"+apt:""),false);
           });
         }
       });
@@ -1079,6 +1086,7 @@ document.querySelectorAll("[data-nav]").forEach(function(b){b.addEventListener("
     el.addEventListener("touchend",function(e){if(e.changedTouches[0].clientY-sy>80)fn();},{passive:true});
   }
   addSwipe("tmListOverlay",closeList);
+  addSwipe("tmExportOverlay",closeExport);
   addSwipe("tmFormOverlay",closeForm);
   addSwipe("tmDetailOverlay",closeDetail);
   addSwipe("tmLogOverlay",closeLog);
@@ -1093,6 +1101,7 @@ document.addEventListener("keydown",function(e){
   if(document.getElementById("tmLogOverlay").classList.contains("open")){closeLog();return;}
   if(document.getElementById("tmFormOverlay").classList.contains("open")){closeForm();return;}
   if(document.getElementById("tmDetailOverlay").classList.contains("open")){closeDetail();return;}
+  if(document.getElementById("tmExportOverlay").classList.contains("open")){closeExport();return;}
   if(document.getElementById("tmListOverlay").classList.contains("open")){closeList();return;}
 });
 
@@ -1114,25 +1123,30 @@ document.getElementById("tmExportBtn").addEventListener("click",function(){
   });
 
   if(terrKeys.length>1){
-    var html='<div class="tm-drawer-handle"></div><div class="tm-drawer-header"><div class="tm-drawer-header-row"><div style="flex:1"><div class="tm-drawer-title">Export PDF</div><div class="tm-drawer-sub">Select a territory to export</div></div><button class="tm-close-btn" id="tmExpClose">✕</button></div></div><div class="tm-drawer-body">';
-    html+='<button class="tm-save-btn" data-exp="__all__" style="margin-bottom:10px;background:#2e7d32">Export All Territories</button>';
+    var html='<button class="tm-save-btn" data-exp="__all__" style="margin-bottom:10px;background:#2e7d32">Export All Territories</button>';
     terrKeys.forEach(function(t){
       html+='<button class="tm-edit-btn" data-exp="'+esc(t)+'" style="margin-bottom:8px">'+(t==="Unassigned"?t:"Territory "+esc(t))+' ('+terrMap[t].length+' houses)</button>';
     });
-    html+='</div>';
-    document.querySelector("#tmListOverlay .tm-drawer").innerHTML=html;
-    document.getElementById("tmExpClose").addEventListener("click",closeList);
-    document.querySelector("#tmListOverlay .tm-drawer").addEventListener("click",function(e){
-      var btn=e.target.closest("[data-exp]");if(!btn)return;
-      var key=btn.dataset.exp;
-      closeList();
-      if(key==="__all__"){terrKeys.forEach(function(t){generateTerritoryPDF(t,terrMap[t]);});}
-      else{generateTerritoryPDF(key,terrMap[key]);}
-    });
-    document.getElementById("tmListOverlay").classList.add("open");
+    document.getElementById("tmExportBody").innerHTML=html;
+    exportTerrMap=terrMap;exportTerrKeys=terrKeys;
+    document.getElementById("tmExportOverlay").classList.add("open");
   } else {
     generateTerritoryPDF(terrKeys[0],terrMap[terrKeys[0]]);
   }
+});
+
+/* Export drawer is its own overlay so it never clobbers the Houses list DOM.
+   Listeners are bound once at load, not per click, so they cannot stack. */
+var exportTerrMap={},exportTerrKeys=[];
+function closeExport(){document.getElementById("tmExportOverlay").classList.remove("open");}
+document.getElementById("tmExpClose").addEventListener("click",closeExport);
+document.getElementById("tmExportOverlay").addEventListener("click",function(e){if(e.target===this)closeExport();});
+document.getElementById("tmExportBody").addEventListener("click",function(e){
+  var btn=e.target.closest("[data-exp]");if(!btn)return;
+  var key=btn.dataset.exp;
+  closeExport();
+  if(key==="__all__"){exportTerrKeys.forEach(function(t){generateTerritoryPDF(t,exportTerrMap[t]);});}
+  else{generateTerritoryPDF(key,exportTerrMap[key]);}
 });
 
 function extractStreet(addr){

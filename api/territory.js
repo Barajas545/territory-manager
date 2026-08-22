@@ -63,14 +63,44 @@ module.exports = async (req, res) => {
       const rows = resp.data.values || [];
       // Auto-initialize/repair the header row. Compares every column, not just A1,
       // so adding a field to FIELDS backfills its header on an already-seeded sheet.
+      // Only ever overwrite row 1 when it is genuinely a header (A1 === 'id') or the
+      // sheet is empty — otherwise a POST-before-first-GET would get clobbered.
       const hdr = rows[0] || [];
-      if (!FIELDS.every((f, i) => hdr[i] === f)) {
+      const isHeaderRow = hdr[0] === 'id';
+      const headerOk = isHeaderRow && FIELDS.every((f, i) => hdr[i] === f);
+      if (!rows.length || (isHeaderRow && !headerOk)) {
         await sheets.spreadsheets.values.update({
           spreadsheetId: SHEET_ID,
           range: `${SHEET_NAME}!A1:${LAST_COL}1`,
           valueInputOption: 'RAW',
           requestBody: { values: [FIELDS] },
         });
+      } else if (rows.length && !isHeaderRow) {
+        // Row 1 holds data, not headers. Insert a header row above it instead of
+        // destroying that record.
+        const meta = await sheets.spreadsheets.get({ spreadsheetId: SHEET_ID });
+        const tab = meta.data.sheets.find(s => s.properties.title === SHEET_NAME);
+        await sheets.spreadsheets.batchUpdate({
+          spreadsheetId: SHEET_ID,
+          requestBody: {
+            requests: [{
+              insertDimension: {
+                range: {
+                  sheetId: tab ? tab.properties.sheetId : 0,
+                  dimension: 'ROWS', startIndex: 0, endIndex: 1,
+                },
+              },
+            }],
+          },
+        });
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: SHEET_ID,
+          range: `${SHEET_NAME}!A1:${LAST_COL}1`,
+          valueInputOption: 'RAW',
+          requestBody: { values: [FIELDS] },
+        });
+        // rows was read pre-insert, so every row is data.
+        return res.json(rows.filter(r => r && r[0]).map(rowToRecord));
       }
       const records = rows.slice(1).filter(r => r && r[0]).map(rowToRecord);
       return res.json(records);
