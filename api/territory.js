@@ -7,9 +7,9 @@ const FIELDS = [
   'HouseTerritoryNumber','HouseTerritoryAssingnedTo','HouseLanguage',
   'HouseLastVisitDate','HouseGPSCoordinates','HouseNotes','HousePersonalNotes',
   'HouseResutsOnVisit1','HouseResutsOnVisit2','HouseResutsOnVisit3',
-  'HouseResutsOnVisit4','HouseResutsOnVisit5'
+  'HouseResutsOnVisit4','HouseResutsOnVisit5','HouseVerifiedOnMaps'
 ];
-const LAST_COL = 'Q'; // 17 fields = A–Q
+const LAST_COL = 'R'; // 18 fields = A–R
 const RANGE = `${SHEET_NAME}!A:${LAST_COL}`;
 
 function getAuth() {
@@ -61,8 +61,10 @@ module.exports = async (req, res) => {
     if (req.method === 'GET') {
       const resp = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: RANGE });
       const rows = resp.data.values || [];
-      // Auto-initialize header row if sheet is empty
-      if (!rows.length || rows[0][0] !== 'id') {
+      // Auto-initialize/repair the header row. Compares every column, not just A1,
+      // so adding a field to FIELDS backfills its header on an already-seeded sheet.
+      const hdr = rows[0] || [];
+      if (!FIELDS.every((f, i) => hdr[i] === f)) {
         await sheets.spreadsheets.values.update({
           spreadsheetId: SHEET_ID,
           range: `${SHEET_NAME}!A1:${LAST_COL}1`,

@@ -164,6 +164,7 @@ button#tmPullTab{display:none;position:absolute;left:0;top:50%;transform:transla
 .tm-pdf-row:active{background:#f5f5f5;}\
 .tm-pdf-row.tm-apt-unit{padding-left:32px;background:#fafafa;}\
 .tm-pdf-addr{min-width:80px;max-width:100px;color:#2e7d32;font-size:19px;font-weight:700;flex-shrink:0;}\
+.tm-unverified{color:#c62828;font-size:13px;font-weight:700;margin-left:3px;vertical-align:super;}\
 .tm-pdf-visits{display:flex;gap:3px;flex-shrink:0;}\
 .tm-pdf-box{width:38px;height:38px;border:1px solid #c5cae9;border-radius:6px;background:#e8eaf6;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#333;cursor:pointer;user-select:none;-webkit-user-select:none;}\
 .tm-pdf-box:active{background:#9fa8da;}\
@@ -285,6 +286,7 @@ button#tmPullTab{display:none;position:absolute;left:0;top:50%;transform:transla
 <div class="tm-field"><label>Assigned To</label><input id="fAssigned"></div>\
 <div class="tm-field"><label>Language</label><input id="fLang"></div>\
 <div class="tm-field"><label>Last Visit</label><input id="fLastVisit" type="date"></div>\
+<div class="tm-field"><label>Verified on Maps</label><select id="fVerified"><option value="">Not checked</option><option value="Yes">Yes \u{2713}</option><option value="No">Not found</option></select></div>\
 </div>\
 <div class="tm-field"><label>GPS Coordinates</label><div class="tm-gps-row"><input id="fGPS" placeholder="35.6266, -120.6910"><button type="button" class="tm-gps-btn" id="tmGPSBtn" title="Use my location">\u{1F4CD}</button></div></div>\
 <div class="tm-field"><label>House Notes</label><textarea id="fNotes" placeholder="Dog in yard, gate code, etc."></textarea></div>\
@@ -411,7 +413,7 @@ function applyFilters(){
       return true;
     });
   }
-  if(searchTerm){var q=searchTerm.toLowerCase();r=r.filter(function(h){return[h.HouseAddress,h.HouseCity,h.HouseState,h.HouseZIP,h.HouseTerritoryNumber,h.HouseTerritoryAssingnedTo,h.HouseLanguage,h.HouseNotes,h.HousePersonalNotes,h.HouseGPSCoordinates,h.HouseResutsOnVisit1,h.HouseResutsOnVisit2,h.HouseResutsOnVisit3,h.HouseResutsOnVisit4,h.HouseResutsOnVisit5].filter(Boolean).join(" ").toLowerCase().includes(q);});}
+  if(searchTerm){var q=searchTerm.toLowerCase();r=r.filter(function(h){return[h.HouseAddress,h.HouseCity,h.HouseState,h.HouseZIP,h.HouseTerritoryNumber,h.HouseTerritoryAssingnedTo,h.HouseLanguage,h.HouseNotes,h.HousePersonalNotes,h.HouseGPSCoordinates,h.HouseResutsOnVisit1,h.HouseResutsOnVisit2,h.HouseResutsOnVisit3,h.HouseResutsOnVisit4,h.HouseResutsOnVisit5,h.HouseVerifiedOnMaps].filter(Boolean).join(" ").toLowerCase().includes(q);});}
   records=r;
 }
 
@@ -649,7 +651,8 @@ function makeHouseRow(h,displayLabel,isAptUnit){
   var visits=[h.HouseResutsOnVisit1,h.HouseResutsOnVisit2,h.HouseResutsOnVisit3,h.HouseResutsOnVisit4];
   var label=displayLabel||extractNumber(h.HouseAddress)||h.HouseAddress||"";
   return'<div class="tm-pdf-row'+(isAptUnit?' tm-apt-unit':'')+'">'+
-    '<div class="tm-pdf-addr" data-act="detail" data-id="'+h.id+'">'+esc(label)+'</div>'+
+    '<div class="tm-pdf-addr" data-act="detail" data-id="'+h.id+'">'+esc(label)+
+      (h.HouseVerifiedOnMaps==="No"?'<span class="tm-unverified" title="Not found on maps">\u{26A0}</span>':'')+'</div>'+
     '<div class="tm-pdf-visits">'+
     visits.map(function(v,i){
       return'<div class="tm-pdf-box'+(v?' tm-pdf-box-filled':'')+'" data-act="visit" data-id="'+h.id+'" data-slot="'+(i+1)+'">'+esc(v||'')+'</div>';
@@ -767,6 +770,10 @@ function openDetail(id){
     (h.HouseTerritoryAssingnedTo?'<div class="tm-detail-row"><span class="tm-detail-icon">\u{1F464}</span>'+esc(h.HouseTerritoryAssingnedTo)+'</div>':'')+
     (h.HouseLanguage?'<div class="tm-detail-row"><span class="tm-detail-icon">\u{1F310}</span>'+esc(h.HouseLanguage)+'</div>':'')+
     (h.HouseGPSCoordinates?'<div class="tm-detail-row"><span class="tm-detail-icon">\u{1F4F1}</span>'+esc(h.HouseGPSCoordinates)+'</div>':'')+
+    '<div class="tm-detail-row"><span class="tm-detail-icon">\u{1F5FA}\u{FE0F}</span>'+
+      (h.HouseVerifiedOnMaps==="Yes"?'Verified on maps \u{2713}':
+       h.HouseVerifiedOnMaps==="No"?'Not found on maps \u{26A0}\u{FE0F}':
+       'Map location not checked')+'</div>'+
     '<button class="tm-dir-btn" id="tmDetDir">\u{1F697} Get Directions</button>'+
     (h.HouseNotes?'<div class="tm-section-label">House Notes</div><div class="tm-notes-wrap">'+esc(h.HouseNotes)+'</div>':'')+
     (h.HousePersonalNotes?'<div class="tm-section-label">Personal Notes</div><div class="tm-notes-wrap">'+esc(h.HousePersonalNotes)+'</div>':'')+
@@ -961,6 +968,7 @@ function openForm(h){
     document.getElementById("fAssigned").value=h.HouseTerritoryAssingnedTo||"";
     document.getElementById("fLang").value=h.HouseLanguage||"";
     document.getElementById("fLastVisit").value=cleanDate(h.HouseLastVisitDate);
+    document.getElementById("fVerified").value=h.HouseVerifiedOnMaps||"";
     document.getElementById("fGPS").value=h.HouseGPSCoordinates||"";
     document.getElementById("fNotes").value=h.HouseNotes||"";
     document.getElementById("fPersonal").value=h.HousePersonalNotes||"";
@@ -973,7 +981,7 @@ function openForm(h){
     document.getElementById("tmFormTitle").textContent="Add House";
     document.getElementById("tmDeleteBtn").style.display="none";
     document.getElementById("tmItemID").value="";
-    ["fAddr","fCity","fZip","fTerrNum","fAssigned","fLang","fLastVisit","fGPS","fNotes","fPersonal","fV1","fV2","fV3","fV4","fV5"].forEach(function(id){document.getElementById(id).value="";});
+    ["fAddr","fCity","fZip","fTerrNum","fAssigned","fLang","fLastVisit","fVerified","fGPS","fNotes","fPersonal","fV1","fV2","fV3","fV4","fV5"].forEach(function(id){document.getElementById(id).value="";});
     document.getElementById("fState").value="CA";
   }
   document.getElementById("tmFormOverlay").classList.add("open");
@@ -1007,6 +1015,7 @@ document.getElementById("tmSaveBtn").addEventListener("click",function(){
     HouseTerritoryAssingnedTo:document.getElementById("fAssigned").value,
     HouseLanguage:document.getElementById("fLang").value,
     HouseLastVisitDate:document.getElementById("fLastVisit").value||null,
+    HouseVerifiedOnMaps:document.getElementById("fVerified").value,
     HouseGPSCoordinates:document.getElementById("fGPS").value,
     HouseNotes:document.getElementById("fNotes").value,
     HousePersonalNotes:document.getElementById("fPersonal").value,
@@ -1510,7 +1519,8 @@ document.getElementById("tmVerifyCreate").addEventListener("click",function(){
     HouseLastVisitDate:document.getElementById("vLastVisit").value||null,
     HouseNotes:document.getElementById("vNotes").value,
     HousePersonalNotes:document.getElementById("vPersonal").value,
-    HouseResutsOnVisit1:"",HouseResutsOnVisit2:"",HouseResutsOnVisit3:"",HouseResutsOnVisit4:"",HouseResutsOnVisit5:""
+    HouseResutsOnVisit1:"",HouseResutsOnVisit2:"",HouseResutsOnVisit3:"",HouseResutsOnVisit4:"",HouseResutsOnVisit5:"",
+    HouseVerifiedOnMaps:""
   };
   var btn=this;btn.textContent="Creating…";btn.disabled=true;
   fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})
