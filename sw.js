@@ -51,11 +51,10 @@ self.addEventListener('message', event => {
   if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
-/* Keep the tile cache from growing without bound. Oldest-inserted first, which
-   is a good enough proxy for least-recently-used here. */
-/* Counting every key on every tile request meant a full cache scan per tile,
-   which gets slower exactly as the cache fills and panning matters most. Track
-   writes and scan only occasionally. */
+/* Keep the tile cache bounded. Oldest-inserted first, a good enough proxy for
+   least-recently-used here. Counting keys on every tile request meant a full
+   cache scan per tile, slowest exactly as the cache fills and panning matters
+   most — so track writes and scan only occasionally. */
 let tileWrites = 0;
 async function trimTiles() {
   if (++tileWrites < 50) return;
