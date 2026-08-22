@@ -2,1165 +2,930 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Territory">
+<meta name="theme-color" content="#0D6B4F" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0D1117" media="(prefers-color-scheme: dark)">
 <title>Territory Manager</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<style>
+/* ═══ DESIGN TOKENS ═══════════════════════════════════════════════════ */
+:root{
+  --bg:#F6F7F9; --surface:#FFFFFF; --surface-2:#F1F3F6; --surface-3:#E8EBF0;
+  --text:#0F1729; --text-2:#5A6478; --text-3:#8A93A6;
+  --border:#E2E6EC; --border-strong:#CDD4DF;
+  --brand:#0D6B4F; --brand-soft:#E6F4EE; --brand-ink:#FFFFFF;
+  --rv:#6941C6; --rv-soft:#F0EAFB;
+  --ok:#12805C; --ok-soft:#E4F5EE;
+  --warn:#B54708; --warn-soft:#FDF0E6;
+  --bad:#B42318; --bad-soft:#FDECEA;
+  --none:#6B7488; --none-soft:#EDEFF3;
+  --shadow-1:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.08);
+  --shadow-2:0 4px 12px rgba(16,24,40,.10);
+  --shadow-3:0 -8px 32px rgba(16,24,40,.16);
+  --r-sm:10px; --r-md:14px; --r-lg:20px; --r-full:999px;
+  --sheet-ease:cubic-bezier(.32,.72,0,1);
+  --safe-t:env(safe-area-inset-top,0px);
+  --safe-b:env(safe-area-inset-bottom,0px);
+  --tabbar-h:58px;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#0D1117; --surface:#161B22; --surface-2:#1C232C; --surface-3:#262D38;
+    --text:#E8EDF4; --text-2:#9BA5B4; --text-3:#6E7889;
+    --border:#293039; --border-strong:#3A424E;
+    --brand:#3FB68B; --brand-soft:#12301F; --brand-ink:#05150E;
+    --rv:#A98BFF; --rv-soft:#241B3A;
+    --ok:#3FB68B; --ok-soft:#12301F;
+    --warn:#E8944A; --warn-soft:#33210F;
+    --bad:#F27267; --bad-soft:#331815;
+    --none:#8A93A6; --none-soft:#22272F;
+    --shadow-1:0 1px 2px rgba(0,0,0,.4);
+    --shadow-2:0 4px 14px rgba(0,0,0,.5);
+    --shadow-3:0 -8px 32px rgba(0,0,0,.6);
+  }
+}
+
+/* ═══ BASE ════════════════════════════════════════════════════════════ */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;overscroll-behavior-y:none;}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  background:var(--bg); color:var(--text);
+  -webkit-font-smoothing:antialiased; -webkit-tap-highlight-color:transparent;
+  font-size:16px; line-height:1.45;
+}
+button,input,textarea,select{font:inherit;color:inherit;font-family:inherit;}
+button{background:none;border:none;cursor:pointer;touch-action:manipulation;}
+input,textarea,select{-webkit-appearance:none;appearance:none;}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px;}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;}
+
+/* ═══ APP FRAME ═══════════════════════════════════════════════════════ */
+#app{position:fixed;inset:0;display:flex;flex-direction:column;overflow:hidden;}
+
+#topbar{
+  flex:0 0 auto;padding:calc(var(--safe-t) + 8px) 12px 8px;
+  background:var(--surface);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:8px;
+}
+.scope-btn{
+  display:flex;align-items:center;gap:7px;min-height:40px;padding:0 12px;
+  background:var(--surface-2);border-radius:var(--r-full);
+  font-size:15px;font-weight:650;letter-spacing:-.01em;max-width:58vw;
+}
+.scope-btn .scope-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.scope-btn .count{
+  font-size:12px;font-weight:700;color:var(--text-2);
+  background:var(--surface);padding:1px 7px;border-radius:var(--r-full);flex:0 0 auto;
+}
+.scope-btn .chev{color:var(--text-3);font-size:11px;flex:0 0 auto;}
+.top-spacer{flex:1;}
+.icon-btn{
+  width:40px;height:40px;border-radius:var(--r-full);background:var(--surface-2);
+  display:flex;align-items:center;justify-content:center;font-size:17px;flex:0 0 auto;
+}
+.icon-btn:active{background:var(--surface-3);}
+
+/* sync pill */
+#syncPill{
+  display:flex;align-items:center;gap:6px;height:40px;padding:0 12px;
+  border-radius:var(--r-full);background:var(--surface-2);
+  font-size:13px;font-weight:650;flex:0 0 auto;
+}
+#syncPill .sdot{width:8px;height:8px;border-radius:50%;background:var(--ok);flex:0 0 auto;}
+#syncPill.pending{background:var(--warn-soft);color:var(--warn);}
+#syncPill.pending .sdot{background:var(--warn);}
+#syncPill.offline{background:var(--none-soft);color:var(--text-2);}
+#syncPill.offline .sdot{background:var(--none);}
+#syncPill.syncing .sdot{animation:pulse 1s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+
+/* ═══ VIEWS ═══════════════════════════════════════════════════════════ */
+#views{flex:1;position:relative;min-height:0;}
+.view{position:absolute;inset:0;display:none;flex-direction:column;min-height:0;}
+.view.active{display:flex;}
+/* The map must stay mounted or Leaflet re-inits and loses tiles/pins. */
+#view-map{display:flex;visibility:hidden;pointer-events:none;}
+#view-map.active{visibility:visible;pointer-events:auto;}
+.scroller{flex:1;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;}
+/* clearance so the FAB never sits on top of the last row's Log button */
+#houseList{padding-bottom:88px;}
+
+/* search + filters */
+.toolbar{flex:0 0 auto;padding:10px 12px 8px;background:var(--surface);border-bottom:1px solid var(--border);}
+.search-wrap{position:relative;display:flex;align-items:center;}
+.search-wrap .mag{position:absolute;left:12px;font-size:15px;color:var(--text-3);pointer-events:none;}
+#searchBox{
+  width:100%;height:42px;padding:0 38px 0 36px;border:1px solid var(--border);
+  border-radius:var(--r-md);background:var(--surface-2);font-size:15px;
+}
+#searchBox:focus{border-color:var(--brand);background:var(--surface);outline:none;}
+#searchClear{position:absolute;right:6px;width:32px;height:32px;border-radius:var(--r-full);
+  display:none;align-items:center;justify-content:center;color:var(--text-3);font-size:15px;}
+.chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-top:8px;}
+.chips::-webkit-scrollbar{display:none;}
+.chip{
+  flex:0 0 auto;display:flex;align-items:center;gap:5px;height:34px;padding:0 12px;
+  border-radius:var(--r-full);background:var(--surface-2);border:1px solid transparent;
+  font-size:13px;font-weight:650;color:var(--text-2);white-space:nowrap;
+}
+.chip .cdot{width:7px;height:7px;border-radius:50%;}
+.chip .cnum{font-size:11px;font-weight:700;opacity:.75;}
+.chip[aria-pressed="true"]{background:var(--surface);border-color:var(--border-strong);color:var(--text);box-shadow:var(--shadow-1);}
+.chip[data-f="all"] .cdot{background:var(--text-3);}
+.chip[data-f="never"] .cdot{background:var(--none);}
+.chip[data-f="overdue"] .cdot{background:var(--bad);}
+.chip[data-f="due"] .cdot{background:var(--warn);}
+.chip[data-f="recent"] .cdot{background:var(--ok);}
+
+/* ═══ HOUSE LIST ══════════════════════════════════════════════════════ */
+.street-hd{
+  position:sticky;top:0;z-index:2;padding:9px 16px 7px;
+  background:var(--bg);color:var(--text-2);
+  font-size:12px;font-weight:750;letter-spacing:.06em;text-transform:uppercase;
+  border-bottom:1px solid var(--border);
+}
+.apt-hd{padding:7px 16px 4px;font-size:12px;font-weight:700;color:var(--text-3);}
+.house{
+  display:flex;align-items:center;gap:10px;padding:9px 12px 9px 14px;min-height:62px;
+  background:var(--surface);border-bottom:1px solid var(--border);
+}
+.house:active{background:var(--surface-2);}
+.house.unit{padding-left:30px;}
+.house-main{flex:1;min-width:0;display:flex;align-items:center;gap:10px;text-align:left;}
+.house-dot{width:10px;height:10px;border-radius:50%;flex:0 0 auto;}
+.dot-recent{background:var(--ok);} .dot-due{background:var(--warn);}
+.dot-overdue{background:var(--bad);} .dot-never{background:var(--none);}
+.house-txt{min-width:0;flex:1;}
+.house-num{display:block;font-size:19px;font-weight:750;letter-spacing:-.02em;line-height:1.15;}
+.house-num .warn-mark{color:var(--bad);font-size:12px;vertical-align:super;margin-left:2px;}
+.house-sub{display:block;font-size:12.5px;color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px;}
+.house-sub .rv-tag{color:var(--rv);font-weight:700;}
+.house-sub .pend{color:var(--warn);font-weight:700;}
+.log-btn{
+  flex:0 0 auto;height:40px;min-width:64px;padding:0 14px;border-radius:var(--r-md);
+  background:var(--brand);color:var(--brand-ink);font-size:14px;font-weight:700;
+}
+.log-btn:active{filter:brightness(.92);}
+.empty{padding:56px 24px;text-align:center;color:var(--text-3);font-size:15px;}
+.empty .big{font-size:34px;display:block;margin-bottom:10px;}
+
+/* ═══ RETURN VISITS ═══════════════════════════════════════════════════ */
+.rv-card{
+  display:block;width:100%;text-align:left;padding:13px 14px;background:var(--surface);
+  border-bottom:1px solid var(--border);
+}
+.rv-card:active{background:var(--surface-2);}
+.rv-top{display:flex;align-items:center;gap:8px;}
+.rv-badge{width:8px;height:8px;border-radius:50%;background:var(--rv);flex:0 0 auto;}
+.rv-addr{font-size:16px;font-weight:700;letter-spacing:-.01em;flex:1;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.rv-when{font-size:12px;color:var(--text-2);font-weight:600;flex:0 0 auto;}
+.rv-note{font-size:13.5px;color:var(--text-2);margin-top:6px;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.rv-count{display:block;font-size:11.5px;color:var(--rv);font-weight:700;margin-top:6px;}
+
+/* ═══ MORE ════════════════════════════════════════════════════════════ */
+.sec{margin:16px 12px 0;}
+.sec-t{font-size:12px;font-weight:750;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--text-3);padding:0 4px 7px;}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;}
+.row{display:flex;align-items:center;gap:12px;width:100%;padding:14px;text-align:left;
+  border-bottom:1px solid var(--border);min-height:56px;}
+.row:last-child{border-bottom:none;}
+.row:active{background:var(--surface-2);}
+.row-ico{width:34px;height:34px;border-radius:var(--r-sm);background:var(--surface-2);
+  display:flex;align-items:center;justify-content:center;font-size:16px;flex:0 0 auto;}
+.row-txt{flex:1;min-width:0;display:block;}
+.row-t{display:block;font-size:15px;font-weight:650;}
+.row-s{display:block;font-size:12.5px;color:var(--text-2);margin-top:2px;}
+.row-act{color:var(--text-3);font-size:13px;flex:0 0 auto;}
+.sw{width:50px;height:30px;border-radius:var(--r-full);background:var(--border-strong);
+  position:relative;transition:background .2s;flex:0 0 auto;}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;
+  background:#fff;box-shadow:var(--shadow-1);transition:transform .2s var(--sheet-ease);}
+.sw[aria-checked="true"]{background:var(--brand);}
+.sw[aria-checked="true"]::after{transform:translateX(20px);}
+
+/* ═══ MAP ═════════════════════════════════════════════════════════════ */
+#map{flex:1;background:var(--surface-2);}
+.map-fabs{position:absolute;right:12px;bottom:14px;display:flex;flex-direction:column;gap:8px;z-index:400;}
+.map-fab{width:46px;height:46px;border-radius:var(--r-full);background:var(--surface);
+  box-shadow:var(--shadow-2);display:flex;align-items:center;justify-content:center;font-size:19px;}
+.map-fab:active{background:var(--surface-2);}
+.leaflet-container{background:var(--surface-2);}
+.pin-pop{font-family:inherit;min-width:170px;}
+.pin-pop .pp-a{font-size:15px;font-weight:750;margin-bottom:2px;}
+.pin-pop .pp-s{font-size:12px;color:#5A6478;margin-bottom:8px;}
+.pin-pop .pp-row{display:flex;gap:6px;}
+.pin-pop button{flex:1;height:34px;border-radius:9px;font-size:12.5px;font-weight:700;}
+.pin-pop .pp-det{background:#EEF1F5;color:#0F1729;}
+.pin-pop .pp-log{background:#0D6B4F;color:#fff;}
+
+/* ═══ FAB ═════════════════════════════════════════════════════════════ */
+#fab{
+  position:absolute;right:14px;bottom:16px;z-index:60;
+  height:52px;padding:0 20px;border-radius:var(--r-full);
+  background:var(--brand);color:var(--brand-ink);font-size:15px;font-weight:750;
+  box-shadow:var(--shadow-2);display:flex;align-items:center;gap:7px;
+}
+#fab:active{filter:brightness(.92);transform:scale(.97);}
+
+/* ═══ TAB BAR ═════════════════════════════════════════════════════════ */
+#tabbar{
+  flex:0 0 auto;display:flex;background:var(--surface);
+  border-top:1px solid var(--border);padding-bottom:var(--safe-b);
+}
+.tab{
+  flex:1;height:var(--tabbar-h);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:2px;color:var(--text-3);position:relative;
+}
+.tab .ti{font-size:20px;line-height:1;}
+.tab .tl{font-size:10.5px;font-weight:700;letter-spacing:.01em;}
+.tab[aria-selected="true"]{color:var(--brand);}
+.tab .tbadge{
+  position:absolute;top:5px;left:50%;margin-left:5px;min-width:16px;height:16px;padding:0 4px;
+  border-radius:var(--r-full);background:var(--bad);color:#fff;
+  font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;
+}
+
+/* ═══ SHEETS ══════════════════════════════════════════════════════════ */
+.scrim{
+  position:fixed;inset:0;z-index:100;background:rgba(8,12,20,.45);
+  opacity:0;pointer-events:none;transition:opacity .28s ease;
+}
+.scrim.open{opacity:1;pointer-events:auto;}
+.sheet{
+  position:fixed;left:0;right:0;bottom:0;z-index:101;
+  background:var(--surface);border-radius:var(--r-lg) var(--r-lg) 0 0;
+  box-shadow:var(--shadow-3);
+  transform:translateY(101%);transition:transform .34s var(--sheet-ease);
+  display:flex;flex-direction:column;max-height:92dvh;
+  padding-bottom:var(--safe-b);
+}
+.sheet.open{transform:translateY(0);}
+.sheet.dragging{transition:none;}
+.grab{flex:0 0 auto;padding:9px 0 4px;display:flex;justify-content:center;cursor:grab;touch-action:none;}
+.grab::after{content:"";width:38px;height:4px;border-radius:2px;background:var(--border-strong);}
+.sheet-hd{
+  flex:0 0 auto;display:flex;align-items:flex-start;gap:10px;
+  padding:4px 16px 12px;border-bottom:1px solid var(--border);
+}
+.sheet-hd .st{flex:1;min-width:0;}
+.sheet-t{font-size:20px;font-weight:800;letter-spacing:-.02em;line-height:1.2;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.sheet-s{font-size:13px;color:var(--text-2);margin-top:2px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.x-btn{width:34px;height:34px;border-radius:var(--r-full);background:var(--surface-2);
+  display:flex;align-items:center;justify-content:center;font-size:15px;color:var(--text-2);flex:0 0 auto;}
+.sheet-bd{flex:1;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:14px 16px 20px;}
+.sheet-ft{flex:0 0 auto;padding:12px 16px calc(12px + var(--safe-b));border-top:1px solid var(--border);
+  background:var(--surface);display:flex;gap:9px;}
+
+/* ═══ OUTCOME GRID (log visit) ════════════════════════════════════════ */
+.out-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;}
+.out{
+  min-height:82px;border-radius:var(--r-md);border:1.5px solid var(--border);
+  background:var(--surface-2);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:5px;padding:8px 4px;
+}
+.out .oi{font-size:22px;line-height:1;}
+.out .ol{font-size:11.5px;font-weight:700;text-align:center;line-height:1.2;color:var(--text-2);}
+.out:active{transform:scale(.96);}
+.out[aria-pressed="true"]{border-color:var(--brand);background:var(--brand-soft);}
+.out[aria-pressed="true"] .ol{color:var(--brand);}
+.out[data-rv="1"][aria-pressed="true"]{border-color:var(--rv);background:var(--rv-soft);}
+.out[data-rv="1"][aria-pressed="true"] .ol{color:var(--rv);}
+
+/* ═══ FORM ════════════════════════════════════════════════════════════ */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:11px;}
+.f{margin-bottom:13px;}
+.f label{display:block;font-size:11.5px;font-weight:750;letter-spacing:.05em;
+  text-transform:uppercase;color:var(--text-3);margin-bottom:5px;}
+.f input,.f textarea,.f select{
+  width:100%;min-height:46px;padding:11px 13px;border:1px solid var(--border);
+  border-radius:var(--r-md);background:var(--surface-2);font-size:16px;
+}
+.f textarea{min-height:88px;resize:vertical;line-height:1.45;}
+.f input:focus,.f textarea:focus,.f select:focus{border-color:var(--brand);background:var(--surface);outline:none;}
+.f select{
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%278%27 viewBox=%270 0 12 8%27><path d=%27M1 1l5 5 5-5%27 stroke=%27%238A93A6%27 stroke-width=%272%27 fill=%27none%27 stroke-linecap=%27round%27/></svg>");
+  background-repeat:no-repeat;background-position:right 14px center;padding-right:38px;
+}
+.gps-row{display:flex;gap:8px;}
+.gps-row input{flex:1;}
+.gps-btn{width:46px;border-radius:var(--r-md);background:var(--surface-3);
+  display:flex;align-items:center;justify-content:center;font-size:18px;flex:0 0 auto;}
+.gps-btn.busy{animation:pulse 1s infinite;}
+.btn{
+  flex:1;min-height:50px;border-radius:var(--r-md);font-size:16px;font-weight:750;
+  display:flex;align-items:center;justify-content:center;gap:7px;
+}
+.btn-p{background:var(--brand);color:var(--brand-ink);}
+.btn-p:active{filter:brightness(.92);}
+.btn-s{background:var(--surface-2);color:var(--text);}
+.btn-d{background:var(--bad-soft);color:var(--bad);}
+.btn[disabled]{opacity:.5;}
+
+/* detail sheet bits */
+.badge{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 12px;
+  border-radius:var(--r-full);font-size:12.5px;font-weight:700;}
+.b-recent{background:var(--ok-soft);color:var(--ok);}
+.b-due{background:var(--warn-soft);color:var(--warn);}
+.b-overdue{background:var(--bad-soft);color:var(--bad);}
+.b-never{background:var(--none-soft);color:var(--text-2);}
+.b-rv{background:var(--rv-soft);color:var(--rv);}
+.meta{display:flex;align-items:center;gap:9px;padding:9px 0;border-bottom:1px solid var(--border);font-size:14.5px;}
+.meta .mi{width:26px;text-align:center;flex:0 0 auto;opacity:.8;}
+.lbl{font-size:11.5px;font-weight:750;letter-spacing:.05em;text-transform:uppercase;
+  color:var(--text-3);margin:18px 0 7px;}
+.note-box{background:var(--surface-2);border-radius:var(--r-md);padding:12px 13px;
+  font-size:14.5px;white-space:pre-wrap;word-break:break-word;line-height:1.5;}
+.vgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(74px,1fr));gap:8px;}
+.vbox{min-height:56px;border-radius:var(--r-sm);border:1px dashed var(--border-strong);
+  background:var(--surface-2);display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:2px;padding:6px 4px;}
+.vbox .vn{font-size:9.5px;font-weight:750;color:var(--text-3);letter-spacing:.04em;}
+.vbox .vv{font-size:12.5px;font-weight:700;text-align:center;line-height:1.15;}
+.vbox.filled{border-style:solid;border-color:var(--brand);background:var(--brand-soft);}
+.vbox.filled .vv{color:var(--brand);}
+
+/* return-visit timeline */
+.rv-add{display:flex;gap:8px;margin-bottom:14px;}
+.rv-add textarea{flex:1;min-height:76px;}
+.tl{position:relative;padding-left:22px;}
+.tl::before{content:"";position:absolute;left:5px;top:6px;bottom:6px;width:2px;background:var(--border);}
+.tl-item{position:relative;padding-bottom:16px;}
+.tl-item::before{content:"";position:absolute;left:-21px;top:5px;width:12px;height:12px;
+  border-radius:50%;background:var(--rv);border:2px solid var(--surface);}
+.tl-d{font-size:11.5px;font-weight:750;color:var(--rv);letter-spacing:.03em;}
+.tl-n{font-size:14.5px;white-space:pre-wrap;word-break:break-word;margin-top:3px;line-height:1.5;}
+.tl-del{font-size:11.5px;color:var(--text-3);font-weight:650;margin-top:4px;}
+
+/* ═══ TOAST / BANNER ══════════════════════════════════════════════════ */
+#toast{
+  position:fixed;left:50%;transform:translateX(-50%) translateY(20px);
+  bottom:calc(var(--tabbar-h) + var(--safe-b) + 14px);z-index:300;
+  max-width:calc(100vw - 32px);padding:11px 18px;border-radius:var(--r-full);
+  background:var(--text);color:var(--bg);font-size:14px;font-weight:650;
+  box-shadow:var(--shadow-2);opacity:0;pointer-events:none;transition:opacity .22s,transform .22s;
+  text-align:center;
+}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+#toast.bad{background:var(--bad);color:#fff;}
+#updateBar{
+  position:fixed;left:12px;right:12px;bottom:calc(var(--tabbar-h) + var(--safe-b) + 12px);
+  z-index:290;display:none;align-items:center;gap:10px;padding:12px 14px;
+  border-radius:var(--r-md);background:var(--brand);color:var(--brand-ink);
+  box-shadow:var(--shadow-2);font-size:14px;font-weight:650;
+}
+#updateBar.show{display:flex;}
+#updateBar button{margin-left:auto;background:rgba(255,255,255,.2);color:inherit;
+  padding:7px 13px;border-radius:var(--r-sm);font-size:13px;font-weight:750;flex:0 0 auto;}
+
+/* skeleton */
+.skel{padding:0;}
+.skel-row{height:62px;border-bottom:1px solid var(--border);background:var(--surface);
+  display:flex;align-items:center;padding:0 14px;gap:10px;}
+.skel-bar{height:12px;border-radius:6px;background:var(--surface-3);animation:sh 1.3s ease-in-out infinite;}
+@keyframes sh{0%,100%{opacity:.55}50%{opacity:1}}
+
+@media (min-width:700px){
+  #app{max-width:560px;margin:0 auto;box-shadow:0 0 60px rgba(0,0,0,.10);}
+  .sheet{max-width:560px;left:50%;transform:translateX(-50%) translateY(101%);}
+  .sheet.open{transform:translateX(-50%) translateY(0);}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms!important;transition-duration:.01ms!important;}
+}
+</style>
 </head>
-<body style="margin:0;padding:0;overflow:hidden;background:#1a1a1a;">
-<div id="tmRoot" style="position:relative;width:100%;height:100vh;height:100dvh;overflow:hidden;background:#1a1a1a;"></div>
+<body>
+<div id="app">
+
+  <header id="topbar">
+    <button class="scope-btn" id="scopeBtn">
+      <span class="scope-name" id="scopeName">All Territories</span>
+      <span class="count" id="scopeCount">0</span>
+      <span class="chev">▼</span>
+    </button>
+    <span class="top-spacer"></span>
+    <button id="syncPill" title="Sync status"><span class="sdot"></span><span id="syncTxt">Synced</span></button>
+  </header>
+
+  <div id="views">
+
+    <!-- ══ HOUSES ══ -->
+    <section class="view active" id="view-houses">
+      <div class="toolbar">
+        <div class="search-wrap">
+          <span class="mag">🔍</span>
+          <input id="searchBox" type="search" placeholder="Search address, notes, language…" autocomplete="off">
+          <button id="searchClear" aria-label="Clear search">✕</button>
+        </div>
+        <div class="chips" id="filterChips">
+          <button class="chip" data-f="all" aria-pressed="true"><span class="cdot"></span>All <span class="cnum" id="n-all"></span></button>
+          <button class="chip" data-f="never" aria-pressed="false"><span class="cdot"></span>Never <span class="cnum" id="n-never"></span></button>
+          <button class="chip" data-f="overdue" aria-pressed="false"><span class="cdot"></span>Overdue <span class="cnum" id="n-overdue"></span></button>
+          <button class="chip" data-f="due" aria-pressed="false"><span class="cdot"></span>Due <span class="cnum" id="n-due"></span></button>
+          <button class="chip" data-f="recent" aria-pressed="false"><span class="cdot"></span>Recent <span class="cnum" id="n-recent"></span></button>
+        </div>
+      </div>
+      <div class="scroller" id="houseList"></div>
+      <button id="fab">＋ Add</button>
+    </section>
+
+    <!-- ══ MAP ══ -->
+    <section class="view" id="view-map">
+      <div id="map"></div>
+      <div class="map-fabs">
+        <button class="map-fab" id="locateBtn" title="Find me">📍</button>
+        <button class="map-fab" id="fitBtn" title="Fit all pins">⤢</button>
+      </div>
+    </section>
+
+    <!-- ══ RETURN VISITS ══ -->
+    <section class="view" id="view-rv">
+      <div class="scroller" id="rvList"></div>
+    </section>
+
+    <!-- ══ MORE ══ -->
+    <section class="view" id="view-more">
+      <div class="scroller">
+        <div class="sec">
+          <div class="sec-t">Data</div>
+          <div class="card">
+            <button class="row" id="rowSync">
+              <span class="row-ico">🔄</span>
+              <span class="row-txt"><span class="row-t">Sync now</span><span class="row-s" id="syncSub">—</span></span>
+              <span class="row-act">›</span>
+            </button>
+            <div class="row">
+              <span class="row-ico">✈️</span>
+              <span class="row-txt"><span class="row-t">Work offline</span><span class="row-s">Hold changes on this device until you sync</span></span>
+              <button class="sw" id="swOffline" role="switch" aria-checked="false" aria-label="Work offline"></button>
+            </div>
+            <button class="row" id="rowPending">
+              <span class="row-ico">📥</span>
+              <span class="row-txt"><span class="row-t">Pending changes</span><span class="row-s" id="pendSub">Nothing waiting</span></span>
+              <span class="row-act">›</span>
+            </button>
+          </div>
+        </div>
+        <div class="sec">
+          <div class="sec-t">Territory</div>
+          <div class="card">
+            <button class="row" id="rowExport">
+              <span class="row-ico">📄</span>
+              <span class="row-txt"><span class="row-t">Export PDF</span><span class="row-s">Printable territory sheet</span></span>
+              <span class="row-act">›</span>
+            </button>
+            <button class="row" id="rowTerr">
+              <span class="row-ico">🗂️</span>
+              <span class="row-txt"><span class="row-t">Territories</span><span class="row-s" id="terrSub">—</span></span>
+              <span class="row-act">›</span>
+            </button>
+          </div>
+        </div>
+        <div class="sec">
+          <div class="sec-t">App</div>
+          <div class="card">
+            <button class="row" id="rowInstall" style="display:none">
+              <span class="row-ico">⬇️</span>
+              <span class="row-txt"><span class="row-t">Install on phone</span><span class="row-s">Adds an icon to your home screen</span></span>
+              <span class="row-act">›</span>
+            </button>
+            <div class="row">
+              <span class="row-ico">💾</span>
+              <span class="row-txt"><span class="row-t">Offline storage</span><span class="row-s" id="storeSub">Checking…</span></span>
+            </div>
+            <div class="row">
+              <span class="row-ico">ℹ️</span>
+              <span class="row-txt"><span class="row-t">Version</span><span class="row-s" id="verSub">—</span></span>
+            </div>
+          </div>
+        </div>
+        <div style="height:28px"></div>
+      </div>
+    </section>
+  </div>
+
+  <nav id="tabbar" role="tablist">
+    <button class="tab" role="tab" data-view="houses" aria-selected="true"><span class="ti">🏠</span><span class="tl">Houses</span></button>
+    <button class="tab" role="tab" data-view="map" aria-selected="false"><span class="ti">🗺️</span><span class="tl">Map</span></button>
+    <button class="tab" role="tab" data-view="rv" aria-selected="false"><span class="ti">📖</span><span class="tl">Return</span><span class="tbadge" id="rvBadge" style="display:none">0</span></button>
+    <button class="tab" role="tab" data-view="more" aria-selected="false"><span class="ti">⚙️</span><span class="tl">More</span></button>
+  </nav>
+</div>
+
+<div id="toast"></div>
+<div id="updateBar">A new version is ready<button id="updateGo">Reload</button></div>
+
+<!-- ══════════ SHEETS ══════════ -->
+<div class="scrim" id="scrim"></div>
+
+<!-- house detail -->
+<div class="sheet" id="sh-detail" style="height:88dvh">
+  <div class="grab" data-drag></div>
+  <div class="sheet-hd"><div class="st"><div class="sheet-t" id="dTitle"></div><div class="sheet-s" id="dSub"></div></div>
+    <button class="x-btn" data-close>✕</button></div>
+  <div class="sheet-bd" id="dBody"></div>
+  <div class="sheet-ft">
+    <button class="btn btn-s" id="dEdit">✏️ Edit</button>
+    <button class="btn btn-p" id="dLog">Log visit</button>
+  </div>
+</div>
+
+<!-- log visit -->
+<div class="sheet" id="sh-log">
+  <div class="grab" data-drag></div>
+  <div class="sheet-hd"><div class="st"><div class="sheet-t" id="lTitle">Log visit</div><div class="sheet-s" id="lSub"></div></div>
+    <button class="x-btn" data-close>✕</button></div>
+  <div class="sheet-bd">
+    <div class="out-grid" id="outGrid"></div>
+    <div class="f" style="margin-top:16px"><label for="lNote">Note (optional)</label>
+      <textarea id="lNote" placeholder="What was said, who you spoke with…"></textarea></div>
+  </div>
+  <div class="sheet-ft"><button class="btn btn-p" id="lSave">Save visit</button></div>
+</div>
+
+<!-- return-visit thread -->
+<div class="sheet" id="sh-rv" style="height:88dvh">
+  <div class="grab" data-drag></div>
+  <div class="sheet-hd"><div class="st"><div class="sheet-t" id="rTitle"></div><div class="sheet-s">Return visits</div></div>
+    <button class="x-btn" data-close>✕</button></div>
+  <div class="sheet-bd" id="rBody"></div>
+</div>
+
+<!-- edit / add house -->
+<div class="sheet" id="sh-form" style="height:92dvh">
+  <div class="grab" data-drag></div>
+  <div class="sheet-hd"><div class="st"><div class="sheet-t" id="fTitle">Add house</div></div>
+    <button class="x-btn" data-close>✕</button></div>
+  <div class="sheet-bd">
+    <input type="hidden" id="fId">
+    <div class="f"><label for="fAddr">Address</label><input id="fAddr" autocomplete="street-address" placeholder="6440 Ardilla Rd #1"></div>
+    <div class="grid2">
+      <div class="f"><label for="fCity">City</label><input id="fCity" autocomplete="address-level2"></div>
+      <div class="f"><label for="fZip">ZIP</label><input id="fZip" inputmode="numeric" autocomplete="postal-code"></div>
+      <div class="f"><label for="fState">State</label><input id="fState" value="CA"></div>
+      <div class="f"><label for="fTerr">Territory</label><input id="fTerr"></div>
+      <div class="f"><label for="fAssigned">Assigned to</label><input id="fAssigned"></div>
+      <div class="f"><label for="fLang">Language</label><input id="fLang"></div>
+      <div class="f"><label for="fLastVisit">Last visit</label><input id="fLastVisit" type="date"></div>
+      <div class="f"><label for="fVerified">On maps</label><select id="fVerified">
+        <option value="">Not checked</option><option value="Yes">Verified</option><option value="No">Not found</option></select></div>
+    </div>
+    <div class="f"><label for="fGPS">GPS coordinates</label>
+      <div class="gps-row"><input id="fGPS" placeholder="35.4873, -120.6700"><button type="button" class="gps-btn" id="fGPSBtn" title="Use my location">📍</button></div></div>
+    <div class="f"><label for="fNotes">House notes</label><textarea id="fNotes" placeholder="Dog in yard, gate code, best time…"></textarea></div>
+    <div class="f"><label for="fPersonal">Personal notes</label><textarea id="fPersonal" placeholder="Who lives here, interests…"></textarea></div>
+    <div class="lbl">Visit results</div>
+    <div class="grid2">
+      <div class="f"><label for="fV1">Visit 1</label><input id="fV1"></div>
+      <div class="f"><label for="fV2">Visit 2</label><input id="fV2"></div>
+      <div class="f"><label for="fV3">Visit 3</label><input id="fV3"></div>
+      <div class="f"><label for="fV4">Visit 4</label><input id="fV4"></div>
+      <div class="f"><label for="fV5">Visit 5</label><input id="fV5"></div>
+    </div>
+    <button class="btn btn-d" id="fDelete" style="width:100%;margin-top:6px">Delete house</button>
+  </div>
+  <div class="sheet-ft"><button class="btn btn-p" id="fSave">Save</button></div>
+</div>
+
+<!-- generic picker (territories / export / pending) -->
+<div class="sheet" id="sh-pick" style="max-height:80dvh">
+  <div class="grab" data-drag></div>
+  <div class="sheet-hd"><div class="st"><div class="sheet-t" id="pTitle"></div><div class="sheet-s" id="pSub"></div></div>
+    <button class="x-btn" data-close>✕</button></div>
+  <div class="sheet-bd" id="pBody" style="padding:8px 12px 20px"></div>
+</div>
+
 <script>
 (function(){
-var root=document.getElementById("tmRoot");
-root.innerHTML='<style>\
-:root{--bar-h:52px;--nav-h:48px;--safe-b:env(safe-area-inset-bottom,0px);--top-h:calc(var(--bar-h) + var(--nav-h));}\
-#tmRoot *,#tmRoot *::before,#tmRoot *::after{box-sizing:border-box;margin:0;padding:0;}\
-#tmRoot{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;color:#222;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;}\
-#tmMap{width:100%;height:100%;}\
-\
-#tmTopBar{position:absolute;top:0;left:0;right:0;z-index:500;background:#1a1a1a;padding:0 16px;height:var(--bar-h);display:flex;align-items:center;justify-content:space-between;gap:8px;box-shadow:0 2px 16px rgba(0,0,0,0.5);}\
-.tm-top-left{display:flex;align-items:center;gap:10px;}\
-.tm-app-title{font-size:17px;font-weight:700;color:#fff;letter-spacing:-.3px;}\
-.tm-count-badge{background:#e53935;color:#fff;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;}\
-.tm-top-right{display:flex;align-items:center;gap:8px;}\
-.tm-icon-btn{background:rgba(255,255,255,.12);color:#fff;border:none;border-radius:10px;width:38px;height:38px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;}\
-.tm-icon-btn:active{background:rgba(255,255,255,.25);}\
-.tm-add-btn{background:#fff;color:#1a1a1a;border:none;border-radius:10px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;letter-spacing:-.2px;}\
-.tm-add-btn:active{background:#e0e0e0;}\
-\
-#tmBottomNav{position:absolute;top:var(--bar-h);left:0;right:0;z-index:500;background:#1a1a1a;padding:0 8px;box-shadow:0 2px 16px rgba(0,0,0,0.4);}\
-.tm-nav-row{display:flex;justify-content:space-around;align-items:stretch;height:var(--nav-h);}\
-.tm-nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;background:none;border:none;color:rgba(255,255,255,.45);font-size:10px;font-weight:600;cursor:pointer;font-family:inherit;padding:4px;transition:color .15s;}\
-.tm-nav-btn.active{color:#fff;}\
-.tm-nav-icon{font-size:20px;line-height:1;}\
-\
-#tmSearchWrap{position:absolute;top:calc(var(--top-h) + 8px);left:12px;right:12px;z-index:500;}\
-#tmSearchBox{width:100%;padding:12px 16px 12px 40px;font-size:15px;border:none;border-radius:14px;background:rgba(255,255,255,0.95);box-shadow:0 4px 20px rgba(0,0,0,0.3);outline:none;font-family:inherit;color:#1a1a1a;-webkit-appearance:none;}\
-#tmSearchBox::placeholder{color:#aaa;}\
-.tm-search-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:16px;color:#999;pointer-events:none;}\
-#tmSearchClear{position:absolute;right:10px;top:50%;transform:translateY(-50%);width:28px;height:28px;border-radius:50%;border:none;background:#e0e0e0;color:#666;font-size:14px;cursor:pointer;display:none;align-items:center;justify-content:center;}\
-\
-#tmFilterFloat{position:absolute;bottom:10px;left:12px;right:12px;z-index:500;display:flex;flex-direction:row;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:2px;}\
-#tmFilterFloat::-webkit-scrollbar{display:none;}\
-.tm-filter-btn{display:flex;align-items:center;gap:5px;padding:8px 14px;border-radius:24px;font-size:13px;font-weight:600;border:2px solid transparent;cursor:pointer;font-family:inherit;background:rgba(20,20,20,0.88);color:#fff;box-shadow:0 2px 12px rgba(0,0,0,0.4);white-space:nowrap;flex-shrink:0;min-height:40px;transition:transform .1s;}\
-.tm-filter-btn:active{transform:scale(.96);}\
-.tm-filter-btn.tm-active-all{background:#1a1a1a;border-color:rgba(255,255,255,.5);}\
-.tm-filter-btn.tm-active-recent{background:#2e7d32;border-color:#66bb6a;}\
-.tm-filter-btn.tm-active-due{background:#ef6c00;border-color:#ffaa44;}\
-.tm-filter-btn.tm-active-overdue{background:#c62828;border-color:#ff6b6b;}\
-.tm-filter-btn.tm-active-never{background:#555;border-color:#999;}\
-.tm-filter-btn .tm-dot{display:inline-block;width:8px;height:8px;border-radius:50%;flex-shrink:0;}\
-.tm-filter-btn[data-f="all"] .tm-dot{background:#fff;}\
-.tm-filter-btn[data-f="recent"] .tm-dot{background:#66bb6a;}\
-.tm-filter-btn[data-f="due"] .tm-dot{background:#ffaa44;}\
-.tm-filter-btn[data-f="overdue"] .tm-dot{background:#ff6b6b;}\
-.tm-filter-btn[data-f="never"] .tm-dot{background:#999;}\
-.tm-filter-count{background:rgba(255,255,255,0.25);color:#fff;border-radius:20px;padding:2px 8px;font-size:11px;font-weight:700;}\
-\
-#tmSidePanel{position:absolute;left:0;top:0;bottom:0;z-index:600;width:min(300px,85vw);background:#1a1a1a;transform:translateX(-100%);transition:transform .3s cubic-bezier(.4,0,.2,1);overflow-y:auto;-webkit-overflow-scrolling:touch;padding:calc(var(--top-h) + 16px) 16px 24px;box-shadow:4px 0 24px rgba(0,0,0,0.5);}\
-#tmSidePanel.open{transform:translateX(0);}\
-.tm-side-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#666;margin-bottom:12px;}\
-.tm-terr-chip{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:14px 16px;font-size:14px;cursor:pointer;margin-bottom:8px;color:#fff;min-height:48px;transition:background .15s;}\
-.tm-terr-chip:active{background:rgba(255,255,255,.18);}\
-.tm-terr-count{margin-left:auto;font-size:11px;opacity:.5;}\
-#tmSideOverlay{display:none;position:absolute;inset:0;z-index:590;background:rgba(0,0,0,0.4);}\
-#tmSideOverlay.open{display:block;}\
-button#tmPullTab{display:none;position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:610;background:#1a1a1a;border:none;border-radius:0 8px 8px 0;padding:18px 12px;cursor:pointer;box-shadow:3px 0 14px rgba(0,0,0,0.30);flex-direction:column;gap:5px;align-items:center;}\
-#tmPullTab span{display:block;width:18px;height:2px;background:#fff;border-radius:2px;}\
-\
-@keyframes tmFadeIn{from{opacity:0;}to{opacity:1;}}\
-@keyframes tmSlideUp{from{transform:translateY(100%);}to{transform:translateY(0);}}\
-.tm-overlay{position:absolute;inset:0;z-index:700;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:none;align-items:flex-end;justify-content:center;padding:0;}\
-.tm-overlay.open{display:flex;animation:tmFadeIn .2s ease;}\
-.tm-drawer{background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:540px;max-height:85%;display:flex;flex-direction:column;box-shadow:0 -8px 40px rgba(0,0,0,0.25);overflow:hidden;animation:tmSlideUp .3s cubic-bezier(.4,0,.2,1);}\
-.tm-drawer-handle{width:36px;height:4px;border-radius:4px;background:rgba(0,0,0,0.15);margin:10px auto 0;flex-shrink:0;}\
-.tm-drawer-header{padding:14px 20px 0;flex-shrink:0;}\
-.tm-drawer-header-row{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;}\
-.tm-drawer-title{font-size:18px;font-weight:700;color:#1a1a1a;line-height:1.3;}\
-.tm-drawer-sub{font-size:13px;color:#999;margin-top:4px;}\
-.tm-close-btn{width:32px;height:32px;border-radius:50%;flex-shrink:0;border:none;background:#f0f0ee;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;color:#666;line-height:1;}\
-.tm-close-btn:active{background:#e0e0de;}\
-.tm-drawer-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 20px calc(28px + var(--safe-b));}\
-\
-.tm-house-card{border:1px solid rgba(0,0,0,0.07);border-radius:14px;padding:14px 16px;background:#fff;cursor:pointer;margin-bottom:8px;transition:background .1s;}\
-.tm-house-card:active{background:#f5f5f3;}\
-.tm-hc-top{display:flex;align-items:center;gap:12px;}\
-.tm-visit-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}\
-.tm-visit-green{background:#2e7d32;}\
-.tm-visit-yellow{background:#ef6c00;}\
-.tm-visit-red{background:#c62828;}\
-.tm-visit-gray{background:#999;}\
-.tm-hc-info{flex:1;min-width:0;}\
-.tm-hc-addr{font-size:15px;font-weight:600;color:#1a1a1a;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}\
-.tm-hc-meta{font-size:12px;color:#999;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}\
-.tm-hc-actions{display:flex;gap:6px;margin-top:10px;padding-left:22px;}\
-.tm-btn-sm{padding:7px 14px;border-radius:10px;font-size:12px;font-weight:600;border:1px solid rgba(0,0,0,0.12);background:#fff;color:#333;cursor:pointer;font-family:inherit;min-height:34px;transition:background .1s;}\
-.tm-btn-sm:active{background:#f0f0ee;}\
-.tm-btn-log{border-color:#2e7d32;color:#2e7d32;background:#f0faf0;}\
-.tm-btn-log:active{background:#2e7d32;color:#fff;}\
-.tm-btn-dir{border-color:#1565c0;color:#1565c0;background:#f0f4ff;}\
-.tm-btn-dir:active{background:#1565c0;color:#fff;}\
-\
-.tm-form-overlay .tm-drawer{max-height:92%;}\
-.tm-form-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 20px calc(28px + var(--safe-b));}\
-.tm-field{margin-bottom:14px;}\
-.tm-field label{display:block;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#888;margin-bottom:6px;}\
-.tm-field input,.tm-field textarea,.tm-field select{width:100%;padding:12px 14px;font-size:15px;border:2px solid #e8e8e8;border-radius:12px;outline:none;font-family:inherit;color:#1a1a1a;background:#fafafa;-webkit-appearance:none;transition:border-color .2s;}\
-.tm-field input:focus,.tm-field textarea:focus,.tm-field select:focus{border-color:#1a1a1a;background:#fff;}\
-.tm-field textarea{min-height:80px;resize:vertical;}\
-.tm-field select{background-image:url("data:image/svg+xml;utf8,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%278%27 viewBox=%270 0 12 8%27><path d=%27M1 1l5 5 5-5%27 stroke=%27%23888%27 stroke-width=%272%27 fill=%27none%27 stroke-linecap=%27round%27/></svg>");background-repeat:no-repeat;background-position:right 14px center;padding-right:38px;cursor:pointer;}\
-.tm-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 14px;}\
-.tm-gps-row{display:flex;gap:8px;}\
-.tm-gps-row input{flex:1;}\
-.tm-gps-btn{flex-shrink:0;width:44px;height:44px;border-radius:12px;border:2px solid #e8e8e8;background:#fafafa;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;margin-top:0;}\
-.tm-gps-btn:active{background:#e8e8e8;}\
-.tm-gps-btn.locating{animation:tmPulse 1s infinite;}\
-@keyframes tmPulse{0%,100%{opacity:1;}50%{opacity:.4;}}\
-.tm-save-btn{width:100%;padding:14px;background:#1a1a1a;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;min-height:48px;margin-top:8px;transition:background .15s;}\
-.tm-save-btn:active{background:#333;}\
-.tm-delete-btn{width:100%;padding:14px;background:#fff;color:#c62828;border:2px solid #fdd;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;min-height:48px;margin-top:8px;}\
-.tm-delete-btn:active{background:#fff0f0;}\
-.tm-section-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#bbb;margin:20px 0 12px;display:flex;align-items:center;gap:8px;}\
-.tm-section-label::after{content:"";flex:1;height:1px;background:rgba(0,0,0,0.06);}\
-\
-.tm-detail-row{display:flex;align-items:center;gap:10px;font-size:14px;color:#555;margin-bottom:10px;min-height:28px;}\
-.tm-detail-icon{font-size:16px;color:#bbb;flex-shrink:0;width:22px;text-align:center;}\
-.tm-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:8px;font-size:13px;font-weight:700;margin-bottom:14px;}\
-.tm-badge-green{background:#f0faf0;color:#2e7d32;}\
-.tm-badge-yellow{background:#fff4ee;color:#ef6c00;}\
-.tm-badge-red{background:#fff0f0;color:#c62828;}\
-.tm-badge-gray{background:#f0f0f0;color:#666;}\
-.tm-visit-block{background:#f5f5f3;border:1px solid rgba(0,0,0,0.06);border-radius:12px;padding:12px 14px;margin-bottom:8px;}\
-.tm-visit-label{font-size:11px;color:#aaa;font-weight:700;text-transform:uppercase;letter-spacing:.04em;}\
-.tm-visit-text{font-size:14px;color:#333;margin-top:4px;line-height:1.5;}\
-.tm-dir-btn{width:100%;padding:12px;border-radius:12px;border:none;background:#1a1a1a;color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;min-height:48px;margin:14px 0 8px;}\
-.tm-dir-btn:active{background:#333;}\
-.tm-edit-btn{width:100%;padding:12px;border-radius:12px;border:2px solid #1a1a1a;background:#fff;color:#1a1a1a;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;min-height:48px;}\
-.tm-edit-btn:active{background:#f0f0ee;}\
-.tm-notes-wrap{white-space:pre-wrap;font-size:14px;color:#444;line-height:1.65;background:#f8f8f6;border-radius:10px;padding:12px 14px;}\
-\
-.tm-confirm-overlay{display:none;position:absolute;inset:0;z-index:1100;background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);align-items:flex-end;justify-content:center;padding:0;}\
-.tm-confirm-overlay.open{display:flex;animation:tmFadeIn .2s ease;}\
-.tm-confirm-modal{background:#fff;border-radius:20px 20px 0 0;padding:24px 20px calc(24px + var(--safe-b));max-width:380px;width:100%;text-align:center;box-shadow:0 -8px 40px rgba(0,0,0,0.25);animation:tmSlideUp .3s cubic-bezier(.4,0,.2,1);}\
-.tm-confirm-btns{display:flex;gap:10px;margin-top:4px;}\
-.tm-confirm-btns button{flex:1;padding:14px;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;min-height:48px;}\
-\
-.tm-log-overlay .tm-drawer{max-height:60%;}\
-.tm-log-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 20px calc(28px + var(--safe-b));}\
-\
-#tmGeocodeStatus{position:absolute;bottom:calc(var(--nav-h) + var(--safe-b) + 56px);left:50%;transform:translateX(-50%);z-index:500;font-size:12px;color:#fff;background:rgba(0,0,0,0.75);border-radius:24px;padding:8px 18px;pointer-events:none;display:none;}\
-.tm-toast{position:absolute;top:calc(var(--top-h) + 8px);left:50%;transform:translateX(-50%);z-index:900;border-radius:24px;padding:10px 22px;font-size:14px;font-weight:600;color:#fff;display:none;pointer-events:none;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,0.3);background:#2e7d32;}\
-.tm-empty{color:#aaa;font-size:15px;padding:32px;text-align:center;}\
-.tm-adjust-map{width:100%;height:200px;border-radius:12px;margin:12px 0;overflow:hidden;border:2px solid #e8e8e8;}\
-.tm-adjust-hint{font-size:12px;color:#999;text-align:center;margin-bottom:10px;}\
-.tm-adjust-coords{font-size:13px;color:#555;text-align:center;font-family:monospace;margin-bottom:10px;}\
-.tm-street-header{font-size:17px;font-weight:700;color:#fff;background:#c62828;margin:10px 0 0;padding:8px 12px;}\
-.tm-street-header:first-child{margin-top:0;}\
-.tm-apt-header{font-size:16px;font-weight:700;color:#333;padding:8px 12px;background:#ebebeb;border-bottom:1px solid #ddd;}\
-.tm-apt-group{padding-left:20px;}\
-.tm-pdf-row{display:flex;align-items:center;min-height:46px;padding:6px 12px;border-bottom:1px solid #eee;cursor:pointer;gap:6px;background:#fff;}\
-.tm-pdf-row:active{background:#f5f5f5;}\
-.tm-pdf-row.tm-apt-unit{padding-left:32px;background:#fafafa;}\
-.tm-pdf-addr{min-width:80px;max-width:100px;color:#2e7d32;font-size:19px;font-weight:700;flex-shrink:0;}\
-.tm-unverified{color:#c62828;font-size:13px;font-weight:700;margin-left:3px;vertical-align:super;}\
-.tm-pdf-visits{display:flex;gap:3px;flex-shrink:0;}\
-.tm-pdf-box{width:38px;height:38px;border:1px solid #c5cae9;border-radius:6px;background:#e8eaf6;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#333;cursor:pointer;user-select:none;-webkit-user-select:none;}\
-.tm-pdf-box:active{background:#9fa8da;}\
-.tm-pdf-box-filled{background:#c5cae9;color:#1a237e;}\
-.tm-pdf-notes{flex:1;font-size:15px;color:#666;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;cursor:pointer;}\
-.tm-pdf-notes-empty{color:#bbb;font-style:italic;}\
-\
-#tmVisitSelect{position:absolute;top:calc(var(--top-h) + 56px);right:12px;z-index:500;padding:9px 14px;border-radius:12px;border:none;background:rgba(20,20,20,0.88);color:#fff;font-size:13px;font-weight:600;font-family:inherit;box-shadow:0 2px 12px rgba(0,0,0,0.4);-webkit-appearance:none;appearance:none;cursor:pointer;padding-right:32px;background-image:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%278%27%3E%3Cpath d=%27M1 1l5 5 5-5%27 stroke=%27white%27 stroke-width=%272%27 fill=%27none%27/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;}\
-#tmVisitSelect option{background:#1a1a1a;color:#fff;}\
-#tmTerrSelect{position:absolute;top:calc(var(--top-h) + 56px);left:12px;z-index:500;padding:9px 14px;border-radius:12px;border:none;background:rgba(20,20,20,0.88);color:#fff;font-size:13px;font-weight:600;font-family:inherit;box-shadow:0 2px 12px rgba(0,0,0,0.4);-webkit-appearance:none;appearance:none;cursor:pointer;padding-right:32px;background-image:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%278%27%3E%3Cpath d=%27M1 1l5 5 5-5%27 stroke=%27white%27 stroke-width=%272%27 fill=%27none%27/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;}\
-#tmTerrSelect option{background:#1a1a1a;color:#fff;}\
-\
-#tmLongPressTimer{position:absolute;z-index:1200;pointer-events:none;display:none;transform:translate(-50%,-50%);}\
-#tmLongPressTimer.active{display:block;}\
-.tm-timer-ring{width:144px;height:144px;}\
-.tm-timer-bg{fill:none;stroke:rgba(255,255,255,0.2);stroke-width:5;}\
-.tm-timer-fg{fill:none;stroke:#fff;stroke-width:5;stroke-linecap:round;stroke-dasharray:377;stroke-dashoffset:377;transition:stroke-dashoffset .15s linear;}\
-.tm-timer-text{font-size:40px;font-weight:700;fill:#fff;text-anchor:middle;dominant-baseline:central;}\
-.tm-timer-label{position:absolute;bottom:-28px;left:50%;transform:translateX(-50%);white-space:nowrap;font-size:12px;font-weight:600;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,0.8);}\
-\
-.tm-verify-overlay .tm-drawer{max-height:80%;}\
-.tm-verify-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 20px calc(28px + var(--safe-b));}\
-.tm-verify-map{width:100%;height:160px;border-radius:12px;margin-bottom:16px;overflow:hidden;border:2px solid #e8e8e8;}\
-.tm-verify-addr{font-size:18px;font-weight:700;color:#1a1a1a;line-height:1.3;margin-bottom:4px;}\
-.tm-verify-coords{font-size:13px;color:#999;margin-bottom:16px;font-family:monospace;}\
-.tm-verify-note{font-size:12px;color:#aaa;text-align:center;margin-bottom:14px;line-height:1.5;}\
-\
-@media(min-width:601px){\
-.tm-overlay{align-items:center;padding:20px;}\
-.tm-drawer{border-radius:16px;max-height:82%;animation:tmFadeIn .25s ease;}\
-.tm-drawer-handle{display:none;}\
-.tm-confirm-overlay{align-items:center;padding:20px;}\
-.tm-confirm-modal{border-radius:16px;}\
-.tm-log-overlay .tm-drawer{max-height:55%;border-radius:16px;}\
-#tmBottomNav{display:none!important;}\
-#tmFilterFloat{bottom:36px;left:14px;right:auto;}\
-#tmPullTab{display:flex!important;}\
-#tmGeocodeStatus{bottom:14px;}\
-}\
-@media(max-width:600px){\
-#tmPullTab{display:none!important;}\
-.tm-hc-actions{flex-wrap:wrap;}\
-}\
-</style>\
-\
-<div id="tmMap"></div>\
-\
-<div id="tmTopBar">\
-<div class="tm-top-left">\
-<span class="tm-app-title">Territory</span>\
-<span class="tm-count-badge" id="tmCountBadge" style="display:none"></span>\
-</div>\
-<div class="tm-top-right">\
-<button class="tm-icon-btn" id="tmExportBtn" title="Export PDF">&#x1F4C4;</button>\
-<button class="tm-add-btn" id="tmAddBtn">+ Add</button>\
-</div>\
-</div>\
-\
-<div id="tmSearchWrap">\
-<span class="tm-search-icon">\u{1F50D}</span>\
-<input type="text" id="tmSearchBox" placeholder="Search address, territory, language...">\
-<button id="tmSearchClear">✕</button>\
-</div>\
-\
-<select id="tmTerrSelect">\
-<option value="all">All Territories</option>\
-</select>\
-\
-<select id="tmVisitSelect">\
-<option value="all">All Visits</option>\
-<option value="today">Not visited today</option>\
-<option value="yesterday">Not visited since yesterday</option>\
-<option value="week">Not visited this week</option>\
-<option value="2weeks">Not visited in 2+ weeks</option>\
-</select>\
-\
-<div id="tmBottomNav"><div class="tm-nav-row">\
-<button class="tm-nav-btn active" data-nav="list"><span class="tm-nav-icon">\u{1F4CB}</span><span>Houses</span></button>\
-<button class="tm-nav-btn" data-nav="territories"><span class="tm-nav-icon">\u{1F4C1}</span><span>Territories</span></button>\
-</div></div>\
-\
-<div id="tmFilterFloat">\
-<button class="tm-filter-btn tm-active-all" data-f="all"><span class="tm-dot"></span> All <span class="tm-filter-count" id="tmCntAll"></span></button>\
-<button class="tm-filter-btn" data-f="recent"><span class="tm-dot"></span> Recent <span class="tm-filter-count" id="tmCntRecent"></span></button>\
-<button class="tm-filter-btn" data-f="due"><span class="tm-dot"></span> Due <span class="tm-filter-count" id="tmCntDue"></span></button>\
-<button class="tm-filter-btn" data-f="overdue"><span class="tm-dot"></span> Overdue <span class="tm-filter-count" id="tmCntOverdue"></span></button>\
-<button class="tm-filter-btn" data-f="never"><span class="tm-dot"></span> Never <span class="tm-filter-count" id="tmCntNever"></span></button>\
-</div>\
-\
-<button id="tmPullTab" aria-label="Menu"><span></span><span></span><span></span></button>\
-<div id="tmSideOverlay"></div>\
-<div id="tmSidePanel"><p class="tm-side-label">Territories</p><div id="tmTerrList"></div></div>\
-<div id="tmGeocodeStatus"></div>\
-<div class="tm-toast" id="tmToast"></div>\
-\
-<!-- List Drawer -->\
-<div class="tm-overlay" id="tmListOverlay"><div class="tm-drawer"><div class="tm-drawer-handle"></div>\
-<div class="tm-drawer-header"><div class="tm-drawer-header-row"><div style="flex:1;min-width:0"><div class="tm-drawer-title" id="tmListTitle">All Houses</div><div class="tm-drawer-sub" id="tmListSub"></div></div><button class="tm-close-btn" id="tmListClose">✕</button></div></div>\
-<div class="tm-drawer-body" id="tmListBody"></div>\
-</div></div>\
-<div class="tm-overlay" id="tmExportOverlay" style="z-index:950"><div class="tm-drawer"><div class="tm-drawer-handle"></div>\
-<div class="tm-drawer-header"><div class="tm-drawer-header-row"><div style="flex:1;min-width:0"><div class="tm-drawer-title">Export PDF</div><div class="tm-drawer-sub">Select a territory to export</div></div><button class="tm-close-btn" id="tmExpClose">✕</button></div></div>\
-<div class="tm-drawer-body" id="tmExportBody"></div>\
-</div></div>\
-\
-<!-- Detail Drawer -->\
-<div class="tm-overlay" id="tmDetailOverlay" style="z-index:800"><div class="tm-drawer"><div class="tm-drawer-handle"></div>\
-<div class="tm-drawer-header"><div class="tm-drawer-header-row"><div style="flex:1;min-width:0"><div class="tm-drawer-title" id="tmDetTitle"></div><div class="tm-drawer-sub" id="tmDetSub"></div></div><button class="tm-close-btn" id="tmDetClose">✕</button></div></div>\
-<div class="tm-drawer-body" id="tmDetBody"></div>\
-</div></div>\
-\
-<!-- Form Drawer -->\
-<div class="tm-overlay tm-form-overlay" id="tmFormOverlay" style="z-index:900"><div class="tm-drawer"><div class="tm-drawer-handle"></div>\
-<div class="tm-drawer-header"><div class="tm-drawer-header-row"><div style="flex:1;min-width:0"><div class="tm-drawer-title" id="tmFormTitle">Add House</div></div><button class="tm-close-btn" id="tmFormClose">✕</button></div></div>\
-<div class="tm-form-body" id="tmFormBody">\
-<input type="hidden" id="tmItemID">\
-<div class="tm-grid">\
-<div class="tm-field"><label>Address</label><input id="fAddr" autocomplete="street-address"></div>\
-<div class="tm-field"><label>City</label><input id="fCity" autocomplete="address-level2"></div>\
-<div class="tm-field"><label>State</label><input id="fState" value="CA"></div>\
-<div class="tm-field"><label>ZIP</label><input id="fZip" inputmode="numeric" autocomplete="postal-code"></div>\
-<div class="tm-field"><label>Territory #</label><input id="fTerrNum"></div>\
-<div class="tm-field"><label>Assigned To</label><input id="fAssigned"></div>\
-<div class="tm-field"><label>Language</label><input id="fLang"></div>\
-<div class="tm-field"><label>Last Visit</label><input id="fLastVisit" type="date"></div>\
-<div class="tm-field"><label>Verified on Maps</label><select id="fVerified"><option value="">Not checked</option><option value="Yes">Yes \u{2713}</option><option value="No">Not found</option></select></div>\
-</div>\
-<div class="tm-field"><label>GPS Coordinates</label><div class="tm-gps-row"><input id="fGPS" placeholder="35.6266, -120.6910"><button type="button" class="tm-gps-btn" id="tmGPSBtn" title="Use my location">\u{1F4CD}</button></div></div>\
-<div class="tm-field"><label>House Notes</label><textarea id="fNotes" placeholder="Dog in yard, gate code, etc."></textarea></div>\
-<div class="tm-field"><label>Personal Notes</label><textarea id="fPersonal" placeholder="Interested in Bible study, speaks Spanish..."></textarea></div>\
-<div class="tm-section-label">Visit Results</div>\
-<div class="tm-grid">\
-<div class="tm-field"><label>Visit 1</label><input id="fV1" placeholder="NH / Spoke with..."></div>\
-<div class="tm-field"><label>Visit 2</label><input id="fV2"></div>\
-<div class="tm-field"><label>Visit 3</label><input id="fV3"></div>\
-<div class="tm-field"><label>Visit 4</label><input id="fV4"></div>\
-<div class="tm-field"><label>Visit 5</label><input id="fV5"></div>\
-</div>\
-<button class="tm-save-btn" id="tmSaveBtn">Save House</button>\
-<button class="tm-delete-btn" id="tmDeleteBtn" style="display:none">Delete House</button>\
-</div></div></div>\
-\
-<!-- Quick Log Visit Drawer -->\
-<div class="tm-overlay tm-log-overlay" id="tmLogOverlay" style="z-index:950"><div class="tm-drawer"><div class="tm-drawer-handle"></div>\
-<div class="tm-drawer-header"><div class="tm-drawer-header-row"><div style="flex:1;min-width:0"><div class="tm-drawer-title" id="tmLogTitle">Log Visit</div><div class="tm-drawer-sub" id="tmLogSub"></div></div><button class="tm-close-btn" id="tmLogClose">✕</button></div></div>\
-<div class="tm-log-body" id="tmLogBody">\
-<div class="tm-field"><label>Visit Date</label><input id="fLogDate" type="date"></div>\
-<div class="tm-field"><label>Result</label><textarea id="fLogResult" placeholder="NH, Not home, Spoke with John about..., Left tract, Started Bible study..." style="min-height:100px"></textarea></div>\
-<button class="tm-save-btn" id="tmLogSave">Save Visit</button>\
-</div></div></div>\
-\
-<!-- Edit Notes Drawer -->\
-<div class="tm-overlay tm-log-overlay" id="tmNotesOverlay" style="z-index:950"><div class="tm-drawer"><div class="tm-drawer-handle"></div>\
-<div class="tm-drawer-header"><div class="tm-drawer-header-row"><div style="flex:1;min-width:0"><div class="tm-drawer-title">Edit Notes</div><div class="tm-drawer-sub" id="tmNotesSub"></div></div><button class="tm-close-btn" id="tmNotesClose">✕</button></div></div>\
-<div class="tm-log-body">\
-<div class="tm-field"><label>House Notes</label><textarea id="fNotesText" placeholder="Add notes about this house…" style="min-height:120px"></textarea></div>\
-<button class="tm-save-btn" id="tmNotesSave">Save Notes</button>\
-</div></div></div>\
-\
-<!-- Long Press Timer -->\
-<div id="tmLongPressTimer"><svg class="tm-timer-ring" viewBox="0 0 144 144"><circle class="tm-timer-bg" cx="72" cy="72" r="60"/><circle class="tm-timer-fg" id="tmTimerFG" cx="72" cy="72" r="60" transform="rotate(-90 72 72)"/><text class="tm-timer-text" id="tmTimerText" x="72" y="72">5</text></svg><div class="tm-timer-label">Hold to add house</div></div>\
-\
-<!-- Verify Address Drawer -->\
-<div class="tm-overlay tm-verify-overlay" id="tmVerifyOverlay" style="z-index:960"><div class="tm-drawer"><div class="tm-drawer-handle"></div>\
-<div class="tm-drawer-header"><div class="tm-drawer-header-row"><div style="flex:1;min-width:0"><div class="tm-drawer-title">New House</div><div class="tm-drawer-sub">Verify the address and fill in details</div></div><button class="tm-close-btn" id="tmVerifyClose">✕</button></div></div>\
-<div class="tm-verify-body" id="tmVerifyBody">\
-<div class="tm-verify-map" id="tmVerifyMap"></div>\
-<div class="tm-verify-note">Address detected from map pin. Please verify and correct if needed.</div>\
-<div class="tm-grid">\
-<div class="tm-field"><label>Address</label><input id="vAddr"></div>\
-<div class="tm-field"><label>City</label><input id="vCity"></div>\
-<div class="tm-field"><label>State</label><input id="vState" value="CA"></div>\
-<div class="tm-field"><label>ZIP</label><input id="vZip" inputmode="numeric"></div>\
-<div class="tm-field"><label>Territory #</label><input id="vTerrNum"></div>\
-<div class="tm-field"><label>Assigned To</label><input id="vAssigned"></div>\
-<div class="tm-field"><label>Language</label><input id="vLang"></div>\
-<div class="tm-field"><label>Last Visit</label><input id="vLastVisit" type="date"></div>\
-</div>\
-<div class="tm-field"><label>GPS Coordinates</label><input id="vGPS" readonly style="background:#f0f0ee;color:#666"></div>\
-<div class="tm-field"><label>House Notes</label><textarea id="vNotes" placeholder="Dog in yard, gate code, etc."></textarea></div>\
-<div class="tm-field"><label>Personal Notes</label><textarea id="vPersonal" placeholder="Interested in Bible study, speaks Spanish..."></textarea></div>\
-<button class="tm-save-btn" id="tmVerifyCreate" style="background:#2e7d32">Create House</button>\
-</div></div></div>\
-\
-<!-- Confirm Modal -->\
-<div class="tm-confirm-overlay" id="tmConfirm"><div class="tm-confirm-modal">\
-<div class="tm-drawer-handle" style="margin-bottom:16px"></div>\
-<div style="font-size:36px;margin:8px 0 12px" id="tmConfirmIcon">⚠️</div>\
-<h3 style="font-size:18px;margin-bottom:6px" id="tmConfirmTitle">Delete this house?</h3>\
-<p style="font-size:13px;color:#aaa;margin-bottom:22px;line-height:1.5" id="tmConfirmMsg">This cannot be undone.</p>\
-<div class="tm-confirm-btns">\
-<button id="tmConfirmNo" style="border:1px solid #e0e0e0;background:#fff;color:#555">Cancel</button>\
-<button id="tmConfirmYes" style="border:none;background:#c62828;color:#fff">Delete</button>\
-</div></div></div>\
-';
+"use strict";
 
-/* ── Config ── */
+/* ═══ CONFIG ═══ */
 var API="https://territory-manager-silk.vercel.app/api/territory";
-var records=[],allRecords=[],map=null,mapMarkers=[],markerMap={},filter="all",searchTerm="";
-var currentLogId="";
-var currentListTitle="",currentListIds=null,currentLogSlot=null;
+var APP_VERSION="2.0.0";
 
-/* ── Helpers ── */
-function esc(v){if(!v)return"";return String(v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;");}
+/* ═══════════════════════════════════════════════════════════════════════
+   OFFLINE DATA LAYER
+
+   Two IndexedDB stores, and the app never reads the network directly:
+
+     mirror  — the last snapshot we received from the server, untouched.
+     pending — per-record *intentions*: only the fields this device changed,
+               plus create/delete flags.
+
+   What the UI shows is mirror + pending applied on top. Because pending
+   records only the FIELDS you edited, a sync sends only those fields, and
+   the server merges them into whatever the live row holds. Two people
+   editing different fields of the same house therefore never clobber each
+   other — which matters here, because a lost note means a real person is
+   forgotten.
+
+   Every write lands in IndexedDB before the UI acknowledges it. Sync is
+   always a background concern; the app is fully usable with the radio off.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+var DB_NAME = 'territory-manager', DB_VER = 1;
+var S_MIRROR = 'mirror', S_PENDING = 'pending', S_META = 'meta';
+var _db = null;
+
+function dbOpen() {
+  if (_db) return Promise.resolve(_db);
+  return new Promise(function (resolve, reject) {
+    var req = indexedDB.open(DB_NAME, DB_VER);
+    req.onupgradeneeded = function (e) {
+      var db = e.target.result;
+      if (!db.objectStoreNames.contains(S_MIRROR)) db.createObjectStore(S_MIRROR, { keyPath: 'id' });
+      if (!db.objectStoreNames.contains(S_PENDING)) db.createObjectStore(S_PENDING, { keyPath: 'id' });
+      if (!db.objectStoreNames.contains(S_META)) db.createObjectStore(S_META, { keyPath: 'k' });
+    };
+    req.onsuccess = function () { _db = req.result; resolve(_db); };
+    req.onerror = function () { reject(req.error); };
+  });
+}
+
+function tx(store, mode, fn) {
+  return dbOpen().then(function (db) {
+    return new Promise(function (resolve, reject) {
+      var t = db.transaction(store, mode);
+      var s = t.objectStore(store);
+      var out = fn(s);
+      t.oncomplete = function () { resolve(out && out.result !== undefined ? out.result : out); };
+      t.onerror = function () { reject(t.error); };
+      t.onabort = function () { reject(t.error); };
+    });
+  });
+}
+
+var idb = {
+  all: function (store) {
+    return tx(store, 'readonly', function (s) { return s.getAll(); })
+      .then(function (r) { return r || []; });
+  },
+  put: function (store, val) { return tx(store, 'readwrite', function (s) { return s.put(val); }); },
+  del: function (store, key) { return tx(store, 'readwrite', function (s) { return s.delete(key); }); },
+  clear: function (store) { return tx(store, 'readwrite', function (s) { return s.clear(); }); },
+  putAll: function (store, vals) {
+    return tx(store, 'readwrite', function (s) { vals.forEach(function (v) { s.put(v); }); });
+  },
+  replaceAll: function (store, vals) {
+    return tx(store, 'readwrite', function (s) { s.clear(); vals.forEach(function (v) { s.put(v); }); });
+  },
+  getMeta: function (k) {
+    return tx(S_META, 'readonly', function (s) { return s.get(k); })
+      .then(function (r) { return r ? r.v : null; });
+  },
+  setMeta: function (k, v) { return idb.put(S_META, { k: k, v: v }); },
+};
+
+/* ── in-memory working set ───────────────────────────────────────────── */
+var mirror = {};   // id -> server record
+var pending = {};  // id -> {id, fields:{}, created, deleted, at}
+
+function localId() {
+  return 'l' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+/* The merged view the UI renders from. */
+function buildRecords() {
+  var out = [];
+  Object.keys(mirror).forEach(function (id) {
+    var p = pending[id];
+    if (p && p.deleted) return;
+    out.push(p ? Object.assign({}, mirror[id], p.fields) : mirror[id]);
+  });
+  Object.keys(pending).forEach(function (id) {
+    var p = pending[id];
+    if (!p.created || p.deleted || mirror[id]) return;
+    out.push(Object.assign({ id: id }, p.fields));
+  });
+  return out;
+}
+
+function pendingCount() {
+  return Object.keys(pending).filter(function (id) {
+    var p = pending[id];
+    return p.deleted || p.created || Object.keys(p.fields).length;
+  }).length;
+}
+
+/* ── local mutations ─────────────────────────────────────────────────── */
+
+/* Record a field-level edit. Returns once it is durably in IndexedDB. */
+function localUpdate(id, changes) {
+  var p = pending[id] || (pending[id] = { id: id, fields: {}, created: false, deleted: false, at: 0 });
+  Object.keys(changes).forEach(function (k) { p.fields[k] = changes[k]; });
+  p.at = Date.now();
+  return idb.put(S_PENDING, p);
+}
+
+function localCreate(rec) {
+  var id = rec.id || localId();
+  var fields = {};
+  Object.keys(rec).forEach(function (k) { if (k !== 'id') fields[k] = rec[k]; });
+  pending[id] = { id: id, fields: fields, created: true, deleted: false, at: Date.now() };
+  return idb.put(S_PENDING, pending[id]).then(function () { return id; });
+}
+
+function localDelete(id) {
+  var p = pending[id];
+  // Created offline and never synced: the server never heard of it, so just forget it.
+  if (p && p.created && !mirror[id]) {
+    delete pending[id];
+    return idb.del(S_PENDING, id);
+  }
+  pending[id] = { id: id, fields: (p && p.fields) || {}, created: false, deleted: true, at: Date.now() };
+  return idb.put(S_PENDING, pending[id]);
+}
+
+/* ── sync ────────────────────────────────────────────────────────────── */
+var syncing = false;
+var lastSyncError = null;
+
+function loadLocal() {
+  return Promise.all([idb.all(S_MIRROR), idb.all(S_PENDING)]).then(function (r) {
+    mirror = {};
+    r[0].forEach(function (rec) { mirror[rec.id] = rec; });
+    pending = {};
+    r[1].forEach(function (p) { pending[p.id] = p; });
+  });
+}
+
+/* Push local intentions, pull the authoritative snapshot back.
+   Returns {ok, offline?, conflicts?, error?}. Never throws. */
+function sync(opts) {
+  opts = opts || {};
+  if (syncing) return Promise.resolve({ ok: false, busy: true });
+  syncing = true;
+
+  // Snapshot exactly what we are sending, so edits made *during* the request
+  // are not mistaken for synced and dropped.
+  var sent = { creates: [], updates: [], deletes: [], snapshot: {} };
+  Object.keys(pending).forEach(function (id) {
+    var p = pending[id];
+    sent.snapshot[id] = JSON.parse(JSON.stringify(p));
+    if (p.deleted) { sent.deletes.push(id); return; }
+    if (p.created) { sent.creates.push(Object.assign({ id: id }, p.fields)); return; }
+    if (Object.keys(p.fields).length) {
+      var u = Object.assign({ id: id }, p.fields);
+      var base = mirror[id] && mirror[id].HouseUpdatedAt;
+      if (base) u._base = base;
+      sent.updates.push(u);
+    }
+  });
+
+  var nothingToPush = !sent.creates.length && !sent.updates.length && !sent.deletes.length;
+  var request = nothingToPush && !opts.force
+    ? fetch(API, { method: 'GET' }).then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      }).then(function (records) { return { records: records, conflicts: [] }; })
+    : fetch(API, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ creates: sent.creates, updates: sent.updates, deletes: sent.deletes }),
+      }).then(function (r) {
+        if (!r.ok) return r.text().then(function (t) { throw new Error('HTTP ' + r.status + ': ' + t.slice(0, 200)); });
+        return r.json();
+      });
+
+  return request.then(function (res) {
+    // Replace the mirror wholesale — the server just told us the truth.
+    mirror = {};
+    (res.records || []).forEach(function (rec) { mirror[rec.id] = rec; });
+
+    // Clear only what we actually sent AND that has not been re-edited since.
+    var stillPending = {};
+    Object.keys(pending).forEach(function (id) {
+      var now = pending[id], was = sent.snapshot[id];
+      if (!was) { stillPending[id] = now; return; } // edited during the request
+      var keep = { id: id, fields: {}, created: false, deleted: false, at: now.at };
+      var any = false;
+      Object.keys(now.fields).forEach(function (k) {
+        // Value changed again while in flight -> it was not covered by this sync.
+        if (!(k in was.fields) || JSON.stringify(was.fields[k]) !== JSON.stringify(now.fields[k])) {
+          keep.fields[k] = now.fields[k]; any = true;
+        }
+      });
+      if (now.deleted && !was.deleted) { keep.deleted = true; any = true; }
+      if (now.created && !was.created) { keep.created = true; any = true; }
+      if (any) stillPending[id] = keep;
+    });
+    pending = stillPending;
+
+    return Promise.all([
+      idb.replaceAll(S_MIRROR, Object.keys(mirror).map(function (k) { return mirror[k]; })),
+      idb.replaceAll(S_PENDING, Object.keys(pending).map(function (k) { return pending[k]; })),
+      idb.setMeta('lastSync', new Date().toISOString()),
+    ]).then(function () {
+      lastSyncError = null;
+      return { ok: true, conflicts: res.conflicts || [], pushed: sent.creates.length + sent.updates.length + sent.deletes.length };
+    });
+  }).catch(function (e) {
+    // Offline or server error: pending is untouched and still on disk. Nothing lost.
+    lastSyncError = e.message;
+    return { ok: false, offline: !navigator.onLine || /Failed to fetch|NetworkError|Load failed/i.test(e.message), error: e.message };
+  }).then(function (r) { syncing = false; return r; });
+}
+
+
+/* ═══ STATE ═══ */
+var records=[],view=[],filter="all",searchTerm="",terrFilter="all";
+var map=null,markerMap={},mapReady=false;
+var curId=null,curSlot=null,curOutcome=null;
+var offlineMode=false, deferredInstall=null;
+
+/* ═══ HELPERS ═══ */
+function $(s){return document.querySelector(s);}
+function esc(v){if(v===0)return"0";if(!v)return"";return String(v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;");}
 function cleanDate(v){if(!v)return"";return String(v).substring(0,10);}
-function fmtDate(v){if(!v)return"Never";var d=new Date(v);if(isNaN(d))return v;return d.toLocaleDateString("en-US",{month:"short",day:"2-digit",year:"numeric"});}
 function todayStr(){var d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
-
-function visitStatus(v){
-  if(!v)return"never";
-  var diff=Math.floor((Date.now()-new Date(v))/86400000);
-  if(diff<=30)return"recent";
-  if(diff<=90)return"due";
-  return"overdue";
+/* "2026-08-22" parses as UTC midnight, which renders as the 21st for anyone
+   west of Greenwich. Visit dates are calendar days, not instants, so parse
+   date-only strings in local time. */
+function parseDay(v){
+  if(!v)return null;
+  var s=String(v).trim();
+  var m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  var d=m?new Date(+m[1],+m[2]-1,+m[3]):new Date(s);
+  return isNaN(d)?null:d;
 }
-function visitLabel(v){
-  if(!v)return"Never visited";
-  var diff=Math.floor((Date.now()-new Date(v))/86400000);
-  if(diff<=0)return"Visited today";
-  if(diff===1)return"Yesterday";
-  if(diff<=30)return diff+"d ago";
-  if(diff<=90)return diff+"d ago – Due soon";
-  return diff+"d ago – Overdue";
-}
-function dotClass(s){return"tm-visit-"+({recent:"green",due:"yellow",overdue:"red",never:"gray"}[s]||"gray");}
-function badgeClass(s){return"tm-badge-"+({recent:"green",due:"yellow",overdue:"red",never:"gray"}[s]||"gray");}
-function pinColor(s){return{recent:"#2e7d32",due:"#ef6c00",overdue:"#c62828",never:"#888"}[s]||"#888";}
+function fmtDate(v){var d=parseDay(v);if(!d)return v?String(v):"Never";
+  return d.toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"});}
+function daysSince(v){var d=parseDay(v);if(!d)return Infinity;
+  var t=new Date();t.setHours(0,0,0,0);d.setHours(0,0,0,0);
+  return Math.round((t.getTime()-d.getTime())/86400000);}
+function visitStatus(v){var d=daysSince(v);if(d===Infinity)return"never";
+  if(d<=30)return"recent";if(d<=90)return"due";return"overdue";}
+function visitLabel(v){if(!v)return"Never visited";var d=daysSince(v);
+  if(d<=0)return"Visited today";if(d===1)return"Yesterday";if(d<365)return d+" days ago";
+  return fmtDate(v);}
 function fullAddr(r){return[r.HouseAddress,r.HouseCity,r.HouseState,r.HouseZIP].filter(Boolean).join(", ");}
-function parseGPS(v){if(!v)return null;var p=v.split(",").map(function(s){return parseFloat(s.trim());});if(p.length===2&&!isNaN(p[0])&&!isNaN(p[1])&&Math.abs(p[0])<=90&&Math.abs(p[1])<=180)return{lat:p[0],lng:p[1]};return null;}
+function parseGPS(v){if(!v)return null;var p=String(v).split(",").map(function(s){return parseFloat(s.trim());});
+  if(p.length===2&&!isNaN(p[0])&&!isNaN(p[1])&&Math.abs(p[0])<=90&&Math.abs(p[1])<=180)return{lat:p[0],lng:p[1]};return null;}
+function byId(id){for(var i=0;i<records.length;i++)if(records[i].id===id)return records[i];return null;}
 
-var visitFilter="all";
-var terrFilter="all";
+function toast(msg,bad){
+  var t=$("#toast");t.textContent=msg;t.className=bad?"show bad":"show";
+  clearTimeout(toast._t);toast._t=setTimeout(function(){t.className="";},2600);
+}
+function haptic(ms){try{if(navigator.vibrate)navigator.vibrate(ms||8);}catch(e){}}
 
-function daysSinceVisit(v){
-  if(!v)return Infinity;
-  return Math.floor((Date.now()-new Date(v))/86400000);
+/* Visits and return visits live in append-only JSON logs that the server
+   merges by entry id, so two phones working the same street offline can
+   never overwrite each other's notes. Entries carry a stable `i`; deleting
+   one writes a tombstone (x:1) rather than removing it, or the next sync
+   from the other device would resurrect it.
+
+   Bad JSON must never take the app down — treat it as empty and carry on. */
+function entryId(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
+function parseLog(s){
+  if(!s)return[];
+  try{var a=JSON.parse(s);return Array.isArray(a)?a:[];}catch(e){return[];}
+}
+function liveEntries(s){return parseLog(s).filter(function(e){return e&&!e.x;});}
+function getRVs(h){return h?liveEntries(h.HouseReturnVisits):[];}
+function getLog(h){return h?parseLog(h.HouseVisitLog):[];}
+function isRV(h){return getRVs(h).length>0;}
+
+/* Mirrors the server's projection so the five visit slots look right
+   immediately, before any sync. */
+function deriveSlotsLocal(changes,logArr){
+  var live=logArr.filter(function(e){return e&&!e.x;})
+    .sort(function(a,b){return String(a.d||"").localeCompare(String(b.d||""));});
+  var last5=live.slice(-5);
+  for(var n=1;n<=5;n++)changes["HouseResutsOnVisit"+n]=last5[n-1]?String(last5[n-1].t||""):"";
+  if(live.length)changes.HouseLastVisitDate=live[live.length-1].d||changes.HouseLastVisitDate;
 }
 
-function applyFilters(){
-  var r=allRecords.slice();
-  if(terrFilter!=="all")r=r.filter(function(h){return(h.HouseTerritoryNumber||"Unassigned")===terrFilter;});
-  if(filter!=="all")r=r.filter(function(h){return visitStatus(h.HouseLastVisitDate)===filter;});
-  if(visitFilter!=="all"){
-    r=r.filter(function(h){
-      var d=daysSinceVisit(h.HouseLastVisitDate);
-      if(visitFilter==="today")return d>=1||d===Infinity;
-      if(visitFilter==="yesterday")return d>=2||d===Infinity;
-      if(visitFilter==="week")return d>=7||d===Infinity;
-      if(visitFilter==="2weeks")return d>=14||d===Infinity;
-      return true;
-    });
+/* A record created before the visit log kept its history only in the slot
+   columns. Seed the log from them once so the first append does not look
+   like it erased them. */
+function seedLogLocal(h){
+  var log=parseLog(h.HouseVisitLog);
+  if(log.length)return log;
+  var seeded=[];
+  for(var n=1;n<=5;n++){
+    var v=h["HouseResutsOnVisit"+n];
+    if(v)seeded.push({i:"legacy"+n,d:h.HouseLastVisitDate||"",t:v});
   }
-  if(searchTerm){var q=searchTerm.toLowerCase();r=r.filter(function(h){return[h.HouseAddress,h.HouseCity,h.HouseState,h.HouseZIP,h.HouseTerritoryNumber,h.HouseTerritoryAssingnedTo,h.HouseLanguage,h.HouseNotes,h.HousePersonalNotes,h.HouseGPSCoordinates,h.HouseResutsOnVisit1,h.HouseResutsOnVisit2,h.HouseResutsOnVisit3,h.HouseResutsOnVisit4,h.HouseResutsOnVisit5,h.HouseVerifiedOnMaps].filter(Boolean).join(" ").toLowerCase().includes(q);});}
-  records=r;
+  return seeded;
 }
 
-function updateCounts(){
-  var el=document.getElementById("tmCountBadge");
-  el.textContent=allRecords.length;el.style.display=allRecords.length?"inline-block":"none";
-  var sc=function(id,n){var e=document.getElementById(id);if(e)e.textContent=n>0?n:"";};
-  sc("tmCntAll",allRecords.length);
-  sc("tmCntRecent",allRecords.filter(function(h){return visitStatus(h.HouseLastVisitDate)==="recent";}).length);
-  sc("tmCntDue",allRecords.filter(function(h){return visitStatus(h.HouseLastVisitDate)==="due";}).length);
-  sc("tmCntOverdue",allRecords.filter(function(h){return visitStatus(h.HouseLastVisitDate)==="overdue";}).length);
-  sc("tmCntNever",allRecords.filter(function(h){return visitStatus(h.HouseLastVisitDate)==="never";}).length);
-}
-
-function toast(msg,bg){var t=document.getElementById("tmToast");t.textContent=msg;t.style.background=bg||"#2e7d32";t.style.display="block";clearTimeout(window._tmTT);window._tmTT=setTimeout(function(){t.style.display="none";},2500);}
-
-/* ── Geocoding ── */
-function geocodeAddr(address,city){
-  var q=[address,city].filter(Boolean).join(", ");
-  return fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&q="+encodeURIComponent(q),{headers:{"Accept-Language":"en","User-Agent":"TerritoryMgr/1.0"}})
-  .then(function(r){return r.json();})
-  .then(function(d){return d&&d.length?{lat:parseFloat(d[0].lat),lng:parseFloat(d[0].lon)}:null;})
-  .catch(function(){return null;});
-}
-
-/* ── Map Pin Icon ── */
-function colorIcon(color){
-  return L.divIcon({className:"",html:'<div style="width:22px;height:22px;border-radius:50%;background:'+color+';border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.4);transition:opacity .3s;"></div>',iconSize:[22,22],iconAnchor:[11,11],popupAnchor:[0,-13]});
-}
-
-/* ── Build Map ── */
-function buildMap(){
-  var statusEl=document.getElementById("tmGeocodeStatus");
-  if(map){map.remove();map=null;}
-  mapMarkers=[];markerMap={};
-  map=L.map("tmMap",{zoomControl:false});
-  L.control.zoom({position:"bottomright"}).addTo(map);
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OSM"}).addTo(map);
-  map.setView([36.7,-119.7],6);
-  if(!allRecords.length)return;
-
-  statusEl.style.display="block";
-  var idx=0;
-
-  function addNext(){
-    if(idx>=allRecords.length){
-      statusEl.style.display="none";
-      if(mapMarkers.length===1)map.setView(mapMarkers[0].getLatLng(),14);
-      else if(mapMarkers.length>1)map.fitBounds(L.featureGroup(mapMarkers).getBounds().pad(0.25),{maxZoom:14});
-      updatePinOpacity();
-      return;
-    }
-    var h=allRecords[idx];
-    var gps=parseGPS(h.HouseGPSCoordinates);
-    statusEl.textContent="Locating "+(idx+1)+"/"+allRecords.length+"…";
-
-    function placePin(loc){
-      if(loc){
-        var s=visitStatus(h.HouseLastVisitDate);
-        var mk=L.marker([loc.lat,loc.lng],{icon:colorIcon(pinColor(s))}).addTo(map);
-        var popup=document.createElement("div");popup.style.minWidth="180px";
-        popup.innerHTML='<strong style="font-size:14px;display:block;margin-bottom:2px">'+esc(h.HouseAddress||"No Address")+'</strong>'+
-          '<span style="color:#666;font-size:12px">'+esc([h.HouseCity,h.HouseState].filter(Boolean).join(", "))+'</span><br>'+
-          '<span style="font-size:12px;color:#888">'+visitLabel(h.HouseLastVisitDate)+'</span>'+
-          '<div style="display:flex;gap:8px;margin-top:10px">'+
-          '<button style="flex:1;padding:9px;background:#1a1a1a;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer" class="pp-det">Details</button>'+
-          '<button style="flex:1;padding:9px;background:#2e7d32;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer" class="pp-log">Log Visit</button>'+
-          '<button style="flex:1;padding:9px;background:#1565c0;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer" class="pp-dir">Directions</button>'+
-          '</div>';
-        popup.querySelector(".pp-det").addEventListener("click",function(){openDetail(h.id);});
-        popup.querySelector(".pp-log").addEventListener("click",function(){openLogVisit(h.id);});
-        popup.querySelector(".pp-dir").addEventListener("click",function(){var q=h.HouseGPSCoordinates||fullAddr(h);window.open("https://www.google.com/maps/dir/?api=1&destination="+encodeURIComponent(q),"_blank");});
-        mk.bindPopup(popup);
-        mapMarkers.push(mk);
-        markerMap[h.id]=mk;
-      }
-      idx++;
-      if(gps||idx>=allRecords.length){addNext();}
-      else{setTimeout(addNext,1100);}
-    }
-
-    if(gps){placePin(gps);}
-    else if(h.HouseAddress){geocodeAddr(h.HouseAddress,h.HouseCity).then(placePin);}
-    else{idx++;addNext();}
-  }
-  addNext();
-}
-
-function updatePinOpacity(){
-  var visIds=new Set(records.map(function(h){return h.id;}));
-  Object.entries(markerMap).forEach(function(e){
-    var mk=e[1];
-    var show=visIds.has(e[0]);
-    mk.setOpacity(show?1:0.15);
-    var el=mk.getElement();
-    if(el){el.style.opacity=show?"1":"0.15";el.style.pointerEvents=show?"auto":"none";}
-  });
-}
-
-/* ── Filter ── */
-function setFilter(f){
-  filter=f;
-  document.querySelectorAll(".tm-filter-btn").forEach(function(b){
-    b.className="tm-filter-btn";
-    if(b.dataset.f===f)b.classList.add("tm-active-"+f);
-  });
-  applyFilters();
-
-  if(map&&f==="all"){
-    searchTerm="";visitFilter="all";terrFilter="all";
-    document.getElementById("tmSearchBox").value="";
-    document.getElementById("tmSearchClear").style.display="none";
-    document.getElementById("tmVisitSelect").value="all";
-    document.getElementById("tmTerrSelect").value="all";
-    applyFilters();
-    closeList();closeSide();closeDetail();
-    Object.values(markerMap).forEach(function(mk){mk.setOpacity(1);var el=mk.getElement();if(el){el.style.opacity="1";el.style.pointerEvents="auto";}});
-    if(mapMarkers.length===1)map.flyTo(mapMarkers[0].getLatLng(),14,{animate:true,duration:1});
-    else if(mapMarkers.length>1)map.flyToBounds(L.featureGroup(mapMarkers).getBounds().pad(0.3),{animate:true,duration:1,maxZoom:13});
-    document.querySelectorAll(".tm-nav-btn").forEach(function(x){x.classList.remove("active");});
-  } else if(map){
-    updatePinOpacity();
-    var fIds=new Set(records.map(function(h){return h.id;}));
-    var fm=Object.entries(markerMap).filter(function(e){return fIds.has(e[0]);}).map(function(e){return e[1];});
-    if(!fm.length){toast("No "+f+" houses","#555");}
-    else if(fm.length===1)map.flyTo(fm[0].getLatLng(),15,{animate:true,duration:1});
-    else map.flyToBounds(L.featureGroup(fm).getBounds().pad(0.3),{animate:true,duration:1,maxZoom:14});
-  }
-}
-document.querySelectorAll(".tm-filter-btn").forEach(function(b){b.addEventListener("click",function(){setFilter(this.dataset.f);});});
-
-/* ── Search ── */
-var searchBox=document.getElementById("tmSearchBox");
-var searchClear=document.getElementById("tmSearchClear");
-var searchTimer;
-searchBox.addEventListener("input",function(){
-  searchClear.style.display=this.value?"flex":"none";
-  clearTimeout(searchTimer);
-  searchTimer=setTimeout(function(){
-    searchTerm=searchBox.value.trim();
-    applyFilters();updatePinOpacity();
-    if(searchTerm&&records.length===0){
-      geocodeAddr(searchTerm,"").then(function(loc){
-        if(loc&&map){
-          if(window._tmSearchMarker){map.removeLayer(window._tmSearchMarker);window._tmSearchMarker=null;}
-          window._tmSearchMarker=L.marker([loc.lat,loc.lng],{icon:L.divIcon({className:"",html:'<div style="width:26px;height:26px;border-radius:50%;background:#ef6c00;border:3px solid #fff;box-shadow:0 2px 10px rgba(0,0,0,0.5);"></div>',iconSize:[26,26],iconAnchor:[13,13],popupAnchor:[0,-15]})}).addTo(map);
-          window._tmSearchMarker.bindPopup('<strong style="font-size:14px">'+esc(searchTerm)+'</strong><br><span style="color:#ef6c00;font-size:12px">Not in territory</span>').openPopup();
-          map.flyTo([loc.lat,loc.lng],17,{animate:true,duration:1.2});
-          toast("Address not in territory","#ef6c00");
-        }
-      });
-    } else if(window._tmSearchMarker){map.removeLayer(window._tmSearchMarker);window._tmSearchMarker=null;}
-  },500);
-});
-searchClear.addEventListener("click",function(){searchBox.value="";searchClear.style.display="none";searchTerm="";applyFilters();updatePinOpacity();});
-
-/* ── Territory Dropdown ── */
-function populateTerrSelect(){
-  var sel=document.getElementById("tmTerrSelect");
-  var old=sel.value;
-  var terrSet={};
-  allRecords.forEach(function(h){var t=h.HouseTerritoryNumber||"Unassigned";terrSet[t]=true;});
-  var keys=Object.keys(terrSet).sort(function(a,b){var na=parseInt(a),nb=parseInt(b);if(!isNaN(na)&&!isNaN(nb))return na-nb;return a.localeCompare(b);});
-  sel.innerHTML='<option value="all">All Territories</option>';
-  keys.forEach(function(t){sel.innerHTML+='<option value="'+esc(t)+'">'+(t==="Unassigned"?t:"Territory "+esc(t))+'</option>';});
-  sel.value=old in terrSet||old==="all"?old:"all";
-}
-document.getElementById("tmTerrSelect").addEventListener("change",function(){
-  terrFilter=this.value;
-  applyFilters();updatePinOpacity();updateCounts();
-  var fIds=new Set(records.map(function(h){return h.id;}));
-  var fm=Object.entries(markerMap).filter(function(e){return fIds.has(e[0]);}).map(function(e){return e[1];});
-  if(map){
-    if(!fm.length){toast("No houses in this territory","#555");}
-    else if(fm.length===1)map.flyTo(fm[0].getLatLng(),15,{animate:true,duration:1});
-    else map.flyToBounds(L.featureGroup(fm).getBounds().pad(0.3),{animate:true,duration:1,maxZoom:14});
-  }
-});
-
-/* ── Visit Timing Dropdown ── */
-document.getElementById("tmVisitSelect").addEventListener("change",function(){
-  visitFilter=this.value;
-  applyFilters();updatePinOpacity();
-  var fIds=new Set(records.map(function(h){return h.id;}));
-  var fm=Object.entries(markerMap).filter(function(e){return fIds.has(e[0]);}).map(function(e){return e[1];});
-  if(map){
-    if(!fm.length){toast("No matching houses","#555");}
-    else if(fm.length===1)map.flyTo(fm[0].getLatLng(),15,{animate:true,duration:1});
-    else map.flyToBounds(L.featureGroup(fm).getBounds().pad(0.3),{animate:true,duration:1,maxZoom:14});
-  }
-});
-
-/* ── Load Data ── */
-function loadRecords(){
-  fetch(API+"?_t="+Date.now(),{cache:"no-store"})
-  .then(function(r){return r.json();})
-  .then(function(data){
-    allRecords=Array.isArray(data)?data:[];
-    applyFilters();updateCounts();buildMap();buildTerrList();populateTerrSelect();
-  })
-  .catch(function(e){toast("Error loading data","#c62828");console.error(e);});
-}
-
-/* ── Territory Side Panel ── */
-function buildTerrList(){
-  var terrMap={};
-  allRecords.forEach(function(h){
-    var t=h.HouseTerritoryNumber||"Unassigned";
-    if(!terrMap[t])terrMap[t]=[];
-    terrMap[t].push(h);
-  });
-  var el=document.getElementById("tmTerrList");
-  var keys=Object.keys(terrMap).sort(function(a,b){
-    var na=parseInt(a),nb=parseInt(b);
-    if(!isNaN(na)&&!isNaN(nb))return na-nb;
-    return a.localeCompare(b);
-  });
-  el.innerHTML=keys.map(function(t){
-    return'<div class="tm-terr-chip" data-terr="'+esc(t)+'">'+
-      (t==="Unassigned"?t:"Territory "+esc(t))+
-      '<span class="tm-terr-count">'+terrMap[t].length+'</span></div>';
-  }).join("")+
-  '<div class="tm-terr-chip" data-terr="__all__" style="margin-top:12px;justify-content:center;border-top:1px solid rgba(255,255,255,.08);padding-top:16px">View All Houses</div>';
-
-  el.onclick=function(e){
-    var chip=e.target.closest(".tm-terr-chip");if(!chip)return;
-    var t=chip.dataset.terr;closeSide();
-    if(t==="__all__"){openList("All Houses",allRecords);}
-    else{openList((t==="Unassigned"?t:"Territory "+t),terrMap[t]||[]);}
-  };
-}
-
-/* ── House List Drawer ── */
-function makeHouseRow(h,displayLabel,isAptUnit){
-  var visits=[h.HouseResutsOnVisit1,h.HouseResutsOnVisit2,h.HouseResutsOnVisit3,h.HouseResutsOnVisit4];
-  var label=displayLabel||extractNumber(h.HouseAddress)||h.HouseAddress||"";
-  return'<div class="tm-pdf-row'+(isAptUnit?' tm-apt-unit':'')+'">'+
-    '<div class="tm-pdf-addr" data-act="detail" data-id="'+h.id+'">'+esc(label)+
-      (h.HouseVerifiedOnMaps==="No"?'<span class="tm-unverified" title="Not found on maps">\u{26A0}</span>':'')+'</div>'+
-    '<div class="tm-pdf-visits">'+
-    visits.map(function(v,i){
-      return'<div class="tm-pdf-box'+(v?' tm-pdf-box-filled':'')+'" data-act="visit" data-id="'+h.id+'" data-slot="'+(i+1)+'">'+esc(v||'')+'</div>';
-    }).join('')+
-    '</div>'+
-    '<div class="tm-pdf-notes'+(h.HouseNotes?'':' tm-pdf-notes-empty')+'" data-act="notes" data-id="'+h.id+'">'+(h.HouseNotes?esc(h.HouseNotes):'Add notes…')+'</div>'+
-    '</div>';
-}
-
-function makeHouseCard(h,displayLabel,compact){
-  var s=visitStatus(h.HouseLastVisitDate);
-  var label=displayLabel||h.HouseAddress||"No Address";
-  return'<div class="tm-house-card" data-id="'+h.id+'">'+
-    '<div class="tm-hc-top">'+
-    '<span class="tm-visit-dot '+dotClass(s)+'"></span>'+
-    '<div class="tm-hc-info">'+
-    '<div class="tm-hc-addr">'+esc(label)+'</div>'+
-    (compact?'':'<div class="tm-hc-meta">'+esc(h.HouseCity||"")+
-    (h.HouseTerritoryNumber?" · T-"+esc(h.HouseTerritoryNumber):"")+
-    (h.HouseLanguage?" · "+esc(h.HouseLanguage):"")+
-    " · "+visitLabel(h.HouseLastVisitDate)+'</div>')+
-    '</div></div>'+
-    '<div class="tm-hc-actions">'+
-    '<button class="tm-btn-sm" data-act="detail" data-id="'+h.id+'">Details</button>'+
-    '<button class="tm-btn-sm tm-btn-log" data-act="log" data-id="'+h.id+'">Log Visit</button>'+
-    '<button class="tm-btn-sm tm-btn-dir" data-act="dir" data-id="'+h.id+'">Directions</button>'+
-    '</div></div>';
-}
-
-function refreshOpenList(){
-  if(!document.getElementById("tmListOverlay").classList.contains("open")||!currentListIds)return;
-  var houses=allRecords.filter(function(h){return currentListIds.indexOf(h.id)>=0;});
-  openList(currentListTitle,houses);
-}
-
-function openList(title,houses){
-  currentListTitle=title;
-  currentListIds=houses.map(function(h){return h.id;});
-  document.getElementById("tmListTitle").textContent=title;
-  document.getElementById("tmListSub").textContent=houses.length+" house"+(houses.length===1?"":"s");
-  var body=document.getElementById("tmListBody");
-  if(!houses.length){body.innerHTML='<div class="tm-empty">No houses found</div>';}
-  else{
-    var streetMap={};
-    houses.forEach(function(h){
-      var st=extractStreet(h.HouseAddress);
-      if(!streetMap[st])streetMap[st]=[];
-      streetMap[st].push(h);
-    });
-    var streetKeys=Object.keys(streetMap).sort();
-    var html="";
-    streetKeys.forEach(function(st){
-      var stHouses=streetMap[st].slice().sort(function(a,b){
-        var na=extractBaseNum(a.HouseAddress),nb=extractBaseNum(b.HouseAddress);
-        var ia=parseInt(na),ib=parseInt(nb);
-        if(!isNaN(ia)&&!isNaN(ib)){if(ia!==ib)return ia-ib;}
-        var aa=extractApt(a.HouseAddress),ab=extractApt(b.HouseAddress);
-        return aa.localeCompare(ab);
-      });
-      html+='<div class="tm-street-header">'+esc(st)+'</div>';
-      var numGroups=[];var curNum=null,curGroup=[];
-      stHouses.forEach(function(h){
-        var bn=extractBaseNum(h.HouseAddress);
-        if(bn!==curNum){if(curGroup.length)numGroups.push({num:curNum,items:curGroup});curNum=bn;curGroup=[h];}
-        else{curGroup.push(h);}
-      });
-      if(curGroup.length)numGroups.push({num:curNum,items:curGroup});
-      numGroups.forEach(function(g){
-        var hasApts=g.items.some(function(h){return hasApt(h.HouseAddress);});
-        if(hasApts&&g.items.length>1){
-          html+='<div class="tm-apt-header">'+esc(g.num)+' (Apts)</div>';
-          g.items.forEach(function(h){
-            var apt=extractApt(h.HouseAddress);
-            html+=makeHouseRow(h,apt||g.num,true);
-          });
-        } else {
-          g.items.forEach(function(h){
-            // Lone unit at a number (e.g. "6400 Nacimiento Ave #3") skips the Apts
-            // grouping, so keep the unit in the label or the door number is lost.
-            var apt=extractApt(h.HouseAddress);
-            html+=makeHouseRow(h,extractNumber(h.HouseAddress)+(apt?" #"+apt:""),false);
-          });
-        }
-      });
-    });
-    body.innerHTML=html;
-  }
-  document.getElementById("tmListOverlay").classList.add("open");
-}
-function closeList(){document.getElementById("tmListOverlay").classList.remove("open");}
-document.getElementById("tmListClose").addEventListener("click",closeList);
-document.getElementById("tmListOverlay").addEventListener("click",function(e){if(e.target===this)closeList();});
-
-document.getElementById("tmListBody").addEventListener("click",function(e){
-  var btn=e.target.closest("[data-act]");
-  if(!btn)return;
-  var act=btn.dataset.act,id=btn.dataset.id;
-  if(act==="detail")openDetail(id);
-  else if(act==="log")openLogVisit(id,null);
-  else if(act==="visit")openLogVisit(id,parseInt(btn.dataset.slot));
-  else if(act==="notes")openEditNotes(id);
-  else if(act==="dir"){var h=allRecords.find(function(r){return r.id===id;});if(h){var q=h.HouseGPSCoordinates||fullAddr(h);window.open("https://www.google.com/maps/dir/?api=1&destination="+encodeURIComponent(q),"_blank");}}
-});
-
-/* ── Detail Drawer ── */
-function openDetail(id){
-  var h=allRecords.find(function(r){return r.id===id;});if(!h)return;
-  var s=visitStatus(h.HouseLastVisitDate);
-  var mapQ=h.HouseGPSCoordinates||fullAddr(h);
-  var visits=[{l:"Visit 1",v:h.HouseResutsOnVisit1},{l:"Visit 2",v:h.HouseResutsOnVisit2},{l:"Visit 3",v:h.HouseResutsOnVisit3},{l:"Visit 4",v:h.HouseResutsOnVisit4},{l:"Visit 5",v:h.HouseResutsOnVisit5}].filter(function(x){return x.v;});
-
-  document.getElementById("tmDetTitle").textContent=h.HouseAddress||"No Address";
-  document.getElementById("tmDetSub").textContent=[h.HouseCity,h.HouseState,h.HouseZIP].filter(Boolean).join(", ");
-
-  document.getElementById("tmDetBody").innerHTML=
-    '<span class="tm-badge '+badgeClass(s)+'">● '+visitLabel(h.HouseLastVisitDate)+'</span>'+
-    (h.HouseTerritoryNumber?'<div class="tm-detail-row"><span class="tm-detail-icon">\u{1F4CD}</span>Territory '+esc(h.HouseTerritoryNumber)+'</div>':'')+
-    (h.HouseTerritoryAssingnedTo?'<div class="tm-detail-row"><span class="tm-detail-icon">\u{1F464}</span>'+esc(h.HouseTerritoryAssingnedTo)+'</div>':'')+
-    (h.HouseLanguage?'<div class="tm-detail-row"><span class="tm-detail-icon">\u{1F310}</span>'+esc(h.HouseLanguage)+'</div>':'')+
-    (h.HouseGPSCoordinates?'<div class="tm-detail-row"><span class="tm-detail-icon">\u{1F4F1}</span>'+esc(h.HouseGPSCoordinates)+'</div>':'')+
-    '<div class="tm-detail-row"><span class="tm-detail-icon">\u{1F5FA}\u{FE0F}</span>'+
-      (h.HouseVerifiedOnMaps==="Yes"?'Verified on maps \u{2713}':
-       h.HouseVerifiedOnMaps==="No"?'Not found on maps \u{26A0}\u{FE0F}':
-       'Map location not checked')+'</div>'+
-    '<button class="tm-dir-btn" id="tmDetDir">\u{1F697} Get Directions</button>'+
-    (h.HouseNotes?'<div class="tm-section-label">House Notes</div><div class="tm-notes-wrap">'+esc(h.HouseNotes)+'</div>':'')+
-    (h.HousePersonalNotes?'<div class="tm-section-label">Personal Notes</div><div class="tm-notes-wrap">'+esc(h.HousePersonalNotes)+'</div>':'')+
-    '<div class="tm-section-label">Visit Results</div>'+
-    (visits.length?visits.map(function(x){return'<div class="tm-visit-block"><div class="tm-visit-label">'+x.l+'</div><div class="tm-visit-text">'+esc(x.v)+'</div></div>';}).join(""):'<div class="tm-empty" style="padding:16px 0">No visits recorded</div>')+
-    '<div style="display:flex;gap:8px;margin-top:18px">'+
-    '<button class="tm-save-btn" id="tmDetLog" style="flex:1;background:#2e7d32">Log Visit</button>'+
-    '<button class="tm-edit-btn" id="tmDetEdit" style="flex:1">\u{270F}\u{FE0F} Edit</button>'+
-    '</div>'+
-    '<button class="tm-edit-btn" id="tmDetAdjust" style="margin-top:8px;width:100%">\u{1F4CD} Adjust Pin Location</button>'+
-    '<div id="tmAdjustWrap" style="display:none">'+
-    '<div class="tm-adjust-map" id="tmAdjustMap"></div>'+
-    '<div class="tm-adjust-hint">Drag the pin to the correct location</div>'+
-    '<div class="tm-adjust-coords" id="tmAdjustCoords"></div>'+
-    '<button class="tm-save-btn" id="tmAdjustSave">\u{1F4CD} Save Pin Location</button>'+
-    '</div>';
-
-  document.getElementById("tmDetDir").addEventListener("click",function(){window.open("https://www.google.com/maps/dir/?api=1&destination="+encodeURIComponent(mapQ),"_blank");});
-  document.getElementById("tmDetEdit").addEventListener("click",function(){closeDetail();openForm(h);});
-  document.getElementById("tmDetLog").addEventListener("click",function(){openLogVisit(id);});
-
-  var adjustMap=null,adjustMarker=null,adjustLat=null,adjustLng=null;
-  document.getElementById("tmDetAdjust").addEventListener("click",function(){
-    var wrap=document.getElementById("tmAdjustWrap");
-    if(wrap.style.display==="none"){
-      wrap.style.display="block";
-      this.style.display="none";
-      setTimeout(function(){
-        if(adjustMap){adjustMap.remove();adjustMap=null;}
-        var gps=parseGPS(h.HouseGPSCoordinates);
-        var startLat=gps?gps.lat:36.7;
-        var startLng=gps?gps.lng:-119.7;
-        var startZoom=gps?17:6;
-        adjustLat=startLat;adjustLng=startLng;
-        adjustMap=L.map("tmAdjustMap",{zoomControl:true});
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OSM"}).addTo(adjustMap);
-        adjustMap.setView([startLat,startLng],startZoom);
-        adjustMarker=L.marker([startLat,startLng],{draggable:true,icon:colorIcon("#c62828")}).addTo(adjustMap);
-        document.getElementById("tmAdjustCoords").textContent=startLat.toFixed(6)+", "+startLng.toFixed(6);
-        adjustMarker.on("dragend",function(){
-          var pos=adjustMarker.getLatLng();
-          adjustLat=pos.lat;adjustLng=pos.lng;
-          document.getElementById("tmAdjustCoords").textContent=pos.lat.toFixed(6)+", "+pos.lng.toFixed(6);
-        });
-        if(!gps&&h.HouseAddress){
-          geocodeAddr(h.HouseAddress,h.HouseCity).then(function(loc){
-            if(loc){
-              adjustLat=loc.lat;adjustLng=loc.lng;
-              adjustMap.setView([loc.lat,loc.lng],17);
-              adjustMarker.setLatLng([loc.lat,loc.lng]);
-              document.getElementById("tmAdjustCoords").textContent=loc.lat.toFixed(6)+", "+loc.lng.toFixed(6);
-            }
-          });
-        }
-        adjustMap.invalidateSize();
-      },300);
-    }
-  });
-
-  document.getElementById("tmAdjustSave").addEventListener("click",function(){
-    if(adjustLat===null)return;
-    var newGPS=adjustLat.toFixed(6)+", "+adjustLng.toFixed(6);
-    var btn=this;btn.textContent="Saving...";btn.disabled=true;
-    fetch(API,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:id,HouseGPSCoordinates:newGPS})})
-    .then(function(r){if(!r.ok)throw new Error("Server error");return r.json();})
-    .then(function(){
-      btn.textContent="\u{1F4CD} Save Pin Location";btn.disabled=false;
-      h.HouseGPSCoordinates=newGPS;
-      toast("Pin location saved ✓");
-      closeDetail();loadRecords();
-    })
-    .catch(function(e){btn.textContent="\u{1F4CD} Save Pin Location";btn.disabled=false;toast("Error: "+e.message,"#c62828");});
-  });
-
-  document.getElementById("tmDetailOverlay").classList.add("open");
-}
-function closeDetail(){document.getElementById("tmDetailOverlay").classList.remove("open");}
-document.getElementById("tmDetClose").addEventListener("click",closeDetail);
-document.getElementById("tmDetailOverlay").addEventListener("click",function(e){if(e.target===this)closeDetail();});
-
-/* ── Quick Log Visit ── */
-function openLogVisit(id,slot){
-  var h=allRecords.find(function(r){return r.id===id;});if(!h)return;
-  currentLogId=id;
-  currentLogSlot=slot||null;
-  document.getElementById("tmLogSub").textContent=h.HouseAddress||"No Address";
-  document.getElementById("fLogDate").value=todayStr();
-
-  if(slot){
-    document.getElementById("tmLogTitle").textContent="Visit "+slot;
-    var existing=h["HouseResutsOnVisit"+slot]||"";
-    document.getElementById("fLogResult").value=existing;
-    document.getElementById("fLogResult").placeholder="Result for visit "+slot+"…";
-  } else {
-    document.getElementById("tmLogTitle").textContent="Log Visit";
-    document.getElementById("fLogResult").value="";
-    var nextSlot="";
-    if(!h.HouseResutsOnVisit1)nextSlot="Visit 1";
-    else if(!h.HouseResutsOnVisit2)nextSlot="Visit 2";
-    else if(!h.HouseResutsOnVisit3)nextSlot="Visit 3";
-    else if(!h.HouseResutsOnVisit4)nextSlot="Visit 4";
-    else if(!h.HouseResutsOnVisit5)nextSlot="Visit 5";
-    else nextSlot="Visit 5 (will overwrite)";
-    document.getElementById("fLogResult").placeholder="What happened? (saves to "+nextSlot+")";
-  }
-  document.getElementById("tmLogOverlay").classList.add("open");
-  setTimeout(function(){document.getElementById("fLogResult").focus();},350);
-}
-function closeLog(){document.getElementById("tmLogOverlay").classList.remove("open");currentLogId="";}
-document.getElementById("tmLogClose").addEventListener("click",closeLog);
-document.getElementById("tmLogOverlay").addEventListener("click",function(e){if(e.target===this)closeLog();});
-
-/* ── Edit Notes ── */
-var currentNotesId="";
-function openEditNotes(id){
-  var h=allRecords.find(function(r){return r.id===id;});if(!h)return;
-  currentNotesId=id;
-  document.getElementById("tmNotesSub").textContent=h.HouseAddress||"No Address";
-  document.getElementById("fNotesText").value=h.HouseNotes||"";
-  document.getElementById("tmNotesOverlay").classList.add("open");
-  setTimeout(function(){document.getElementById("fNotesText").focus();},350);
-}
-function closeNotes(){document.getElementById("tmNotesOverlay").classList.remove("open");currentNotesId="";}
-document.getElementById("tmNotesClose").addEventListener("click",closeNotes);
-document.getElementById("tmNotesOverlay").addEventListener("click",function(e){if(e.target===this)closeNotes();});
-document.getElementById("tmNotesSave").addEventListener("click",function(){
-  if(!currentNotesId)return;
-  var h=allRecords.find(function(r){return r.id===currentNotesId;});if(!h)return;
-  var notes=document.getElementById("fNotesText").value.trim();
-  var btn=document.getElementById("tmNotesSave");
-  btn.textContent="Saving…";btn.disabled=true;
-  fetch(API,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:currentNotesId,HouseNotes:notes})})
-  .then(function(r){if(!r.ok)throw new Error("Server error");return r.json();})
-  .then(function(){
-    btn.textContent="Save Notes";btn.disabled=false;
-    h.HouseNotes=notes;
-    closeNotes();
-    refreshOpenList();
-    toast("Notes saved ✓");
-  })
-  .catch(function(e){btn.textContent="Save Notes";btn.disabled=false;toast("Error: "+e.message,"#c62828");});
-});
-
-document.getElementById("tmLogSave").addEventListener("click",function(){
-  if(!currentLogId)return;
-  var h=allRecords.find(function(r){return r.id===currentLogId;});if(!h)return;
-  var result=document.getElementById("fLogResult").value.trim();
-  var date=document.getElementById("fLogDate").value;
-  if(!result){toast("Please enter a result","#ef6c00");return;}
-
-  var body={id:currentLogId,HouseLastVisitDate:date||todayStr()};
-  if(currentLogSlot){
-    body["HouseResutsOnVisit"+currentLogSlot]=result;
-  } else {
-    if(!h.HouseResutsOnVisit1)body.HouseResutsOnVisit1=result;
-    else if(!h.HouseResutsOnVisit2)body.HouseResutsOnVisit2=result;
-    else if(!h.HouseResutsOnVisit3)body.HouseResutsOnVisit3=result;
-    else if(!h.HouseResutsOnVisit4)body.HouseResutsOnVisit4=result;
-    else body.HouseResutsOnVisit5=result;
-  }
-
-  var btn=document.getElementById("tmLogSave");
-  btn.textContent="Saving…";btn.disabled=true;
-
-  fetch(API,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})
-  .then(function(r){if(!r.ok)throw new Error("Server error");return r.json();})
-  .then(function(){
-    btn.textContent="Save Visit";btn.disabled=false;
-    // Update in-memory record immediately so the list refreshes without waiting for reload
-    Object.keys(body).forEach(function(k){if(k!=="id")h[k]=body[k];});
-    var mk=markerMap[h.id];
-    if(mk)mk.setIcon(colorIcon(pinColor(visitStatus(h.HouseLastVisitDate))));
-    closeLog();closeDetail();
-    toast("Visit logged ✓");
-    refreshOpenList();
-    loadRecords();
-  })
-  .catch(function(e){btn.textContent="Save Visit";btn.disabled=false;toast("Error: "+e.message,"#c62828");});
-});
-
-/* ── Form Drawer ── */
-/* Assigning an unmatched value to a <select> silently leaves it on the first
-   option, so a stored value outside Yes/No/"" would be wiped on the next save.
-   Carry it as a temporary option instead so it round-trips untouched. */
-function setVerified(val){
-  var sel=document.getElementById("fVerified"),i;
-  for(i=sel.options.length-1;i>=0;i--){if(sel.options[i].dataset.adhoc)sel.remove(i);}
-  var known=false;
-  for(i=0;i<sel.options.length;i++){if(sel.options[i].value===val){known=true;break;}}
-  if(val&&!known){var o=new Option(val,val);o.dataset.adhoc="1";sel.add(o);}
-  sel.value=val;
-}
-function openForm(h){
-  if(h){
-    document.getElementById("tmFormTitle").textContent="Edit House";
-    document.getElementById("tmDeleteBtn").style.display="block";
-    document.getElementById("tmItemID").value=h.id||"";
-    document.getElementById("fAddr").value=h.HouseAddress||"";
-    document.getElementById("fCity").value=h.HouseCity||"";
-    document.getElementById("fState").value=h.HouseState||"CA";
-    document.getElementById("fZip").value=h.HouseZIP||"";
-    document.getElementById("fTerrNum").value=h.HouseTerritoryNumber||"";
-    document.getElementById("fAssigned").value=h.HouseTerritoryAssingnedTo||"";
-    document.getElementById("fLang").value=h.HouseLanguage||"";
-    document.getElementById("fLastVisit").value=cleanDate(h.HouseLastVisitDate);
-    setVerified(h.HouseVerifiedOnMaps||"");
-    document.getElementById("fGPS").value=h.HouseGPSCoordinates||"";
-    document.getElementById("fNotes").value=h.HouseNotes||"";
-    document.getElementById("fPersonal").value=h.HousePersonalNotes||"";
-    document.getElementById("fV1").value=h.HouseResutsOnVisit1||"";
-    document.getElementById("fV2").value=h.HouseResutsOnVisit2||"";
-    document.getElementById("fV3").value=h.HouseResutsOnVisit3||"";
-    document.getElementById("fV4").value=h.HouseResutsOnVisit4||"";
-    document.getElementById("fV5").value=h.HouseResutsOnVisit5||"";
-  } else {
-    document.getElementById("tmFormTitle").textContent="Add House";
-    document.getElementById("tmDeleteBtn").style.display="none";
-    document.getElementById("tmItemID").value="";
-    ["fAddr","fCity","fZip","fTerrNum","fAssigned","fLang","fLastVisit","fGPS","fNotes","fPersonal","fV1","fV2","fV3","fV4","fV5"].forEach(function(id){document.getElementById(id).value="";});
-    setVerified(""); // clears any ad-hoc option left by the previously edited house
-    document.getElementById("fState").value="CA";
-  }
-  document.getElementById("tmFormOverlay").classList.add("open");
-}
-function closeForm(){document.getElementById("tmFormOverlay").classList.remove("open");}
-document.getElementById("tmFormClose").addEventListener("click",closeForm);
-document.getElementById("tmFormOverlay").addEventListener("click",function(e){if(e.target===this)closeForm();});
-document.getElementById("tmAddBtn").addEventListener("click",function(){openForm(null);});
-
-/* GPS auto-detect */
-document.getElementById("tmGPSBtn").addEventListener("click",function(){
-  var btn=this;
-  if(!navigator.geolocation){toast("GPS not supported","#c62828");return;}
-  btn.classList.add("locating");
-  navigator.geolocation.getCurrentPosition(
-    function(pos){btn.classList.remove("locating");document.getElementById("fGPS").value=pos.coords.latitude.toFixed(6)+", "+pos.coords.longitude.toFixed(6);toast("Location captured ✓");},
-    function(err){btn.classList.remove("locating");toast("Could not get location","#c62828");console.error(err);},
-    {enableHighAccuracy:true,timeout:15000}
-  );
-});
-
-/* Save */
-document.getElementById("tmSaveBtn").addEventListener("click",function(){
-  var id=document.getElementById("tmItemID").value;
-  var body={
-    HouseAddress:document.getElementById("fAddr").value,
-    HouseCity:document.getElementById("fCity").value,
-    HouseState:document.getElementById("fState").value,
-    HouseZIP:document.getElementById("fZip").value,
-    HouseTerritoryNumber:document.getElementById("fTerrNum").value,
-    HouseTerritoryAssingnedTo:document.getElementById("fAssigned").value,
-    HouseLanguage:document.getElementById("fLang").value,
-    HouseLastVisitDate:document.getElementById("fLastVisit").value||null,
-    HouseVerifiedOnMaps:document.getElementById("fVerified").value,
-    HouseGPSCoordinates:document.getElementById("fGPS").value,
-    HouseNotes:document.getElementById("fNotes").value,
-    HousePersonalNotes:document.getElementById("fPersonal").value,
-    HouseResutsOnVisit1:document.getElementById("fV1").value,
-    HouseResutsOnVisit2:document.getElementById("fV2").value,
-    HouseResutsOnVisit3:document.getElementById("fV3").value,
-    HouseResutsOnVisit4:document.getElementById("fV4").value,
-    HouseResutsOnVisit5:document.getElementById("fV5").value
-  };
-  if(id)body.id=id;
-  var method=id?"PATCH":"POST";
-  var btn=this;btn.textContent="Saving…";btn.disabled=true;
-
-  fetch(API,{method:method,headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})
-  .then(function(r){if(!r.ok)throw new Error("Server error");return r.json();})
-  .then(function(){btn.textContent="Save House";btn.disabled=false;closeForm();closeList();toast("House saved ✓");loadRecords();})
-  .catch(function(e){btn.textContent="Save House";btn.disabled=false;toast("Error: "+e.message,"#c62828");});
-});
-
-/* Delete */
-document.getElementById("tmDeleteBtn").addEventListener("click",function(){
-  var id=document.getElementById("tmItemID").value;if(!id)return;
-  document.getElementById("tmConfirmTitle").textContent="Delete this house?";
-  document.getElementById("tmConfirmMsg").textContent="This action cannot be undone.";
-  document.getElementById("tmConfirmIcon").textContent="⚠️";
-  document.getElementById("tmConfirmYes").textContent="Delete";
-  document.getElementById("tmConfirmYes").style.background="#c62828";
-  document.getElementById("tmConfirm").classList.add("open");
-  document.getElementById("tmConfirmYes").onclick=function(){
-    document.getElementById("tmConfirm").classList.remove("open");
-    fetch(API,{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:id})})
-    .then(function(r){if(!r.ok)throw new Error("Server error");closeForm();closeDetail();closeList();toast("House deleted");loadRecords();})
-    .catch(function(e){toast("Error: "+e.message,"#c62828");});
-  };
-  document.getElementById("tmConfirmNo").onclick=function(){document.getElementById("tmConfirm").classList.remove("open");};
-});
-document.getElementById("tmConfirm").addEventListener("click",function(e){if(e.target===this)this.classList.remove("open");});
-
-/* ── Side Panel ── */
-function toggleSide(){document.getElementById("tmSidePanel").classList.toggle("open");document.getElementById("tmSideOverlay").classList.toggle("open");}
-function closeSide(){document.getElementById("tmSidePanel").classList.remove("open");document.getElementById("tmSideOverlay").classList.remove("open");}
-document.getElementById("tmPullTab").addEventListener("click",toggleSide);
-document.getElementById("tmSideOverlay").addEventListener("click",closeSide);
-
-/* ── Bottom Nav ── */
-document.querySelectorAll("[data-nav]").forEach(function(b){b.addEventListener("click",function(){
-  var tab=this.dataset.nav;
-  document.querySelectorAll(".tm-nav-btn").forEach(function(x){x.classList.remove("active");});
-  this.classList.add("active");
-  if(tab==="map"){closeList();closeSide();if(map&&mapMarkers.length>1)map.flyToBounds(L.featureGroup(mapMarkers).getBounds().pad(0.3),{animate:true,duration:1,maxZoom:13});}
-  else if(tab==="list"){closeSide();applyFilters();openList("All Houses",records);}
-  else if(tab==="territories"){closeList();toggleSide();}
-});});
-
-/* ── Swipe to dismiss ── */
-(function(){
-  function addSwipe(oid,fn){
-    var el=document.getElementById(oid);if(!el)return;
-    var sy=0;
-    el.addEventListener("touchstart",function(e){sy=e.touches[0].clientY;},{passive:true});
-    el.addEventListener("touchend",function(e){if(e.changedTouches[0].clientY-sy>80)fn();},{passive:true});
-  }
-  addSwipe("tmListOverlay",closeList);
-  addSwipe("tmExportOverlay",closeExport);
-  addSwipe("tmFormOverlay",closeForm);
-  addSwipe("tmDetailOverlay",closeDetail);
-  addSwipe("tmLogOverlay",closeLog);
-  addSwipe("tmConfirm",function(){document.getElementById("tmConfirm").classList.remove("open");});
-})();
-
-/* ── Keyboard ── */
-document.addEventListener("keydown",function(e){
-  if(e.key!=="Escape")return;
-  if(document.getElementById("tmConfirm").classList.contains("open")){document.getElementById("tmConfirm").classList.remove("open");return;}
-  if(document.getElementById("tmVerifyOverlay").classList.contains("open")){closeVerify();return;}
-  if(document.getElementById("tmLogOverlay").classList.contains("open")){closeLog();return;}
-  if(document.getElementById("tmFormOverlay").classList.contains("open")){closeForm();return;}
-  if(document.getElementById("tmDetailOverlay").classList.contains("open")){closeDetail();return;}
-  if(document.getElementById("tmExportOverlay").classList.contains("open")){closeExport();return;}
-  if(document.getElementById("tmListOverlay").classList.contains("open")){closeList();return;}
-});
-
-/* ── PDF Export ── */
-document.getElementById("tmExportBtn").addEventListener("click",function(){
-  if(!allRecords.length){toast("No houses to export","#555");return;}
-
-  var terrMap={};
-  allRecords.forEach(function(h){
-    var t=h.HouseTerritoryNumber||"Unassigned";
-    if(!terrMap[t])terrMap[t]=[];
-    terrMap[t].push(h);
-  });
-
-  var terrKeys=Object.keys(terrMap).sort(function(a,b){
-    var na=parseInt(a),nb=parseInt(b);
-    if(!isNaN(na)&&!isNaN(nb))return na-nb;
-    return a.localeCompare(b);
-  });
-
-  if(terrKeys.length>1){
-    var html='<button class="tm-save-btn" data-exp="__all__" style="margin-bottom:10px;background:#2e7d32">Export All Territories</button>';
-    terrKeys.forEach(function(t){
-      html+='<button class="tm-edit-btn" data-exp="'+esc(t)+'" style="margin-bottom:8px">'+(t==="Unassigned"?t:"Territory "+esc(t))+' ('+terrMap[t].length+' houses)</button>';
-    });
-    document.getElementById("tmExportBody").innerHTML=html;
-    exportTerrMap=terrMap;exportTerrKeys=terrKeys;
-    document.getElementById("tmExportOverlay").classList.add("open");
-  } else {
-    generateTerritoryPDF(terrKeys[0],terrMap[terrKeys[0]]);
-  }
-});
-
-/* Export drawer is its own overlay so it never clobbers the Houses list DOM.
-   Listeners are bound once at load, not per click, so they cannot stack. */
-var exportTerrMap={},exportTerrKeys=[];
-function closeExport(){document.getElementById("tmExportOverlay").classList.remove("open");}
-document.getElementById("tmExpClose").addEventListener("click",closeExport);
-document.getElementById("tmExportOverlay").addEventListener("click",function(e){if(e.target===this)closeExport();});
-document.getElementById("tmExportBody").addEventListener("click",function(e){
-  var btn=e.target.closest("[data-exp]");if(!btn)return;
-  var key=btn.dataset.exp;
-  closeExport();
-  if(key==="__all__"){exportTerrKeys.forEach(function(t){generateTerritoryPDF(t,exportTerrMap[t]);});}
-  else{generateTerritoryPDF(key,exportTerrMap[key]);}
-});
+/* ═══ PORTED VERBATIM: address helpers + PDF generator ═══ */
 
 function extractStreet(addr){
   if(!addr)return"Unknown Street";
@@ -1429,140 +1194,772 @@ function generateTerritoryPDF(terrNum,houses){
   toast("PDF exported ✓");
 }
 
-/* ── Long Press to Add ── */
-var lpTimer=null,lpInterval=null,lpCount=0,lpLatLng=null,lpActive=false;
-var LP_DURATION=5;
-var timerEl=document.getElementById("tmLongPressTimer");
-var timerFG=document.getElementById("tmTimerFG");
-var timerText=document.getElementById("tmTimerText");
-var CIRCUMFERENCE=2*Math.PI*60; // 377
 
-function lpStart(e){
-  if(lpActive)return;
-  var point=e.touches?e.touches[0]:e;
-  var containerRect=document.getElementById("tmMap").getBoundingClientRect();
-  var px=point.clientX-containerRect.left;
-  var py=point.clientY-containerRect.top;
-  lpLatLng=map.containerPointToLatLng(L.point(px,py));
-  lpCount=0;lpActive=true;
-  timerEl.style.left=point.clientX+"px";
-  timerEl.style.top=point.clientY+"px";
-  timerFG.style.strokeDashoffset=CIRCUMFERENCE;
-  timerText.textContent=LP_DURATION;
-  timerEl.classList.add("active");
-
-  lpInterval=setInterval(function(){
-    lpCount++;
-    var remaining=LP_DURATION-lpCount;
-    timerText.textContent=remaining;
-    timerFG.style.strokeDashoffset=CIRCUMFERENCE-(CIRCUMFERENCE*(lpCount/LP_DURATION));
-    if(lpCount>=LP_DURATION){
-      lpCancel();
-      reverseGeocodeAndVerify(lpLatLng);
-    }
-  },1000);
+/* ═══ RENDER: HOUSE LIST ═══ */
+function applyFilters(){
+  var r=records.slice();
+  if(terrFilter!=="all")r=r.filter(function(h){return(h.HouseTerritoryNumber||"Unassigned")===terrFilter;});
+  if(filter!=="all")r=r.filter(function(h){return visitStatus(h.HouseLastVisitDate)===filter;});
+  if(searchTerm){
+    var q=searchTerm.toLowerCase();
+    r=r.filter(function(h){
+      return [h.HouseAddress,h.HouseCity,h.HouseState,h.HouseZIP,h.HouseTerritoryNumber,
+        h.HouseTerritoryAssingnedTo,h.HouseLanguage,h.HouseNotes,h.HousePersonalNotes,
+        h.HouseGPSCoordinates,h.HouseVerifiedOnMaps,h.HouseReturnVisits,
+        h.HouseResutsOnVisit1,h.HouseResutsOnVisit2,h.HouseResutsOnVisit3,
+        h.HouseResutsOnVisit4,h.HouseResutsOnVisit5]
+        .filter(Boolean).join(" ").toLowerCase().indexOf(q)!==-1;
+    });
+  }
+  view=r;
 }
 
-function lpCancel(){
-  lpActive=false;
-  clearInterval(lpInterval);lpInterval=null;
-  timerEl.classList.remove("active");
+function updateCounts(){
+  var scoped=terrFilter==="all"?records:records.filter(function(h){return(h.HouseTerritoryNumber||"Unassigned")===terrFilter;});
+  var c={all:scoped.length,never:0,recent:0,due:0,overdue:0};
+  scoped.forEach(function(h){c[visitStatus(h.HouseLastVisitDate)]++;});
+  ["all","never","recent","due","overdue"].forEach(function(k){
+    var el=document.getElementById("n-"+k);if(el)el.textContent=c[k];
+  });
+  $("#scopeCount").textContent=scoped.length;
+  $("#scopeName").textContent=terrFilter==="all"?"All Territories":terrFilter;
+  var rvN=records.filter(isRV).length;
+  var b=$("#rvBadge");
+  if(rvN){b.textContent=rvN;b.style.display="flex";}else{b.style.display="none";}
 }
 
-function attachLongPress(){
-  var mapEl=document.getElementById("tmMap");
-  mapEl.addEventListener("mousedown",function(e){if(e.button===0)lpStart(e);});
-  mapEl.addEventListener("mouseup",lpCancel);
-  mapEl.addEventListener("mouseleave",lpCancel);
-  mapEl.addEventListener("mousemove",function(e){if(lpActive){var dx=e.clientX-parseInt(timerEl.style.left);var dy=e.clientY-parseInt(timerEl.style.top);if(Math.abs(dx)>15||Math.abs(dy)>15)lpCancel();}});
-  mapEl.addEventListener("touchstart",function(e){if(e.touches.length===1)lpStart(e);},{passive:true});
-  mapEl.addEventListener("touchend",lpCancel,{passive:true});
-  mapEl.addEventListener("touchcancel",lpCancel,{passive:true});
-  mapEl.addEventListener("touchmove",function(e){if(lpActive&&e.touches.length){var t=e.touches[0];var dx=t.clientX-parseInt(timerEl.style.left);var dy=t.clientY-parseInt(timerEl.style.top);if(Math.abs(dx)>15||Math.abs(dy)>15)lpCancel();}},{passive:true});
+function houseSubtitle(h){
+  var bits=[];
+  if(isRV(h))bits.push('<span class="rv-tag">Return visit</span>');
+  bits.push(esc(visitLabel(h.HouseLastVisitDate)));
+  if(h.HouseNotes)bits.push(esc(h.HouseNotes));
+  else if(h.HouseLanguage)bits.push(esc(h.HouseLanguage));
+  if(pending[h.id])bits.push('<span class="pend">• not synced</span>');
+  return bits.join(" · ");
 }
 
-function reverseGeocodeAndVerify(latlng){
-  toast("Looking up address…","#555");
-  fetch("https://nominatim.openstreetmap.org/reverse?format=json&lat="+latlng.lat+"&lon="+latlng.lng+"&addressdetails=1&zoom=18",{headers:{"Accept-Language":"en","User-Agent":"TerritoryMgr/1.0"}})
-  .then(function(r){return r.json();})
-  .then(function(data){
-    var addr=data.address||{};
-    var houseNum=addr.house_number||"";
-    var road=addr.road||"";
-    var street=(houseNum&&road)?houseNum+" "+road:road||data.display_name||"";
-    var city=addr.city||addr.town||addr.village||addr.hamlet||"";
-    var state=addr.state||"CA";
-    var zip=addr.postcode||"";
-    if(state.length>2){var stateMap={"California":"CA","Texas":"TX","Arizona":"AZ","Nevada":"NV","Oregon":"OR","Washington":"WA","New York":"NY","Florida":"FL"};state=stateMap[state]||state;}
-    openVerifyDrawer(latlng,street,city,state,zip);
-  })
-  .catch(function(){
-    openVerifyDrawer(latlng,"","","CA","");
+function renderHouses(){
+  applyFilters();updateCounts();
+  var el=$("#houseList");
+  if(!view.length){
+    el.innerHTML='<div class="empty"><span class="big">🔍</span>'+
+      (records.length?"No houses match this filter.":"No houses yet. Tap Add to create one.")+'</div>';
+    return;
+  }
+  var streets={};
+  view.forEach(function(h){var s=extractStreet(h.HouseAddress);(streets[s]||(streets[s]=[])).push(h);});
+  var html="";
+  Object.keys(streets).sort().forEach(function(st){
+    var list=streets[st].slice().sort(function(a,b){
+      var na=parseInt(extractBaseNum(a.HouseAddress),10),nb=parseInt(extractBaseNum(b.HouseAddress),10);
+      if(!isNaN(na)&&!isNaN(nb)&&na!==nb)return na-nb;
+      return extractApt(a.HouseAddress).localeCompare(extractApt(b.HouseAddress));
+    });
+    html+='<div class="street-hd">'+esc(st)+' <span style="opacity:.6">· '+list.length+'</span></div>';
+    var groups=[],cur=null,g=null;
+    list.forEach(function(h){
+      var bn=extractBaseNum(h.HouseAddress);
+      if(bn!==cur){cur=bn;g={num:bn,items:[h]};groups.push(g);}else g.items.push(h);
+    });
+    groups.forEach(function(gr){
+      var multi=gr.items.length>1&&gr.items.some(function(h){return hasApt(h.HouseAddress);});
+      if(multi)html+='<div class="apt-hd">'+esc(gr.num)+' · units</div>';
+      gr.items.forEach(function(h){
+        var apt=extractApt(h.HouseAddress);
+        var label=multi?(apt||gr.num):(extractNumber(h.HouseAddress)+(apt?" #"+apt:""));
+        html+=houseRow(h,label,multi);
+      });
+    });
+  });
+  el.innerHTML=html;
+}
+
+function houseRow(h,label,isUnit){
+  return '<div class="house'+(isUnit?' unit':'')+'">'+
+    '<button class="house-main" data-act="detail" data-id="'+esc(h.id)+'">'+
+      '<span class="house-dot dot-'+visitStatus(h.HouseLastVisitDate)+'"></span>'+
+      '<span class="house-txt">'+
+        '<span class="house-num">'+esc(label)+
+          (h.HouseVerifiedOnMaps==="No"?'<span class="warn-mark" title="Not found on maps">⚠</span>':'')+
+        '</span>'+
+        '<span class="house-sub">'+houseSubtitle(h)+'</span>'+
+      '</span>'+
+    '</button>'+
+    '<button class="log-btn" data-act="log" data-id="'+esc(h.id)+'">Log</button>'+
+  '</div>';
+}
+
+/* ═══ RENDER: RETURN VISITS ═══ */
+function renderRV(){
+  var list=records.filter(isRV).map(function(h){
+    var rv=getRVs(h);
+    var last=rv.map(function(x){return x.d||"";}).sort().slice(-1)[0]||"";
+    return {h:h,rv:rv,last:last};
+  }).sort(function(a,b){return b.last.localeCompare(a.last);});
+
+  var el=$("#rvList");
+  if(!list.length){
+    el.innerHTML='<div class="empty"><span class="big">📖</span>'+
+      'No return visits yet.<br><span style="font-size:13.5px">Log a visit and choose '+
+      '<b>Return visit</b> to start one.</span></div>';
+    return;
+  }
+  el.innerHTML=list.map(function(x){
+    var newest=x.rv.slice().sort(function(a,b){return String(a.d).localeCompare(String(b.d));}).slice(-1)[0]||{};
+    return '<button class="rv-card" data-act="rv" data-id="'+esc(x.h.id)+'">'+
+      '<span class="rv-top"><span class="rv-badge"></span>'+
+        '<span class="rv-addr">'+esc(x.h.HouseAddress||"No address")+'</span>'+
+        '<span class="rv-when">'+esc(x.last?fmtDate(x.last):"")+'</span></span>'+
+      (newest.n?'<span class="rv-note">'+esc(newest.n)+'</span>':'')+
+      '<span class="rv-count">'+x.rv.length+(x.rv.length===1?" note":" notes")+'</span>'+
+    '</button>';
+  }).join("");
+}
+
+/* ═══ SHEETS ═══ */
+var openSheets=[];
+function openSheet(sel){
+  var s=$(sel);if(!s)return;
+  s.style.transform="";s.classList.add("open");
+  $("#scrim").classList.add("open");
+  if(openSheets.indexOf(sel)===-1)openSheets.push(sel);
+}
+function closeSheet(sel){
+  var s=$(sel);if(!s)return;
+  s.classList.remove("open");s.style.transform="";
+  openSheets=openSheets.filter(function(x){return x!==sel;});
+  if(!openSheets.length)$("#scrim").classList.remove("open");
+}
+function closeTopSheet(){if(openSheets.length)closeSheet(openSheets[openSheets.length-1]);}
+$("#scrim").addEventListener("click",closeTopSheet);
+document.addEventListener("keydown",function(e){if(e.key==="Escape")closeTopSheet();});
+document.querySelectorAll("[data-close]").forEach(function(b){
+  b.addEventListener("click",function(){closeSheet("#"+b.closest(".sheet").id);});
+});
+
+/* drag-to-dismiss on the grab handle */
+document.querySelectorAll("[data-drag]").forEach(function(g){
+  var sheet=g.closest(".sheet"),y0=0,dy=0,dragging=false;
+  function down(e){dragging=true;dy=0;y0=(e.touches?e.touches[0]:e).clientY;sheet.classList.add("dragging");}
+  function move(e){
+    if(!dragging)return;
+    dy=Math.max(0,(e.touches?e.touches[0]:e).clientY-y0);
+    sheet.style.transform=(window.innerWidth>=700?"translateX(-50%) ":"")+"translateY("+dy+"px)";
+  }
+  function up(){
+    if(!dragging)return;dragging=false;sheet.classList.remove("dragging");
+    if(dy>110){sheet.style.transform="";closeSheet("#"+sheet.id);}
+    else sheet.style.transform="";
+  }
+  g.addEventListener("touchstart",down,{passive:true});
+  g.addEventListener("touchmove",move,{passive:true});
+  g.addEventListener("touchend",up);
+  g.addEventListener("mousedown",function(e){down(e);
+    var mm=function(ev){move(ev);},mu=function(){up();document.removeEventListener("mousemove",mm);document.removeEventListener("mouseup",mu);};
+    document.addEventListener("mousemove",mm);document.addEventListener("mouseup",mu);});
+});
+
+/* ═══ DETAIL SHEET ═══ */
+function openDetail(id){
+  var h=byId(id);if(!h)return;
+  curId=id;
+  var st=visitStatus(h.HouseLastVisitDate);
+  $("#dTitle").textContent=h.HouseAddress||"No address";
+  $("#dSub").textContent=[h.HouseCity,h.HouseState,h.HouseZIP].filter(Boolean).join(", ");
+  var rv=getRVs(h);
+  var visits=[1,2,3,4,5].map(function(n){return{n:n,v:h["HouseResutsOnVisit"+n]||""};});
+
+  $("#dBody").innerHTML=
+    '<div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:6px">'+
+      '<span class="badge b-'+st+'">● '+esc(visitLabel(h.HouseLastVisitDate))+'</span>'+
+      (rv.length?'<span class="badge b-rv">📖 '+rv.length+' return '+(rv.length===1?'visit':'visits')+'</span>':'')+
+      (pending[h.id]?'<span class="badge b-due">⏳ Not synced</span>':'')+
+    '</div>'+
+    (h.HouseTerritoryNumber?'<div class="meta"><span class="mi">🗂️</span>'+esc(h.HouseTerritoryNumber)+'</div>':'')+
+    (h.HouseTerritoryAssingnedTo?'<div class="meta"><span class="mi">👤</span>'+esc(h.HouseTerritoryAssingnedTo)+'</div>':'')+
+    (h.HouseLanguage?'<div class="meta"><span class="mi">🌐</span>'+esc(h.HouseLanguage)+'</div>':'')+
+    '<div class="meta"><span class="mi">🗺️</span>'+
+      (h.HouseVerifiedOnMaps==="Yes"?'Verified on maps ✓':
+       h.HouseVerifiedOnMaps==="No"?'Not found on maps ⚠️':'Map location not checked')+'</div>'+
+    (h.HouseGPSCoordinates?'<div class="meta"><span class="mi">📍</span>'+esc(h.HouseGPSCoordinates)+'</div>':'')+
+    '<div style="display:flex;gap:8px;margin-top:14px">'+
+      '<button class="btn btn-s" id="dDir">🚗 Directions</button>'+
+      '<button class="btn btn-s" id="dRV">📖 Return visits</button>'+
+    '</div>'+
+    (h.HouseNotes?'<div class="lbl">House notes</div><div class="note-box">'+esc(h.HouseNotes)+'</div>':'')+
+    (h.HousePersonalNotes?'<div class="lbl">Personal notes</div><div class="note-box">'+esc(h.HousePersonalNotes)+'</div>':'')+
+    '<div class="lbl">Visit results — tap to edit</div>'+
+    '<div class="vgrid">'+visits.map(function(x){
+      return '<button class="vbox'+(x.v?' filled':'')+'" data-act="slot" data-id="'+esc(h.id)+'" data-slot="'+x.n+'">'+
+        '<span class="vn">VISIT '+x.n+'</span><span class="vv">'+(x.v?esc(x.v):"—")+'</span></button>';
+    }).join("")+'</div>'+
+    '<div style="height:8px"></div>';
+
+  $("#dDir").addEventListener("click",function(){
+    var q=h.HouseGPSCoordinates||fullAddr(h);
+    window.open("https://www.google.com/maps/dir/?api=1&destination="+encodeURIComponent(q),"_blank");
+  });
+  $("#dRV").addEventListener("click",function(){openRV(h.id);});
+  openSheet("#sh-detail");
+}
+$("#dEdit").addEventListener("click",function(){var id=curId;closeSheet("#sh-detail");openForm(byId(id));});
+$("#dLog").addEventListener("click",function(){openLog(curId,null);});
+
+/* ═══ LOG VISIT ═══ */
+var OUTCOMES=[
+  {k:"NH",  i:"🚪", l:"Not home"},
+  {k:"Talked", i:"💬", l:"Talked"},
+  {k:"Busy", i:"⏳", l:"Busy"},
+  {k:"Come back", i:"↩️", l:"Come back"},
+  {k:"Not interested", i:"🚫", l:"Not interested"},
+  {k:"RV", i:"📖", l:"Return visit", rv:true}
+];
+function openLog(id,slot){
+  var h=byId(id);if(!h)return;
+  curId=id;curSlot=slot;curOutcome=null;
+  $("#lTitle").textContent=h.HouseAddress||"Log visit";
+  $("#lSub").textContent=slot?("Visit "+slot):"Pick what happened";
+  $("#lNote").value=slot?(h["HouseResutsOnVisit"+slot]||""):"";
+  $("#outGrid").innerHTML=OUTCOMES.map(function(o){
+    return '<button class="out" data-k="'+esc(o.k)+'"'+(o.rv?' data-rv="1"':'')+' aria-pressed="false">'+
+      '<span class="oi">'+o.i+'</span><span class="ol">'+esc(o.l)+'</span></button>';
+  }).join("");
+  openSheet("#sh-log");
+}
+$("#outGrid").addEventListener("click",function(e){
+  var b=e.target.closest(".out");if(!b)return;
+  var already=b.getAttribute("aria-pressed")==="true";
+  this.querySelectorAll(".out").forEach(function(x){x.setAttribute("aria-pressed","false");});
+  if(already){curOutcome=null;return;}
+  b.setAttribute("aria-pressed","true");curOutcome=b.dataset.k;haptic();
+});
+
+$("#lSave").addEventListener("click",function(){
+  var h=byId(curId);if(!h)return;
+  var note=$("#lNote").value.trim();
+  if(!curOutcome&&!note){toast("Pick an outcome or write a note",true);return;}
+  var text=curOutcome==="RV"?(note||"Return visit"):[curOutcome,note].filter(Boolean).join(" — ");
+
+  var log=seedLogLocal(h);
+  if(curSlot){
+    // Editing one specific slot: replace the entry it projects from, so the
+    // grid stays in step instead of growing a duplicate.
+    var live=log.filter(function(e){return e&&!e.x;})
+      .sort(function(a,b){return String(a.d||"").localeCompare(String(b.d||""));});
+    var target=live.slice(-5)[curSlot-1];
+    if(target)target.t=text;
+    else log.push({i:entryId(),d:todayStr(),t:text});
+  }else{
+    log.push({i:entryId(),d:todayStr(),t:text});
+  }
+
+  var changes={HouseVisitLog:JSON.stringify(log),HouseLastVisitDate:todayStr()};
+  deriveSlotsLocal(changes,log);
+
+  if(curOutcome==="RV"){
+    var rv=parseLog(h.HouseReturnVisits);
+    rv.push({i:entryId(),d:todayStr(),n:note||"Started return visit"});
+    changes.HouseReturnVisits=JSON.stringify(rv);
+  }
+  saveChanges(curId,changes,"Visit logged ✓");
+  closeSheet("#sh-log");
+});
+
+/* ═══ RETURN-VISIT THREAD ═══ */
+function openRV(id){
+  var h=byId(id);if(!h)return;
+  curId=id;
+  $("#rTitle").textContent=h.HouseAddress||"Return visits";
+  drawRV();
+  openSheet("#sh-rv");
+}
+function drawRV(){
+  var h=byId(curId);if(!h)return;
+  var rv=getRVs(h).slice().sort(function(a,b){return String(b.d).localeCompare(String(a.d));});
+  $("#rBody").innerHTML=
+    '<div class="rv-add">'+
+      '<textarea id="rvNew" placeholder="What did you talk about? Who did you speak with?"></textarea>'+
+    '</div>'+
+    '<button class="btn btn-p" id="rvAdd" style="width:100%">＋ Add return visit note</button>'+
+    (rv.length?'<div class="lbl">History</div><div class="tl">'+rv.map(function(x){
+      return '<div class="tl-item"><div class="tl-d">'+esc(fmtDate(x.d))+'</div>'+
+        '<div class="tl-n">'+esc(x.n||"")+'</div>'+
+        '<button class="tl-del" data-act="rvdel" data-eid="'+esc(x.i||"")+'">Delete</button></div>';
+    }).join("")+'</div>'
+    :'<div class="empty" style="padding:30px 10px"><span class="big">📖</span>No notes yet.</div>');
+
+  $("#rvAdd").addEventListener("click",function(){
+    var t=$("#rvNew").value.trim();
+    if(!t){toast("Write a note first",true);return;}
+    var cur=parseLog(byId(curId).HouseReturnVisits);
+    cur.push({i:entryId(),d:todayStr(),n:t});
+    saveChanges(curId,{HouseReturnVisits:JSON.stringify(cur),HouseLastVisitDate:todayStr()},"Return visit saved ✓");
+    drawRV();
+  });
+  $("#rBody").querySelectorAll('[data-act="rvdel"]').forEach(function(b){
+    b.addEventListener("click",function(){
+      var eid=b.dataset.eid;
+      // Tombstone rather than splice: a removed entry would be restored by the
+      // next sync from another device that still has it.
+      var stored=parseLog(byId(curId).HouseReturnVisits);
+      var hit=false;
+      stored.forEach(function(e){if(String(e.i)===eid){e.x=1;hit=true;}});
+      if(!hit)return;
+      saveChanges(curId,{HouseReturnVisits:JSON.stringify(stored)},"Note deleted");
+      drawRV();
+    });
   });
 }
 
-var verifyMiniMap=null;
-function openVerifyDrawer(latlng,street,city,state,zip){
-  document.getElementById("vAddr").value=street;
-  document.getElementById("vCity").value=city;
-  document.getElementById("vState").value=state;
-  document.getElementById("vZip").value=zip;
-  document.getElementById("vGPS").value=latlng.lat.toFixed(6)+", "+latlng.lng.toFixed(6);
-  document.getElementById("vTerrNum").value="";
-  document.getElementById("vAssigned").value="";
-  document.getElementById("vLang").value="";
-  document.getElementById("vLastVisit").value="";
-  document.getElementById("vNotes").value="";
-  document.getElementById("vPersonal").value="";
-  document.getElementById("tmVerifyOverlay").classList.add("open");
+/* ═══ FORM ═══ */
+var FORM=[["fAddr","HouseAddress"],["fCity","HouseCity"],["fState","HouseState"],["fZip","HouseZIP"],
+  ["fTerr","HouseTerritoryNumber"],["fAssigned","HouseTerritoryAssingnedTo"],["fLang","HouseLanguage"],
+  ["fGPS","HouseGPSCoordinates"],["fNotes","HouseNotes"],["fPersonal","HousePersonalNotes"],
+  ["fV1","HouseResutsOnVisit1"],["fV2","HouseResutsOnVisit2"],["fV3","HouseResutsOnVisit3"],
+  ["fV4","HouseResutsOnVisit4"],["fV5","HouseResutsOnVisit5"]];
 
-  setTimeout(function(){
-    if(verifyMiniMap){verifyMiniMap.remove();verifyMiniMap=null;}
-    verifyMiniMap=L.map("tmVerifyMap",{zoomControl:false,dragging:false,scrollWheelZoom:false,doubleClickZoom:false,touchZoom:false,attributionControl:false});
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(verifyMiniMap);
-    verifyMiniMap.setView([latlng.lat,latlng.lng],17);
-    L.marker([latlng.lat,latlng.lng],{icon:colorIcon("#c62828")}).addTo(verifyMiniMap);
-    verifyMiniMap.invalidateSize();
-  },350);
+function setVerified(val){
+  var sel=$("#fVerified"),i;
+  for(i=sel.options.length-1;i>=0;i--)if(sel.options[i].dataset.adhoc)sel.remove(i);
+  var known=false;
+  for(i=0;i<sel.options.length;i++)if(sel.options[i].value===val){known=true;break;}
+  if(val&&!known){var o=new Option(val,val);o.dataset.adhoc="1";sel.add(o);}
+  sel.value=val;
 }
-
-function closeVerify(){
-  document.getElementById("tmVerifyOverlay").classList.remove("open");
-  if(verifyMiniMap){setTimeout(function(){verifyMiniMap.remove();verifyMiniMap=null;},300);}
+function openForm(h){
+  $("#fTitle").textContent=h?"Edit house":"Add house";
+  $("#fDelete").style.display=h?"flex":"none";
+  $("#fId").value=h?h.id:"";
+  FORM.forEach(function(p){$("#"+p[0]).value=h?(h[p[1]]||""):"";});
+  $("#fLastVisit").value=h?cleanDate(h.HouseLastVisitDate):"";
+  setVerified(h?(h.HouseVerifiedOnMaps||""):"");
+  if(!h){
+    $("#fState").value="CA";
+    // Prefill from what they are already looking at — most houses come in batches.
+    if(terrFilter!=="all")$("#fTerr").value=terrFilter;
+    var sample=records[0];
+    if(sample){$("#fCity").value=sample.HouseCity||"";$("#fZip").value=sample.HouseZIP||"";}
+  }
+  openSheet("#sh-form");
 }
-document.getElementById("tmVerifyClose").addEventListener("click",closeVerify);
-document.getElementById("tmVerifyOverlay").addEventListener("click",function(e){if(e.target===this)closeVerify();});
+$("#fab").addEventListener("click",function(){openForm(null);});
 
-document.getElementById("tmVerifyCreate").addEventListener("click",function(){
-  var body={
-    HouseAddress:document.getElementById("vAddr").value,
-    HouseCity:document.getElementById("vCity").value,
-    HouseState:document.getElementById("vState").value,
-    HouseZIP:document.getElementById("vZip").value,
-    HouseGPSCoordinates:document.getElementById("vGPS").value,
-    HouseTerritoryNumber:document.getElementById("vTerrNum").value,
-    HouseTerritoryAssingnedTo:document.getElementById("vAssigned").value,
-    HouseLanguage:document.getElementById("vLang").value,
-    HouseLastVisitDate:document.getElementById("vLastVisit").value||null,
-    HouseNotes:document.getElementById("vNotes").value,
-    HousePersonalNotes:document.getElementById("vPersonal").value,
-    HouseResutsOnVisit1:"",HouseResutsOnVisit2:"",HouseResutsOnVisit3:"",HouseResutsOnVisit4:"",HouseResutsOnVisit5:"",
-    HouseVerifiedOnMaps:""
-  };
-  var btn=this;btn.textContent="Creating…";btn.disabled=true;
-  fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})
-  .then(function(r){if(!r.ok)throw new Error("Server error");return r.json();})
-  .then(function(){btn.textContent="Create House";btn.disabled=false;closeVerify();toast("House created ✓");loadRecords();})
-  .catch(function(e){btn.textContent="Create House";btn.disabled=false;toast("Error: "+e.message,"#c62828");});
+$("#fGPSBtn").addEventListener("click",function(){
+  var b=this;
+  if(!navigator.geolocation){toast("GPS not available",true);return;}
+  b.classList.add("busy");
+  navigator.geolocation.getCurrentPosition(function(p){
+    b.classList.remove("busy");
+    $("#fGPS").value=p.coords.latitude.toFixed(6)+", "+p.coords.longitude.toFixed(6);
+    toast("Location captured ✓");
+  },function(){b.classList.remove("busy");toast("Could not get location",true);},
+  {enableHighAccuracy:true,timeout:15000});
 });
 
-/* Add swipe dismiss for verify drawer */
-(function(){var el=document.getElementById("tmVerifyOverlay");var sy=0;el.addEventListener("touchstart",function(e){sy=e.touches[0].clientY;},{passive:true});el.addEventListener("touchend",function(e){if(e.changedTouches[0].clientY-sy>80)closeVerify();},{passive:true});})();
+$("#fSave").addEventListener("click",function(){
+  var id=$("#fId").value;
+  var data={};
+  FORM.forEach(function(p){data[p[1]]=$("#"+p[0]).value;});
+  data.HouseLastVisitDate=$("#fLastVisit").value||"";
+  data.HouseVerifiedOnMaps=$("#fVerified").value;
+  if(!data.HouseAddress.trim()){toast("Address is required",true);return;}
 
-attachLongPress();
+  if(id){saveChanges(id,data,"House saved ✓");closeSheet("#sh-form");}
+  else{
+    localCreate(data).then(function(newId){
+      afterLocalChange();toast("House added ✓");closeSheet("#sh-form");
+      scheduleSync();
+    });
+  }
+});
 
-/* ── Init ── */
-loadRecords();
+$("#fDelete").addEventListener("click",function(){
+  var id=$("#fId").value;if(!id)return;
+  var h=byId(id);
+  if(!confirm("Delete "+(h&&h.HouseAddress?h.HouseAddress:"this house")+"?\n\nThis cannot be undone."))return;
+  localDelete(id).then(function(){
+    afterLocalChange();toast("House deleted");closeSheet("#sh-form");scheduleSync();
+  });
+});
+
+/* ═══ WRITE PATH ═══
+   Every edit lands in IndexedDB first and the UI updates immediately.
+   The network is a background consequence, so a write can never fail
+   in front of the user. */
+function saveChanges(id,changes,msg){
+  localUpdate(id,changes).then(function(){
+    afterLocalChange();
+    if(msg)toast(msg);
+    haptic();
+    scheduleSync();
+  }).catch(function(e){toast("Could not save locally: "+e.message,true);});
+}
+function afterLocalChange(){
+  records=buildRecords();
+  renderHouses();renderRV();refreshMapPins();updateSyncUI();
+  if(openSheets.indexOf("#sh-detail")!==-1&&curId&&byId(curId))openDetail(curId);
+}
+
+/* ═══ SYNC ═══ */
+var syncTimer=null;
+function scheduleSync(){
+  if(offlineMode)return;
+  clearTimeout(syncTimer);
+  syncTimer=setTimeout(function(){doSync(false);},2000);
+}
+function doSync(manual){
+  if(offlineMode&&!manual){updateSyncUI();return Promise.resolve();}
+  updateSyncUI("syncing");
+  return sync().then(function(r){
+    if(r.busy)return;
+    if(r.ok){
+      records=buildRecords();
+      renderHouses();renderRV();refreshMapPins();buildTerrSub();
+      if(r.conflicts&&r.conflicts.length){
+        toast(r.conflicts.length+" house(s) also changed elsewhere — check notes");
+      }else if(manual){
+        toast(r.pushed?("Synced "+r.pushed+" change"+(r.pushed===1?"":"s")+" ✓"):"Up to date ✓");
+      }
+    }else if(manual){
+      toast(r.offline?"You're offline — changes are saved on this phone":("Sync failed: "+r.error),true);
+    }
+    updateSyncUI();
+  });
+}
+function updateSyncUI(forceState){
+  var pill=$("#syncPill"),txt=$("#syncTxt"),n=pendingCount();
+  var state=forceState||(offlineMode?"offline":(n?"pending":(lastSyncError?"offline":"ok")));
+  pill.className="";
+  if(state==="syncing"){pill.className="syncing";txt.textContent="Syncing…";}
+  else if(state==="offline"){pill.className="offline";txt.textContent=n?(n+" saved"):"Offline";}
+  else if(state==="pending"){pill.className="pending";txt.textContent=n+" to sync";}
+  else{txt.textContent="Synced";}
+
+  $("#pendSub").textContent=n?(n+" house"+(n===1?"":"s")+" waiting to upload"):"Nothing waiting";
+  idb.getMeta("lastSync").then(function(v){
+    $("#syncSub").textContent=v?("Last synced "+new Date(v).toLocaleString()):"Never synced";
+  });
+}
+$("#syncPill").addEventListener("click",function(){doSync(true);});
+$("#rowSync").addEventListener("click",function(){doSync(true);});
+$("#swOffline").addEventListener("click",function(){
+  offlineMode=!offlineMode;
+  this.setAttribute("aria-checked",offlineMode?"true":"false");
+  localStorage.setItem("tm_offline",offlineMode?"1":"0");
+  updateSyncUI();
+  toast(offlineMode?"Working offline — changes stay on this phone":"Auto-sync on");
+  if(!offlineMode)doSync(true);
+});
+$("#rowPending").addEventListener("click",function(){
+  var ids=Object.keys(pending);
+  $("#pTitle").textContent="Pending changes";
+  $("#pSub").textContent=ids.length?(ids.length+" waiting"):"Nothing waiting";
+  $("#pBody").innerHTML=ids.length?ids.map(function(id){
+    var h=byId(id)||{};var p=pending[id];
+    var what=p.deleted?"deleted":p.created?"new house":Object.keys(p.fields).length+" field(s) changed";
+    return '<div class="row" style="border-radius:12px;background:var(--surface);margin-bottom:6px;border:1px solid var(--border)">'+
+      '<span class="row-ico">'+(p.deleted?"🗑️":p.created?"✨":"✏️")+'</span>'+
+      '<span class="row-txt"><span class="row-t">'+esc(h.HouseAddress||id)+'</span>'+
+      '<span class="row-s">'+esc(what)+'</span></span></div>';
+  }).join(""):'<div class="empty"><span class="big">✅</span>Everything is synced.</div>';
+  openSheet("#sh-pick");
+});
+
+/* ═══ TERRITORY PICKER / EXPORT ═══ */
+function terrMap(){
+  var m={};
+  records.forEach(function(h){var t=h.HouseTerritoryNumber||"Unassigned";(m[t]||(m[t]=[])).push(h);});
+  return m;
+}
+function buildTerrSub(){
+  var k=Object.keys(terrMap());
+  $("#terrSub").textContent=k.length+" territor"+(k.length===1?"y":"ies");
+  $("#verSub").textContent=APP_VERSION;
+}
+function pickerRow(label,sub,attr){
+  return '<button class="row" style="border-radius:12px;background:var(--surface);margin-bottom:6px;border:1px solid var(--border)" '+attr+'>'+
+    '<span class="row-txt"><span class="row-t">'+esc(label)+'</span>'+
+    (sub?'<span class="row-s">'+esc(sub)+'</span>':'')+'</span><span class="row-act">›</span></button>';
+}
+function openTerrPicker(){
+  var m=terrMap(),keys=Object.keys(m).sort();
+  $("#pTitle").textContent="Territories";
+  $("#pSub").textContent=records.length+" houses total";
+  $("#pBody").innerHTML=pickerRow("All Territories",records.length+" houses",'data-terr="all"')+
+    keys.map(function(t){return pickerRow(t,m[t].length+" houses",'data-terr="'+esc(t)+'"');}).join("");
+  openSheet("#sh-pick");
+}
+$("#scopeBtn").addEventListener("click",openTerrPicker);
+$("#rowTerr").addEventListener("click",openTerrPicker);
+$("#rowExport").addEventListener("click",function(){
+  var m=terrMap(),keys=Object.keys(m).sort();
+  if(!records.length){toast("No houses to export",true);return;}
+  if(keys.length===1){generateTerritoryPDF(keys[0],m[keys[0]]);return;}
+  $("#pTitle").textContent="Export PDF";
+  $("#pSub").textContent="Pick a territory";
+  $("#pBody").innerHTML=pickerRow("All territories","One PDF per territory",'data-exp="__all__"')+
+    keys.map(function(t){return pickerRow(t,m[t].length+" houses",'data-exp="'+esc(t)+'"');}).join("");
+  openSheet("#sh-pick");
+});
+$("#pBody").addEventListener("click",function(e){
+  var b=e.target.closest("[data-terr],[data-exp]");if(!b)return;
+  if(b.dataset.terr!==undefined){
+    terrFilter=b.dataset.terr;closeSheet("#sh-pick");renderHouses();fitPins();
+  }else{
+    var m=terrMap();closeSheet("#sh-pick");
+    if(b.dataset.exp==="__all__")Object.keys(m).sort().forEach(function(t){generateTerritoryPDF(t,m[t]);});
+    else generateTerritoryPDF(b.dataset.exp,m[b.dataset.exp]);
+  }
+});
+
+/* ═══ MAP ═══ */
+function pinColor(s){return{recent:"#12805C",due:"#B54708",overdue:"#B42318",never:"#6B7488"}[s]||"#6B7488";}
+function pinIcon(h){
+  var c=pinColor(visitStatus(h.HouseLastVisitDate));
+  var rv=isRV(h);
+  return L.divIcon({className:"",iconSize:[24,24],iconAnchor:[12,12],popupAnchor:[0,-14],
+    html:'<div style="width:22px;height:22px;border-radius:50%;background:'+c+
+      ';border:3px solid '+(rv?"#6941C6":"#fff")+';box-shadow:0 2px 8px rgba(0,0,0,.45)"></div>'});
+}
+function initMap(){
+  if(mapReady)return;
+  map=L.map("map",{zoomControl:false,attributionControl:false}).setView([35.4873,-120.6700],14);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19}).addTo(map);
+  L.control.zoom({position:"topright"}).addTo(map);
+  mapReady=true;
+  refreshMapPins();fitPins();
+}
+function refreshMapPins(){
+  if(!mapReady)return;
+  Object.keys(markerMap).forEach(function(id){
+    if(!byId(id)){map.removeLayer(markerMap[id]);delete markerMap[id];}
+  });
+  records.forEach(function(h){
+    var g=parseGPS(h.HouseGPSCoordinates);if(!g)return;
+    var m=markerMap[h.id];
+    if(m){m.setLatLng([g.lat,g.lng]);m.setIcon(pinIcon(h));return;}
+    m=L.marker([g.lat,g.lng],{icon:pinIcon(h)}).addTo(map);
+    m.bindPopup("");
+    m.on("popupopen",function(){
+      var rec=byId(h.id);if(!rec)return;
+      var el=document.createElement("div");
+      el.className="pin-pop";
+      el.innerHTML='<div class="pp-a">'+esc(rec.HouseAddress||"")+'</div>'+
+        '<div class="pp-s">'+esc(visitLabel(rec.HouseLastVisitDate))+'</div>'+
+        '<div class="pp-row"><button class="pp-det">Details</button><button class="pp-log">Log</button></div>';
+      el.querySelector(".pp-det").addEventListener("click",function(){map.closePopup();openDetail(h.id);});
+      el.querySelector(".pp-log").addEventListener("click",function(){map.closePopup();openLog(h.id,null);});
+      m.setPopupContent(el);
+    });
+    markerMap[h.id]=m;
+  });
+}
+function fitPins(){
+  if(!mapReady)return;
+  var pts=[];
+  (terrFilter==="all"?records:records.filter(function(h){return(h.HouseTerritoryNumber||"Unassigned")===terrFilter;}))
+    .forEach(function(h){var g=parseGPS(h.HouseGPSCoordinates);if(g)pts.push([g.lat,g.lng]);});
+  if(pts.length)map.fitBounds(pts,{padding:[50,50],maxZoom:17});
+}
+$("#fitBtn").addEventListener("click",fitPins);
+$("#locateBtn").addEventListener("click",function(){
+  if(!navigator.geolocation){toast("GPS not available",true);return;}
+  var b=this;b.style.opacity=".5";
+  navigator.geolocation.getCurrentPosition(function(p){
+    b.style.opacity="";
+    map.setView([p.coords.latitude,p.coords.longitude],17);
+    if(window._meMarker)map.removeLayer(window._meMarker);
+    window._meMarker=L.circleMarker([p.coords.latitude,p.coords.longitude],
+      {radius:8,color:"#fff",weight:3,fillColor:"#2563EB",fillOpacity:1}).addTo(map);
+  },function(){b.style.opacity="";toast("Could not get location",true);},{enableHighAccuracy:true,timeout:15000});
+});
+
+/* ═══ NAV ═══ */
+function showView(name){
+  document.querySelectorAll(".view").forEach(function(v){v.classList.toggle("active",v.id==="view-"+name);});
+  document.querySelectorAll(".tab").forEach(function(t){t.setAttribute("aria-selected",t.dataset.view===name?"true":"false");});
+  if(name==="map"){initMap();setTimeout(function(){if(map)map.invalidateSize();},60);}
+  if(name==="rv")renderRV();
+  if(name==="more"){buildTerrSub();updateSyncUI();showStorage();}
+}
+document.querySelectorAll(".tab").forEach(function(t){
+  t.addEventListener("click",function(){showView(t.dataset.view);haptic(5);});
+});
+
+/* delegated list actions */
+document.addEventListener("click",function(e){
+  var b=e.target.closest("[data-act]");if(!b)return;
+  var a=b.dataset.act,id=b.dataset.id;
+  if(a==="detail")openDetail(id);
+  else if(a==="log")openLog(id,null);
+  else if(a==="slot")openLog(id,parseInt(b.dataset.slot,10));
+  else if(a==="rv")openRV(id);
+});
+
+/* search */
+var sT;
+$("#searchBox").addEventListener("input",function(){
+  var v=this.value;
+  $("#searchClear").style.display=v?"flex":"none";
+  clearTimeout(sT);sT=setTimeout(function(){searchTerm=v.trim();renderHouses();},160);
+});
+$("#searchClear").addEventListener("click",function(){
+  $("#searchBox").value="";this.style.display="none";searchTerm="";renderHouses();
+});
+$("#filterChips").addEventListener("click",function(e){
+  var c=e.target.closest(".chip");if(!c)return;
+  filter=c.dataset.f;
+  this.querySelectorAll(".chip").forEach(function(x){x.setAttribute("aria-pressed",x===c?"true":"false");});
+  renderHouses();
+});
+
+/* ═══ STORAGE INFO ═══ */
+function showStorage(){
+  var el=$("#storeSub");
+  if(!navigator.storage||!navigator.storage.estimate){el.textContent=records.length+" houses on this device";return;}
+  navigator.storage.estimate().then(function(e){
+    var mb=(e.usage||0)/1048576;
+    navigator.storage.persisted?navigator.storage.persisted().then(function(p){
+      el.textContent=records.length+" houses · "+mb.toFixed(1)+" MB"+(p?" · protected":"");
+    }):el.textContent=records.length+" houses · "+mb.toFixed(1)+" MB";
+  }).catch(function(){el.textContent=records.length+" houses on this device";});
+}
+
+/* ═══ PWA ═══ */
+var isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent)||
+  (navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+var isStandalone=window.matchMedia("(display-mode: standalone)").matches||navigator.standalone===true;
+
+window.addEventListener("beforeinstallprompt",function(e){
+  e.preventDefault();deferredInstall=e;$("#rowInstall").style.display="flex";
+});
+// iOS has no beforeinstallprompt at all, so the row must be offered outright
+// with the manual steps — otherwise iPhone users never discover installing.
+if(isIOS&&!isStandalone)$("#rowInstall").style.display="flex";
+
+$("#rowInstall").addEventListener("click",function(){
+  if(deferredInstall){
+    deferredInstall.prompt();
+    deferredInstall.userChoice.then(function(){deferredInstall=null;$("#rowInstall").style.display="none";});
+    return;
+  }
+  $("#pTitle").textContent="Install on your phone";
+  $("#pSub").textContent="Keeps working with no signal";
+  $("#pBody").innerHTML='<div style="padding:6px 6px 14px;font-size:15px;line-height:1.6">'+
+    (isIOS
+      ? '<p style="margin-bottom:12px">In <b>Safari</b>:</p>'+
+        '<p>1. Tap the <b>Share</b> button <span style="font-size:17px">􀈂</span> at the bottom.</p>'+
+        '<p>2. Scroll down and tap <b>Add to Home Screen</b>.</p>'+
+        '<p>3. Tap <b>Add</b>.</p>'+
+        '<p style="margin-top:14px;color:var(--text-2);font-size:13.5px">'+
+        'Installing also tells iOS to stop clearing your saved data, so notes '+
+        'taken with no signal survive.</p>'
+      : '<p>Open your browser menu and choose <b>Install app</b> or '+
+        '<b>Add to Home screen</b>.</p>')+
+    '</div>';
+  openSheet("#sh-pick");
+});
+$("#updateGo").addEventListener("click",function(){
+  if(window._waitingSW)window._waitingSW.postMessage({type:"SKIP_WAITING"});
+  location.reload();
+});
+function registerSW(){
+  if(!("serviceWorker" in navigator))return;
+  // Captured before registering. A first-ever install also fires updatefound,
+  // and a worker from a different scope can be controlling us; neither is an
+  // update, so requiring a controller that predates this registration keeps
+  // "A new version is ready" from greeting first-time visitors.
+  var hadController=!!navigator.serviceWorker.controller;
+  navigator.serviceWorker.register("sw.js").then(function(reg){
+    if(reg.waiting&&hadController){window._waitingSW=reg.waiting;$("#updateBar").classList.add("show");}
+    reg.addEventListener("updatefound",function(){
+      var nw=reg.installing;if(!nw)return;
+      nw.addEventListener("statechange",function(){
+        if(nw.state==="installed"&&hadController&&reg.active){
+          window._waitingSW=nw;$("#updateBar").classList.add("show");
+        }
+      });
+    });
+  }).catch(function(){});
+}
+
+/* ═══ BOOT ═══ */
+function boot(){
+  offlineMode=localStorage.getItem("tm_offline")==="1";
+  $("#swOffline").setAttribute("aria-checked",offlineMode?"true":"false");
+  $("#verSub").textContent=APP_VERSION;
+
+  $("#houseList").innerHTML='<div class="skel">'+Array(8).join()
+    .split(",").map(function(_,i){
+      return '<div class="skel-row"><div class="skel-bar" style="width:'+(30+i*7)+'%"></div></div>';
+    }).join("")+'</div>';
+
+  loadLocal().then(function(){
+    records=buildRecords();
+    renderHouses();renderRV();buildTerrSub();updateSyncUI();
+    restoreDrafts();
+    // Ask to keep our data off the eviction list. Best-effort; ignore refusal.
+    if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(function(){});
+    return doSync(false);
+  }).catch(function(e){
+    toast("Could not open local storage: "+e.message,true);
+    console.error(e);
+  });
+
+  registerSW();
+}
+
+window.addEventListener("online",function(){if(!offlineMode)doSync(false);updateSyncUI();});
+window.addEventListener("offline",updateSyncUI);
+document.addEventListener("visibilitychange",function(){
+  if(document.visibilityState==="visible"&&!offlineMode)doSync(false);
+});
+
+/* iOS kills backgrounded tabs without waiting for IndexedDB to flush, and a
+   half-typed note lives only in the DOM. localStorage writes synchronously
+   during pagehide, so mirror open composers there and offer them back. */
+var DRAFT_KEY="tm_draft";
+function stashDrafts(){
+  try{
+    var d={};
+    var rv=document.getElementById("rvNew"),ln=document.getElementById("lNote");
+    if(rv&&rv.value.trim())d.rv={id:curId,t:rv.value};
+    if(ln&&ln.value.trim())d.log={id:curId,t:ln.value};
+    if(d.rv||d.log)localStorage.setItem(DRAFT_KEY,JSON.stringify(d));
+    else localStorage.removeItem(DRAFT_KEY);
+  }catch(e){}
+}
+function restoreDrafts(){
+  var raw;try{raw=localStorage.getItem(DRAFT_KEY);}catch(e){return;}
+  if(!raw)return;
+  var d;try{d=JSON.parse(raw);}catch(e){localStorage.removeItem(DRAFT_KEY);return;}
+  var entry=d.rv||d.log;if(!entry||!entry.id)return;
+  var h=byId(entry.id);if(!h){localStorage.removeItem(DRAFT_KEY);return;}
+  $("#pTitle").textContent="Unsaved note recovered";
+  $("#pSub").textContent=h.HouseAddress||"";
+  $("#pBody").innerHTML='<div class="note-box" style="margin-bottom:12px">'+esc(entry.t)+'</div>'+
+    '<div style="display:flex;gap:9px">'+
+      '<button class="btn btn-s" id="drDiscard">Discard</button>'+
+      '<button class="btn btn-p" id="drKeep">Save as return visit</button></div>';
+  $("#drDiscard").addEventListener("click",function(){
+    try{localStorage.removeItem(DRAFT_KEY);}catch(e){}
+    closeSheet("#sh-pick");
+  });
+  $("#drKeep").addEventListener("click",function(){
+    var cur=parseLog(byId(entry.id).HouseReturnVisits);
+    cur.push({i:entryId(),d:todayStr(),n:entry.t});
+    saveChanges(entry.id,{HouseReturnVisits:JSON.stringify(cur)},"Note recovered ✓");
+    try{localStorage.removeItem(DRAFT_KEY);}catch(e){}
+    closeSheet("#sh-pick");
+  });
+  openSheet("#sh-pick");
+}
+window.addEventListener("pagehide",stashDrafts);
+document.addEventListener("visibilitychange",function(){
+  if(document.visibilityState==="hidden")stashDrafts();
+});
+
+boot();
 })();
 </script>
 </body>

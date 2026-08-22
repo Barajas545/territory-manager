@@ -1,0 +1,15 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "territory",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "C:/Users/crist/AppData/Local/Temp/claude/I--My-Drive-DCR-database-Progaming-Temporary/b91ea879-e7b2-49cb-bb41-c17ce5938335/scratchpad/devserver.js",
+        "I:/My Drive/DCR database/Progaming/Temporary",
+        "8787"
+      ],
+      "port": 8787
+    }
+  ]
+}
