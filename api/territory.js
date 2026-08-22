@@ -101,13 +101,19 @@ function seedLog(rec) {
    Keeping them means the printed territory sheet and older clients still work,
    while the log remains the source of truth. */
 function deriveSlots(rec) {
-  const live = parseArr(rec.HouseVisitLog).filter(e => e && !e.x);
-  if (!live.length) return; // legacy row with no log — leave its slots alone
+  const all = parseArr(rec.HouseVisitLog);
+  // No log at all means a record predating the log — leave its slots alone.
+  // A log whose entries are ALL tombstoned is different: every visit was
+  // deleted, so the slots must clear too, or deleted text lingers forever.
+  if (!all.length) return;
+  const live = all.filter(e => e && !e.x);
   live.sort((a, b) => String(a.d || '').localeCompare(String(b.d || '')));
   const last5 = live.slice(-5);
   DERIVED_SLOTS.forEach((f, i) => { rec[f] = last5[i] ? String(last5[i].t || '') : ''; });
-  const lastD = live[live.length - 1].d;
-  if (lastD) rec.HouseLastVisitDate = lastD;
+  if (live.length) {
+    const lastD = live[live.length - 1].d;
+    if (lastD) rec.HouseLastVisitDate = lastD;
+  }
 }
 
 /* The one place merge policy lives. Runs against the row the server just read,
