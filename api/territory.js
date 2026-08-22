@@ -61,7 +61,15 @@ module.exports = async (req, res) => {
     if (req.method === 'GET') {
       const resp = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: RANGE });
       const rows = resp.data.values || [];
-      // row 0 is the header; skip it and skip blank rows
+      // Auto-initialize header row if sheet is empty
+      if (!rows.length || rows[0][0] !== 'id') {
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: SHEET_ID,
+          range: `${SHEET_NAME}!A1:${LAST_COL}1`,
+          valueInputOption: 'RAW',
+          requestBody: { values: [FIELDS] },
+        });
+      }
       const records = rows.slice(1).filter(r => r && r[0]).map(rowToRecord);
       return res.json(records);
     }
