@@ -624,7 +624,7 @@ input,textarea,select{-webkit-appearance:none;appearance:none;}
 
 /* ═══ CONFIG ═══ */
 var API="https://territory-manager-silk.vercel.app/api/territory";
-var APP_VERSION="2.0.1";
+var APP_VERSION="2.0.2";
 
 /* ═══════════════════════════════════════════════════════════════════════
    OFFLINE DATA LAYER
@@ -1587,6 +1587,7 @@ var FORM=[["fAddr","HouseAddress"],["fCity","HouseCity"],["fState","HouseState"]
   ["fTerr","HouseTerritoryNumber"],["fAssigned","HouseTerritoryAssingnedTo"],["fLang","HouseLanguage"],
   ["fGPS","HouseGPSCoordinates"],["fNotes","HouseNotes"],["fPersonal","HousePersonalNotes"]];
 var FORM_SLOTS=["fV1","fV2","fV3","fV4","fV5"];
+var formSlotsAtOpen=["","","","",""];   // what the form showed when it opened
 
 function setVerified(val){
   var sel=$("#fVerified"),i;
@@ -1601,6 +1602,14 @@ function openForm(h){
   $("#fDelete").style.display=h?"flex":"none";
   $("#fId").value=h?h.id:"";
   FORM.forEach(function(p){$("#"+p[0]).value=h?(h[p[1]]||""):"";});
+  // The slots are not in FORM (the server derives them), so fill them from the
+  // record explicitly. Leaving them blank would make slotEditsToLog read every
+  // visit as "cleared" on save and tombstone real history.
+  FORM_SLOTS.forEach(function(fid,i){
+    var v=h?(h["HouseResutsOnVisit"+(i+1)]||""):"";
+    $("#"+fid).value=v;
+    formSlotsAtOpen[i]=v;
+  });
   $("#fLastVisit").value=h?cleanDate(h.HouseLastVisitDate):"";
   setVerified(h?(h.HouseVerifiedOnMaps||""):"");
   if(!h){
@@ -1637,13 +1646,17 @@ function slotEditsToLog(h){
   var touched=false;
   FORM_SLOTS.forEach(function(fid,i){
     var val=$("#"+fid).value.trim();
+    // Compare against what the form actually DISPLAYED, not against the log.
+    // If population ever fails, the opened value is blank too, so the field
+    // reads as unchanged and no visit is destroyed. Comparing to the log would
+    // read an unpopulated form as "the user cleared everything".
+    var opened=String(formSlotsAtOpen[i]||"").trim();
+    if(val===opened)return;
     var cur=shown[i];
-    var was=cur?String(cur.t||""):"";
-    if(val===was)return;
     touched=true;
     if(cur){
       if(val)cur.t=val;
-      else cur.x=1;                       // cleared -> tombstone that visit
+      else cur.x=1;                       // deliberately cleared -> tombstone
     }else if(val){
       log.push({i:entryId(),d:$("#fLastVisit").value||todayStr(),t:val});
     }
