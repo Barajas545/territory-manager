@@ -111,6 +111,7 @@ button#tmPullTab{display:none;position:absolute;left:0;top:50%;transform:transla
 .tm-field input,.tm-field textarea,.tm-field select{width:100%;padding:12px 14px;font-size:15px;border:2px solid #e8e8e8;border-radius:12px;outline:none;font-family:inherit;color:#1a1a1a;background:#fafafa;-webkit-appearance:none;transition:border-color .2s;}\
 .tm-field input:focus,.tm-field textarea:focus,.tm-field select:focus{border-color:#1a1a1a;background:#fff;}\
 .tm-field textarea{min-height:80px;resize:vertical;}\
+.tm-field select{background-image:url("data:image/svg+xml;utf8,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%278%27 viewBox=%270 0 12 8%27><path d=%27M1 1l5 5 5-5%27 stroke=%27%23888%27 stroke-width=%272%27 fill=%27none%27 stroke-linecap=%27round%27/></svg>");background-repeat:no-repeat;background-position:right 14px center;padding-right:38px;cursor:pointer;}\
 .tm-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 14px;}\
 .tm-gps-row{display:flex;gap:8px;}\
 .tm-gps-row input{flex:1;}\
@@ -962,6 +963,17 @@ document.getElementById("tmLogSave").addEventListener("click",function(){
 });
 
 /* ── Form Drawer ── */
+/* Assigning an unmatched value to a <select> silently leaves it on the first
+   option, so a stored value outside Yes/No/"" would be wiped on the next save.
+   Carry it as a temporary option instead so it round-trips untouched. */
+function setVerified(val){
+  var sel=document.getElementById("fVerified"),i;
+  for(i=sel.options.length-1;i>=0;i--){if(sel.options[i].dataset.adhoc)sel.remove(i);}
+  var known=false;
+  for(i=0;i<sel.options.length;i++){if(sel.options[i].value===val){known=true;break;}}
+  if(val&&!known){var o=new Option(val,val);o.dataset.adhoc="1";sel.add(o);}
+  sel.value=val;
+}
 function openForm(h){
   if(h){
     document.getElementById("tmFormTitle").textContent="Edit House";
@@ -975,7 +987,7 @@ function openForm(h){
     document.getElementById("fAssigned").value=h.HouseTerritoryAssingnedTo||"";
     document.getElementById("fLang").value=h.HouseLanguage||"";
     document.getElementById("fLastVisit").value=cleanDate(h.HouseLastVisitDate);
-    document.getElementById("fVerified").value=h.HouseVerifiedOnMaps||"";
+    setVerified(h.HouseVerifiedOnMaps||"");
     document.getElementById("fGPS").value=h.HouseGPSCoordinates||"";
     document.getElementById("fNotes").value=h.HouseNotes||"";
     document.getElementById("fPersonal").value=h.HousePersonalNotes||"";
@@ -988,7 +1000,8 @@ function openForm(h){
     document.getElementById("tmFormTitle").textContent="Add House";
     document.getElementById("tmDeleteBtn").style.display="none";
     document.getElementById("tmItemID").value="";
-    ["fAddr","fCity","fZip","fTerrNum","fAssigned","fLang","fLastVisit","fVerified","fGPS","fNotes","fPersonal","fV1","fV2","fV3","fV4","fV5"].forEach(function(id){document.getElementById(id).value="";});
+    ["fAddr","fCity","fZip","fTerrNum","fAssigned","fLang","fLastVisit","fGPS","fNotes","fPersonal","fV1","fV2","fV3","fV4","fV5"].forEach(function(id){document.getElementById(id).value="";});
+    setVerified(""); // clears any ad-hoc option left by the previously edited house
     document.getElementById("fState").value="CA";
   }
   document.getElementById("tmFormOverlay").classList.add("open");
