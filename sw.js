@@ -2,7 +2,7 @@
    Lives at the GitHub Pages project subpath, so its scope is /territory-manager/.
    Bump CACHE_VERSION on every deploy that changes the shell. */
 
-const CACHE_VERSION = 'v6';
+const CACHE_VERSION = 'v7';
 const SHELL_CACHE = `tm-shell-${CACHE_VERSION}`;
 const VENDOR_CACHE = `tm-vendor-${CACHE_VERSION}`;
 const TILE_CACHE = 'tm-tiles-v1'; // survives shell upgrades; tiles never go stale
@@ -17,11 +17,17 @@ const VENDOR = [
   'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 ];
 
+// The page itself is non-negotiable: without it there is no offline app at all.
+const CRITICAL = './index.html';
+
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
     const shell = await caches.open(SHELL_CACHE);
-    // Individually, so one failure cannot abort the whole install.
-    await Promise.all(SHELL.map(u => shell.add(u).catch(() => {})));
+    // Let this reject. If the page cannot be cached, the install MUST fail so
+    // the previous worker and its caches stay in place — otherwise activate
+    // would delete a working offline copy and replace it with nothing.
+    await shell.add(CRITICAL);
+    await Promise.all(SHELL.filter(u => u !== CRITICAL).map(u => shell.add(u).catch(() => {})));
     const vendor = await caches.open(VENDOR_CACHE);
     await Promise.all(VENDOR.map(u => vendor.add(u).catch(() => {})));
   })());
@@ -29,9 +35,14 @@ self.addEventListener('install', event => {
 
 self.addEventListener('activate', event => {
   event.waitUntil((async () => {
-    const keep = new Set([SHELL_CACHE, VENDOR_CACHE, TILE_CACHE]);
-    const names = await caches.keys();
-    await Promise.all(names.map(n => (keep.has(n) ? null : caches.delete(n))));
+    // Only discard the old caches once this version's page is genuinely cached.
+    const shell = await caches.open(SHELL_CACHE);
+    const ok = await shell.match(CRITICAL);
+    if (ok) {
+      const keep = new Set([SHELL_CACHE, VENDOR_CACHE, TILE_CACHE]);
+      const names = await caches.keys();
+      await Promise.all(names.map(n => (keep.has(n) ? null : caches.delete(n))));
+    }
     await self.clients.claim();
   })());
 });
@@ -42,7 +53,13 @@ self.addEventListener('message', event => {
 
 /* Keep the tile cache from growing without bound. Oldest-inserted first, which
    is a good enough proxy for least-recently-used here. */
+/* Counting every key on every tile request meant a full cache scan per tile,
+   which gets slower exactly as the cache fills and panning matters most. Track
+   writes and scan only occasionally. */
+let tileWrites = 0;
 async function trimTiles() {
+  if (++tileWrites < 50) return;
+  tileWrites = 0;
   const cache = await caches.open(TILE_CACHE);
   const keys = await cache.keys();
   if (keys.length <= TILE_LIMIT) return;
@@ -54,8 +71,11 @@ async function cacheFirst(request, cacheName) {
   const hit = await cache.match(request);
   if (hit) return hit;
   const res = await fetch(request);
-  // Opaque responses (no-cors) still cache and still render; we just cannot inspect them.
-  if (res && (res.ok || res.type === 'opaque')) cache.put(request, res.clone()).catch(() => {});
+  // Only cache real successes. Both OSM tiles and unpkg send CORS headers, so a
+  // response here should never be opaque — and an opaque one cannot be checked,
+  // meaning a 404 or a captive-portal page would be cached as if it were a tile
+  // and served forever from a cache that is never versioned.
+  if (res && res.ok && res.type !== 'opaque') cache.put(request, res.clone()).catch(() => {});
   return res;
 }
 

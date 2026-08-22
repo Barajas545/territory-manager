@@ -87,12 +87,25 @@ function unionLog(existingStr, incomingStr) {
 
 /* A record predating the visit log has history only in the five slot columns.
    Seed a log from them once, so the first append does not appear to erase them. */
+/* Seed ids must be derived from the slot's CONTENT, not just its position.
+   With a positional id, a device holding a stale copy of the row re-seeds
+   'legacy2' with the old text and the union overwrites an edit made elsewhere.
+   Keyed by content, a stale re-seed simply produces a different entry — a
+   duplicate is recoverable, an overwritten note is not.
+   The client computes this identically, or every sync would duplicate. */
+function legacyId(i, text) {
+  const s = String(text || '');
+  let h = 0;
+  for (let k = 0; k < s.length; k++) h = (h * 31 + s.charCodeAt(k)) | 0;
+  return 'lg' + (i + 1) + '-' + (h >>> 0).toString(36);
+}
+
 function seedLog(rec) {
   const existing = parseArr(rec.HouseVisitLog);
   if (existing.length) return rec.HouseVisitLog;
   const seeded = [];
   DERIVED_SLOTS.forEach((f, i) => {
-    if (rec[f]) seeded.push({ i: 'legacy' + (i + 1), d: rec.HouseLastVisitDate || '', t: rec[f] });
+    if (rec[f]) seeded.push({ i: legacyId(i, rec[f]), d: rec.HouseLastVisitDate || '', t: rec[f] });
   });
   return seeded.length ? JSON.stringify(seeded) : '';
 }

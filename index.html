@@ -387,9 +387,12 @@ input,textarea,select{-webkit-appearance:none;appearance:none;}
 }
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 #toast.bad{background:var(--bad);color:#fff;}
+/* Top banner, not bottom. At the bottom it sat over the FAB and tab bar, so a
+   tap meant for "+ Add" reloaded the app. z-index is below sheets (101) so it
+   can never cover an open sheet either. */
 #updateBar{
-  position:fixed;left:12px;right:12px;bottom:calc(var(--tabbar-h) + var(--safe-b) + 12px);
-  z-index:290;display:none;align-items:center;gap:10px;padding:12px 14px;
+  position:fixed;left:10px;right:10px;top:calc(var(--safe-t) + 10px);
+  z-index:95;display:none;align-items:center;gap:10px;padding:11px 14px;
   border-radius:var(--r-md);background:var(--brand);color:var(--brand-ink);
   box-shadow:var(--shadow-2);font-size:14px;font-weight:650;
 }
@@ -621,7 +624,7 @@ input,textarea,select{-webkit-appearance:none;appearance:none;}
 
 /* ═══ CONFIG ═══ */
 var API="https://territory-manager-silk.vercel.app/api/territory";
-var APP_VERSION="2.0.0";
+var APP_VERSION="2.0.1";
 
 /* ═══════════════════════════════════════════════════════════════════════
    OFFLINE DATA LAYER
@@ -647,30 +650,52 @@ var DB_NAME = 'territory-manager', DB_VER = 1;
 var S_MIRROR = 'mirror', S_PENDING = 'pending', S_META = 'meta';
 var _db = null;
 
+var _dbPromise = null;
+
 function dbOpen() {
   if (_db) return Promise.resolve(_db);
-  return new Promise(function (resolve, reject) {
-    var req = indexedDB.open(DB_NAME, DB_VER);
+  // Cache the promise, not just the result: two callers racing at boot would
+  // otherwise each open their own connection and leak one forever.
+  if (_dbPromise) return _dbPromise;
+  _dbPromise = new Promise(function (resolve, reject) {
+    if (!self.indexedDB) { reject(new Error('IndexedDB is unavailable (private browsing?)')); return; }
+    var req;
+    try { req = indexedDB.open(DB_NAME, DB_VER); }
+    catch (e) { reject(e); return; }
     req.onupgradeneeded = function (e) {
       var db = e.target.result;
       if (!db.objectStoreNames.contains(S_MIRROR)) db.createObjectStore(S_MIRROR, { keyPath: 'id' });
       if (!db.objectStoreNames.contains(S_PENDING)) db.createObjectStore(S_PENDING, { keyPath: 'id' });
       if (!db.objectStoreNames.contains(S_META)) db.createObjectStore(S_META, { keyPath: 'k' });
     };
-    req.onsuccess = function () { _db = req.result; resolve(_db); };
-    req.onerror = function () { reject(req.error); };
+    req.onsuccess = function () {
+      _db = req.result;
+      // Another tab upgrading must not leave this connection wedged.
+      _db.onversionchange = function () { try { _db.close(); } catch (e) {} _db = null; _dbPromise = null; };
+      resolve(_db);
+    };
+    req.onerror = function () { reject(req.error || new Error('IndexedDB open failed')); };
+    req.onblocked = function () { reject(new Error('IndexedDB blocked by another tab')); };
   });
+  _dbPromise.catch(function () { _dbPromise = null; }); // let a later attempt retry
+  return _dbPromise;
 }
 
 function tx(store, mode, fn) {
   return dbOpen().then(function (db) {
     return new Promise(function (resolve, reject) {
-      var t = db.transaction(store, mode);
-      var s = t.objectStore(store);
-      var out = fn(s);
+      var t, s, out, reqErr = null;
+      try { t = db.transaction(store, mode); s = t.objectStore(store); out = fn(s); }
+      catch (e) { reject(e); return; }
+      // A failing *request* surfaces its error on the request, not the
+      // transaction — t.error is null there. Rejecting with null made every
+      // catch block throw on e.message, so real failures vanished.
+      if (out && typeof out === 'object' && 'onerror' in out) {
+        out.onerror = function (ev) { reqErr = out.error; if (ev && ev.stopPropagation) ev.stopPropagation(); };
+      }
       t.oncomplete = function () { resolve(out && out.result !== undefined ? out.result : out); };
-      t.onerror = function () { reject(t.error); };
-      t.onabort = function () { reject(t.error); };
+      t.onerror = function () { reject(t.error || reqErr || new Error('IndexedDB transaction failed')); };
+      t.onabort = function () { reject(t.error || reqErr || new Error('IndexedDB transaction aborted')); };
     });
   });
 }
@@ -747,8 +772,11 @@ function localCreate(rec) {
 
 function localDelete(id) {
   var p = pending[id];
-  // Created offline and never synced: the server never heard of it, so just forget it.
-  if (p && p.created && !mirror[id]) {
+  // Created offline and never sent: the server has never heard of it, so drop
+  // it outright. But NOT while its create is mid-flight — the response would
+  // land afterwards, put it in the mirror, and resurrect it with no pending
+  // delete to remove it again.
+  if (p && p.created && !mirror[id] && !inFlightIds[id]) {
     delete pending[id];
     return idb.del(S_PENDING, id);
   }
@@ -759,6 +787,7 @@ function localDelete(id) {
 /* ── sync ────────────────────────────────────────────────────────────── */
 var syncing = false;
 var lastSyncError = null;
+var inFlightIds = {}; // ids whose create/update is currently being sent
 
 function loadLocal() {
   return Promise.all([idb.all(S_MIRROR), idb.all(S_PENDING)]).then(function (r) {
@@ -779,8 +808,10 @@ function sync(opts) {
   // Snapshot exactly what we are sending, so edits made *during* the request
   // are not mistaken for synced and dropped.
   var sent = { creates: [], updates: [], deletes: [], snapshot: {} };
+  inFlightIds = {};
   Object.keys(pending).forEach(function (id) {
     var p = pending[id];
+    inFlightIds[id] = true;
     sent.snapshot[id] = JSON.parse(JSON.stringify(p));
     if (p.deleted) { sent.deletes.push(id); return; }
     if (p.created) { sent.creates.push(Object.assign({ id: id }, p.fields)); return; }
@@ -843,7 +874,7 @@ function sync(opts) {
     // Offline or server error: pending is untouched and still on disk. Nothing lost.
     lastSyncError = e.message;
     return { ok: false, offline: !navigator.onLine || /Failed to fetch|NetworkError|Load failed/i.test(e.message), error: e.message };
-  }).then(function (r) { syncing = false; return r; });
+  }).then(function (r) { syncing = false; inFlightIds = {}; return r; });
 }
 
 
@@ -851,7 +882,7 @@ function sync(opts) {
 var records=[],view=[],filter="all",searchTerm="",terrFilter="all";
 var map=null,markerMap={},mapReady=false;
 var curId=null,curSlot=null,curOutcome=null;
-var offlineMode=false, deferredInstall=null;
+var offlineMode=false, deferredInstall=null, storageBroken=false;
 
 /* ═══ HELPERS ═══ */
 function $(s){return document.querySelector(s);}
@@ -919,13 +950,20 @@ function deriveSlotsLocal(changes,logArr){
 /* A record created before the visit log kept its history only in the slot
    columns. Seed the log from them once so the first append does not look
    like it erased them. */
+/* Must match legacyId() in api/territory.js exactly, or the union merge would
+   see two ids for the same visit and duplicate it on every sync. */
+function legacyId(i,text){
+  var s=String(text||""),h=0;
+  for(var k=0;k<s.length;k++)h=(h*31+s.charCodeAt(k))|0;
+  return "lg"+(i+1)+"-"+(h>>>0).toString(36);
+}
 function seedLogLocal(h){
   var log=parseLog(h.HouseVisitLog);
   if(log.length)return log;
   var seeded=[];
   for(var n=1;n<=5;n++){
     var v=h["HouseResutsOnVisit"+n];
-    if(v)seeded.push({i:"legacy"+n,d:h.HouseLastVisitDate||"",t:v});
+    if(v)seeded.push({i:legacyId(n-1,v),d:h.HouseLastVisitDate||"",t:v});
   }
   return seeded;
 }
@@ -962,6 +1000,9 @@ function extractApt(addr){
 function hasApt(addr){return!!extractApt(addr);}
 
 function generateTerritoryPDF(terrNum,houses){
+  if(!window.jspdf||!window.jspdf.jsPDF){
+    toast("PDF export needs to load once with a signal",true);return;
+  }
   var jsPDF=window.jspdf.jsPDF;
   var pw=215.9,ph=279.4;
   var ml=6,mt=14;
@@ -1332,6 +1373,10 @@ function openSheet(sel){
 function closeSheet(sel){
   var s=$(sel);if(!s)return;
   s.classList.remove("open");s.style.transform="";
+  // A closed composer is no longer owned, so its leftover text is never
+  // re-offered as a recovered draft.
+  if(sel==="#sh-rv")delete draftOwner.rvNew;
+  if(sel==="#sh-log")delete draftOwner.lNote;
   openSheets=openSheets.filter(function(x){return x!==sel;});
   if(!openSheets.length)$("#scrim").classList.remove("open");
 }
@@ -1425,6 +1470,7 @@ function openLog(id,slot){
   $("#lTitle").textContent=h.HouseAddress||"Log visit";
   $("#lSub").textContent=slot?("Visit "+slot):"Pick what happened";
   $("#lNote").value=slot?(h["HouseResutsOnVisit"+slot]||""):"";
+  ownDraft("lNote",id);
   $("#outGrid").innerHTML=OUTCOMES.map(function(o){
     return '<button class="out" data-k="'+esc(o.k)+'"'+(o.rv?' data-rv="1"':'')+' aria-pressed="false">'+
       '<span class="oi">'+o.i+'</span><span class="ol">'+esc(o.l)+'</span></button>';
@@ -1492,36 +1538,55 @@ function drawRV(){
         '<button class="tl-del" data-act="rvdel" data-eid="'+esc(x.i||"")+'">Delete</button></div>';
     }).join("")+'</div>'
     :'<div class="empty" style="padding:30px 10px"><span class="big">📖</span>No notes yet.</div>');
+  ownDraft("rvNew",curId);
 
-  $("#rvAdd").addEventListener("click",function(){
-    var t=$("#rvNew").value.trim();
+  /* Every mutation here must await the write before redrawing. Redrawing
+     synchronously reads the pre-write `records` array, so the note the user
+     just typed disappears — and a second tap would then build its payload
+     from that stale array and destroy the first note for real. */
+  var addBtn=$("#rvAdd");
+  addBtn.addEventListener("click",function(){
+    var box=$("#rvNew"), t=box.value.trim();
     if(!t){toast("Write a note first",true);return;}
+    if(addBtn.disabled)return;
+    addBtn.disabled=true;box.disabled=true;
     var cur=parseLog(byId(curId).HouseReturnVisits);
     cur.push({i:entryId(),d:todayStr(),n:t});
-    saveChanges(curId,{HouseReturnVisits:JSON.stringify(cur),HouseLastVisitDate:todayStr()},"Return visit saved ✓");
-    drawRV();
+    saveChanges(curId,{HouseReturnVisits:JSON.stringify(cur),HouseLastVisitDate:todayStr()},"Return visit saved ✓")
+      .then(function(ok){
+        clearDraft();          // it is committed now; do not offer it back later
+        if(ok)drawRV();
+        else{addBtn.disabled=false;box.disabled=false;}
+      });
   });
   $("#rBody").querySelectorAll('[data-act="rvdel"]').forEach(function(b){
     b.addEventListener("click",function(){
       var eid=b.dataset.eid;
+      if(b.disabled)return;
+      if(!confirm("Delete this return-visit note?\n\nThis cannot be undone."))return;
+      b.disabled=true;
       // Tombstone rather than splice: a removed entry would be restored by the
       // next sync from another device that still has it.
       var stored=parseLog(byId(curId).HouseReturnVisits);
       var hit=false;
       stored.forEach(function(e){if(String(e.i)===eid){e.x=1;hit=true;}});
-      if(!hit)return;
-      saveChanges(curId,{HouseReturnVisits:JSON.stringify(stored)},"Note deleted");
-      drawRV();
+      if(!hit){b.disabled=false;return;}
+      saveChanges(curId,{HouseReturnVisits:JSON.stringify(stored)},"Note deleted")
+        .then(function(){drawRV();});
     });
   });
 }
 
 /* ═══ FORM ═══ */
+/* Plain columns the form owns outright. The five visit slots are deliberately
+   NOT here: the server derives them from HouseVisitLog and discards anything a
+   client sends for them, so writing them directly would look saved and then be
+   silently reverted by the next sync. They are translated into log edits in
+   #fSave instead. */
 var FORM=[["fAddr","HouseAddress"],["fCity","HouseCity"],["fState","HouseState"],["fZip","HouseZIP"],
   ["fTerr","HouseTerritoryNumber"],["fAssigned","HouseTerritoryAssingnedTo"],["fLang","HouseLanguage"],
-  ["fGPS","HouseGPSCoordinates"],["fNotes","HouseNotes"],["fPersonal","HousePersonalNotes"],
-  ["fV1","HouseResutsOnVisit1"],["fV2","HouseResutsOnVisit2"],["fV3","HouseResutsOnVisit3"],
-  ["fV4","HouseResutsOnVisit4"],["fV5","HouseResutsOnVisit5"]];
+  ["fGPS","HouseGPSCoordinates"],["fNotes","HouseNotes"],["fPersonal","HousePersonalNotes"]];
+var FORM_SLOTS=["fV1","fV2","fV3","fV4","fV5"];
 
 function setVerified(val){
   var sel=$("#fVerified"),i;
@@ -1561,20 +1626,63 @@ $("#fGPSBtn").addEventListener("click",function(){
   {enableHighAccuracy:true,timeout:15000});
 });
 
+/* Translate the five visit inputs into edits on the append-only log, which is
+   the actual source of truth. Editing an existing slot rewrites that entry's
+   text; typing into an empty slot appends a new entry. */
+function slotEditsToLog(h){
+  var log=seedLogLocal(h);
+  var live=log.filter(function(e){return e&&!e.x;})
+    .sort(function(a,b){return String(a.d||"").localeCompare(String(b.d||""));});
+  var shown=live.slice(-5);
+  var touched=false;
+  FORM_SLOTS.forEach(function(fid,i){
+    var val=$("#"+fid).value.trim();
+    var cur=shown[i];
+    var was=cur?String(cur.t||""):"";
+    if(val===was)return;
+    touched=true;
+    if(cur){
+      if(val)cur.t=val;
+      else cur.x=1;                       // cleared -> tombstone that visit
+    }else if(val){
+      log.push({i:entryId(),d:$("#fLastVisit").value||todayStr(),t:val});
+    }
+  });
+  return touched?log:null;
+}
+
 $("#fSave").addEventListener("click",function(){
   var id=$("#fId").value;
   var data={};
   FORM.forEach(function(p){data[p[1]]=$("#"+p[0]).value;});
-  data.HouseLastVisitDate=$("#fLastVisit").value||"";
   data.HouseVerifiedOnMaps=$("#fVerified").value;
   if(!data.HouseAddress.trim()){toast("Address is required",true);return;}
 
-  if(id){saveChanges(id,data,"House saved ✓");closeSheet("#sh-form");}
-  else{
-    localCreate(data).then(function(newId){
-      afterLocalChange();toast("House added ✓");closeSheet("#sh-form");
-      scheduleSync();
+  var btn=this;btn.disabled=true;
+  if(id){
+    var h=byId(id)||{};
+    var log=slotEditsToLog(h);
+    if(log){
+      data.HouseVisitLog=JSON.stringify(log);
+      deriveSlotsLocal(data,log);         // keeps the optimistic view honest
+    }
+    // The server recomputes the date from the log, so only send a hand-typed
+    // date when there is no log for it to override.
+    var typed=$("#fLastVisit").value||"";
+    if(typed!==cleanDate(h.HouseLastVisitDate)&&!(log||[]).some(function(e){return !e.x;}))
+      data.HouseLastVisitDate=typed;
+    saveChanges(id,data,"House saved ✓").then(function(){
+      btn.disabled=false;closeSheet("#sh-form");
     });
+  }else{
+    data.HouseLastVisitDate=$("#fLastVisit").value||"";
+    var newLog=slotEditsToLog({});
+    if(newLog){data.HouseVisitLog=JSON.stringify(newLog);deriveSlotsLocal(data,newLog);}
+    localCreate(data).then(function(){
+      afterLocalChange();toast("House added ✓");closeSheet("#sh-form");scheduleSync();
+    }).catch(function(e){
+      toast("Could not save on this phone: "+(e&&e.message||e),true);
+    }).then(function(){btn.disabled=false;});
   }
 });
 
@@ -1584,6 +1692,9 @@ $("#fDelete").addEventListener("click",function(){
   if(!confirm("Delete "+(h&&h.HouseAddress?h.HouseAddress:"this house")+"?\n\nThis cannot be undone."))return;
   localDelete(id).then(function(){
     afterLocalChange();toast("House deleted");closeSheet("#sh-form");scheduleSync();
+  }).catch(function(e){
+    toast("Could not delete on this phone: "+(e&&e.message||e),true);
+    console.error("local delete failed",e);
   });
 });
 
@@ -1591,13 +1702,22 @@ $("#fDelete").addEventListener("click",function(){
    Every edit lands in IndexedDB first and the UI updates immediately.
    The network is a background consequence, so a write can never fail
    in front of the user. */
+/* Returns a promise that settles only after the write is durably in
+   IndexedDB. Callers that redraw MUST await it, or they render from a
+   `records` array that has not been rebuilt yet and the user watches their
+   note vanish. */
 function saveChanges(id,changes,msg){
-  localUpdate(id,changes).then(function(){
+  return localUpdate(id,changes).then(function(){
     afterLocalChange();
     if(msg)toast(msg);
     haptic();
     scheduleSync();
-  }).catch(function(e){toast("Could not save locally: "+e.message,true);});
+    return true;
+  }).catch(function(e){
+    toast("Could not save on this phone: "+(e&&e.message||e),true);
+    console.error("local save failed",e);
+    return false;
+  });
 }
 function afterLocalChange(){
   records=buildRecords();
@@ -1616,7 +1736,9 @@ function doSync(manual){
   if(offlineMode&&!manual){updateSyncUI();return Promise.resolve();}
   updateSyncUI("syncing");
   return sync().then(function(r){
-    if(r.busy)return;
+    // A sync was already in flight. Our changes were not necessarily included
+    // in it, so ask again shortly rather than dropping this attempt.
+    if(r.busy){clearTimeout(syncTimer);syncTimer=setTimeout(function(){doSync(manual);},1500);return;}
     if(r.ok){
       records=buildRecords();
       renderHouses();renderRV();refreshMapPins();buildTerrSub();
@@ -1728,6 +1850,13 @@ function pinIcon(h){
 }
 function initMap(){
   if(mapReady)return;
+  if(typeof L==="undefined"){
+    // Leaflet never loaded (first run with no signal, or a blocked CDN).
+    document.getElementById("map").innerHTML='<div class="empty"><span class="big">\u{1F5FA}\u{FE0F}</span>'+
+      'The map needs to load once with a signal.<br><span style="font-size:13.5px">'+
+      'Your houses and notes still work offline \u2014 use the Houses tab.</span></div>';
+    return;
+  }
   map=L.map("map",{zoomControl:false,attributionControl:false}).setView([35.4873,-120.6700],14);
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19}).addTo(map);
   L.control.zoom({position:"topright"}).addTo(map);
@@ -1907,8 +2036,24 @@ function boot(){
     if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(function(){});
     return doSync(false);
   }).catch(function(e){
-    toast("Could not open local storage: "+e.message,true);
-    console.error(e);
+    // IndexedDB can be unavailable outright (some private-browsing modes).
+    // Fall back to read-only network data rather than leaving the user staring
+    // at a loading skeleton forever.
+    console.error("local store unavailable",e);
+    storageBroken=true;
+    fetch(API).then(function(r){
+      if(!r.ok)throw new Error("HTTP "+r.status);
+      return r.json();
+    }).then(function(list){
+      mirror={};list.forEach(function(rec){mirror[rec.id]=rec;});
+      records=buildRecords();
+      renderHouses();renderRV();buildTerrSub();updateSyncUI();
+      toast("Offline saving unavailable on this browser — changes need signal",true);
+    }).catch(function(){
+      $("#houseList").innerHTML='<div class="empty"><span class="big">⚠️</span>'+
+        'Could not load your houses.<br><span style="font-size:13.5px">'+
+        'This browser is blocking offline storage, and there is no signal right now.</span></div>';
+    });
   });
 
   registerSW();
@@ -1923,39 +2068,74 @@ document.addEventListener("visibilitychange",function(){
 /* iOS kills backgrounded tabs without waiting for IndexedDB to flush, and a
    half-typed note lives only in the DOM. localStorage writes synchronously
    during pagehide, so mirror open composers there and offer them back. */
-var DRAFT_KEY="tm_draft";
-function stashDrafts(){
+/* Each composer records which house it belongs to when it is OPENED. Reading
+   curId at stash time instead would file a leftover note under whatever house
+   the user happens to be looking at when the phone locks. */
+var DRAFT_KEY="tm_drafts";
+var draftOwner={};                    // composer element id -> house id
+function ownDraft(el,id){draftOwner[el]=id;}
+function clearDraft(){
+  var box=document.getElementById("rvNew");
+  if(box)box.value="";
+  delete draftOwner.rvNew;
+  writeDrafts(readDrafts().filter(function(d){return d.el!=="rvNew";}));
+}
+function readDrafts(){
+  try{var a=JSON.parse(localStorage.getItem(DRAFT_KEY)||"[]");return Array.isArray(a)?a:[];}
+  catch(e){return[];}
+}
+function writeDrafts(list){
   try{
-    var d={};
-    var rv=document.getElementById("rvNew"),ln=document.getElementById("lNote");
-    if(rv&&rv.value.trim())d.rv={id:curId,t:rv.value};
-    if(ln&&ln.value.trim())d.log={id:curId,t:ln.value};
-    if(d.rv||d.log)localStorage.setItem(DRAFT_KEY,JSON.stringify(d));
+    if(list.length)localStorage.setItem(DRAFT_KEY,JSON.stringify(list));
     else localStorage.removeItem(DRAFT_KEY);
   }catch(e){}
 }
-function restoreDrafts(){
-  var raw;try{raw=localStorage.getItem(DRAFT_KEY);}catch(e){return;}
-  if(!raw)return;
-  var d;try{d=JSON.parse(raw);}catch(e){localStorage.removeItem(DRAFT_KEY);return;}
-  var entry=d.rv||d.log;if(!entry||!entry.id)return;
-  var h=byId(entry.id);if(!h){localStorage.removeItem(DRAFT_KEY);return;}
-  $("#pTitle").textContent="Unsaved note recovered";
-  $("#pSub").textContent=h.HouseAddress||"";
-  $("#pBody").innerHTML='<div class="note-box" style="margin-bottom:12px">'+esc(entry.t)+'</div>'+
-    '<div style="display:flex;gap:9px">'+
-      '<button class="btn btn-s" id="drDiscard">Discard</button>'+
-      '<button class="btn btn-p" id="drKeep">Save as return visit</button></div>';
-  $("#drDiscard").addEventListener("click",function(){
-    try{localStorage.removeItem(DRAFT_KEY);}catch(e){}
-    closeSheet("#sh-pick");
+function stashDrafts(){
+  var out=[];
+  [["rvNew","return visit"],["lNote","visit note"]].forEach(function(p){
+    var el=document.getElementById(p[0]);
+    var owner=draftOwner[p[0]];
+    // Only stash a composer that is actually open and owned. A stale value left
+    // in a hidden sheet has already been saved or abandoned.
+    if(!el||!owner||!el.value.trim())return;
+    if(!isSheetOpen(p[0]==="rvNew"?"#sh-rv":"#sh-log"))return;
+    out.push({el:p[0],id:owner,t:el.value,kind:p[1]});
   });
-  $("#drKeep").addEventListener("click",function(){
-    var cur=parseLog(byId(entry.id).HouseReturnVisits);
-    cur.push({i:entryId(),d:todayStr(),n:entry.t});
-    saveChanges(entry.id,{HouseReturnVisits:JSON.stringify(cur)},"Note recovered ✓");
-    try{localStorage.removeItem(DRAFT_KEY);}catch(e){}
-    closeSheet("#sh-pick");
+  writeDrafts(out);
+}
+function isSheetOpen(sel){var s=$(sel);return !!(s&&s.classList.contains("open"));}
+
+function restoreDrafts(){
+  var list=readDrafts().filter(function(d){return d&&d.id&&d.t&&byId(d.id);});
+  if(!list.length){writeDrafts([]);return;}
+  $("#pTitle").textContent=list.length>1?"Unsaved notes recovered":"Unsaved note recovered";
+  $("#pSub").textContent=list.length>1?(list.length+" notes were still being typed"):"";
+  $("#pBody").innerHTML=list.map(function(d,i){
+    var h=byId(d.id);
+    return '<div style="margin-bottom:16px">'+
+      '<div class="lbl" style="margin-top:0">'+esc(h.HouseAddress||"")+' · '+esc(d.kind)+'</div>'+
+      '<div class="note-box" style="margin-bottom:9px">'+esc(d.t)+'</div>'+
+      '<div style="display:flex;gap:9px">'+
+        '<button class="btn btn-s" data-dr="skip" data-i="'+i+'">Discard</button>'+
+        '<button class="btn btn-p" data-dr="keep" data-i="'+i+'">Save as return visit</button>'+
+      '</div></div>';
+  }).join("");
+  $("#pBody").querySelectorAll("[data-dr]").forEach(function(b){
+    b.addEventListener("click",function(){
+      var i=parseInt(b.dataset.i,10),d=list[i];
+      if(!d)return;
+      var done=function(){
+        // Remove only this one; any other recovered note stays on offer.
+        writeDrafts(readDrafts().filter(function(x){return !(x.el===d.el&&x.id===d.id&&x.t===d.t);}));
+        list[i]=null;
+        b.closest("div[style]").parentNode.removeChild(b.closest("div[style]"));
+        if(!list.filter(Boolean).length)closeSheet("#sh-pick");
+      };
+      if(b.dataset.dr==="skip"){done();return;}
+      var cur=parseLog(byId(d.id).HouseReturnVisits);
+      cur.push({i:entryId(),d:todayStr(),n:d.t});
+      saveChanges(d.id,{HouseReturnVisits:JSON.stringify(cur)},"Note recovered ✓").then(done);
+    });
   });
   openSheet("#sh-pick");
 }
