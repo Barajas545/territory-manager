@@ -12,11 +12,16 @@
 
    Underscore-prefixed, so Vercel treats it as a module rather than a route. */
 
-const TENANT = process.env.SP_TENANT_ID;
-const CLIENT_ID = process.env.SP_CLIENT_ID;
-const CLIENT_SECRET = process.env.SP_CLIENT_SECRET;
-const SITE_URL = process.env.SP_SITE_URL;   // https://contoso.sharepoint.com/sites/Territory
-const SITE_ID_ENV = process.env.SP_SITE_ID; // optional, skips the lookup
+/* Trimmed on the way in. Copying an id out of the Azure portal very easily
+   picks up a trailing newline, and an untrimmed one corrupts the sign-in URL
+   or the site path with an error that points nowhere near the real cause. */
+const env = k => String(process.env[k] || '').trim();
+
+const TENANT = env('SP_TENANT_ID');
+const CLIENT_ID = env('SP_CLIENT_ID');
+const CLIENT_SECRET = env('SP_CLIENT_SECRET');
+const SITE_URL = env('SP_SITE_URL');   // https://contoso.sharepoint.com/sites/Territory
+const SITE_ID_ENV = env('SP_SITE_ID'); // optional, skips the lookup
 
 const GRAPH = 'https://graph.microsoft.com/v1.0';
 
