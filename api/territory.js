@@ -1,5 +1,6 @@
 const { google } = require('googleapis');
 const { claimsFrom } = require('./_auth');
+const AS = require('./_assign');
 
 const SHEET_ID = process.env.GOOGLE_SHEET_ID;
 const SHEET_NAME = 'Houses';
@@ -223,7 +224,8 @@ module.exports = async (req, res) => {
      about them; an open endpoint meant anyone holding the URL could read the
      lot. Auth actions live on /api/team, which stays reachable so a signed-out
      app can still get back in. */
-  if (!claimsFrom(req)) {
+  const claims = claimsFrom(req);
+  if (!claims) {
     return res.status(401).json({ error: 'Sign in to use this territory' });
   }
 
@@ -232,10 +234,26 @@ module.exports = async (req, res) => {
     const sheets = google.sheets({ version: 'v4', auth });
     const now = new Date().toISOString();
 
+    /* A guest token carries a work packet rather than an account. It may only
+       ever see and touch the specific houses it was handed, and only while the
+       packet is live — so scope is resolved here, once, before any handler
+       runs, rather than trusted to each branch remembering to check. */
+    let scope = null;
+    if (claims.g) {
+      const packet = await AS.loadPacket(sheets, claims.g, Date.now());
+      if (!packet.state.ok) return res.status(403).json({ error: packet.state.reason });
+      scope = new Set(AS.houseIdList(packet.assignment));
+      if (req.method === 'DELETE' || req.method === 'POST') {
+        return res.status(403).json({ error: 'Guests can record visits, not add or remove houses' });
+      }
+    }
+    const inScope = id => !scope || scope.has(id);
+
     /* ── GET ── */
     if (req.method === 'GET') {
       const { dataRows } = await readAll(sheets);
-      return res.json(dataRows.filter(r => r && r[0]).map(rowToRecord).filter(isLive));
+      const all = dataRows.filter(r => r && r[0]).map(rowToRecord).filter(isLive);
+      return res.json(scope ? all.filter(r => scope.has(r.id)) : all);
     }
 
     /* ── POST: create one ── */
@@ -258,6 +276,7 @@ module.exports = async (req, res) => {
     /* ── PATCH: update one ── */
     if (req.method === 'PATCH') {
       const body = await parseBody(req);
+      if (!inScope(body.id)) return res.status(403).json({ error: 'That house is not on your list' });
       const { dataRows, headerOffset } = await readAll(sheets);
       const idx = dataRows.findIndex(r => r && r[0] === body.id);
       if (idx === -1) return res.status(404).json({ error: 'Not found' });
@@ -304,9 +323,16 @@ module.exports = async (req, res) => {
        offline session uploads in one round trip. */
     if (req.method === 'PUT') {
       const body = await parseBody(req);
-      const creates = Array.isArray(body.creates) ? body.creates : [];
-      const updates = Array.isArray(body.updates) ? body.updates : [];
-      const deletes = Array.isArray(body.deletes) ? body.deletes.filter(x => typeof x === 'string') : [];
+      let creates = Array.isArray(body.creates) ? body.creates : [];
+      let updates = Array.isArray(body.updates) ? body.updates : [];
+      let deletes = Array.isArray(body.deletes) ? body.deletes.filter(x => typeof x === 'string') : [];
+      if (scope) {
+        // Silently drop what a guest may not touch instead of rejecting the
+        // whole batch: one stray id must not strand the visits they did record.
+        creates = [];
+        deletes = [];
+        updates = updates.filter(u => u && inScope(u.id));
+      }
 
       const { dataRows, headerOffset } = await readAll(sheets);
       const rowById = new Map();
@@ -378,7 +404,8 @@ module.exports = async (req, res) => {
       }
 
       const after = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: RANGE });
-      const records = (after.data.values || []).slice(1).filter(r => r && r[0]).map(rowToRecord).filter(isLive);
+      let records = (after.data.values || []).slice(1).filter(r => r && r[0]).map(rowToRecord).filter(isLive);
+      if (scope) records = records.filter(r => scope.has(r.id));
       return res.json({ ok: true, applied, conflicts, records, serverTime: now });
     }
 

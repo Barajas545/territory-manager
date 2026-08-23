@@ -10,6 +10,7 @@
 
 const crypto = require('crypto');
 const { google } = require('googleapis');
+const AS = require('./_assign');
 
 const SHEET_ID = process.env.GOOGLE_SHEET_ID;
 
@@ -19,10 +20,8 @@ const TABS = {
     cols: ['id','name','phone','email','role','passHash','passSalt','setupCode',
            'mustSetup','active','createdAt','updatedAt'],
   },
-  territories: {
-    name: 'Territories',
-    cols: ['name','ownerId','assigneeIds','updatedAt'],
-  },
+  territories: AS.TERR_TAB,
+  assignments: AS.ASSIGN_TAB,
   presence: {
     name: 'Presence',
     cols: ['userId','territory','lat','lng','acc','ts'],
@@ -244,11 +243,33 @@ module.exports = async (req, res) => {
     const claims = verify(bearer);
 
     async function currentUser() {
-      if (!claims) return null;
+      if (!claims || !claims.uid) return null;
       const users = await readTab(sheets, TABS.users);
       const u = users.find(x => x.id === claims.uid);
       return u && u.active !== '0' ? u : null;
     }
+    /* A guest is a real participant for the parts that matter in the field --
+       being visible on the map and being able to talk -- but is not a user and
+       owns nothing. Modelled as a synthetic identity rather than a row. */
+    async function currentActor() {
+      if (claims && claims.g) {
+        const packet = await AS.loadPacket(sheets, claims.g, now);
+        if (!packet.state.ok) { const e = new Error(packet.state.reason); e.code = 403; throw e; }
+        return {
+          id: 'g:' + packet.assignment.id,
+          name: packet.assignment.guestName || 'Guest',
+          role: 'guest',
+          territory: packet.assignment.territory,
+        };
+      }
+      const u = await currentUser();
+      return u ? { id: u.id, name: u.name, role: u.role || 'user', territory: null } : null;
+    }
+    const requireActor = async () => {
+      const a = await currentActor();
+      if (!a) { const e = new Error('Not signed in'); e.code = 401; throw e; }
+      return a;
+    };
     const requireUser = async () => {
       const u = await currentUser();
       if (!u) { const e = new Error('Not signed in'); e.code = 401; throw e; }
@@ -495,19 +516,197 @@ module.exports = async (req, res) => {
 
     /* Everyone the territory is shared with — owner plus assignees. */
     async function teamFor(territory) {
-      const terrs = await readTab(sheets, TABS.territories);
+      const [terrs, assigns] = await Promise.all([
+        readTab(sheets, TABS.territories), readTab(sheets, TABS.assignments),
+      ]);
       const t = terrs.find(x => x.name === territory);
       if (!t) return null;
       const ids = new Set(String(t.assigneeIds || '').split(',').filter(Boolean));
       if (t.ownerId) ids.add(t.ownerId);
+      // Anyone holding a live packet for this territory counts as present,
+      // account or not — they are the ones actually at the doors.
+      assigns.forEach(a => {
+        if (a.territory !== territory) return;
+        if (!AS.packetState(a, t, now).ok) return;
+        if (a.assigneeId) ids.add(a.assigneeId);
+        else ids.add('g:' + a.id);
+      });
       return ids;
+    }
+
+    /* ══ WORK PACKETS ══
+       The owner picks house numbers and hands them to one person for one
+       session. Someone with an account gets them in their own app; someone
+       without gets a QR code that opens a guest view limited to exactly
+       those houses, for exactly today. */
+
+    if (action === 'setTerritoryWorking') {
+      const me = await requireUser();
+      const name = String(body.territory || '').trim();
+      if (!name) return res.status(400).json({ error: 'Territory is required' });
+      const terrs = await readTab(sheets, TABS.territories);
+      const t = terrs.find(x => x.name === name);
+      if (t && t.ownerId && t.ownerId !== me.id && me.role !== 'admin')
+        return res.status(403).json({ error: 'Only the person this territory is assigned to can start it' });
+      const rec = {
+        name,
+        ownerId: t ? (t.ownerId || me.id) : me.id,
+        assigneeIds: t ? t.assigneeIds : '',
+        updatedAt: nowIso,
+        working: body.working ? '1' : '0',
+      };
+      if (t) await writeRow(sheets, TABS.territories, t._row, rec);
+      else await appendRow(sheets, TABS.territories, rec);
+      return res.json({ ok: true, working: rec.working === '1' });
+    }
+
+    if (action === 'createAssignment') {
+      const me = await requireUser();
+      const territory = String(body.territory || '').trim();
+      const houseIds = Array.isArray(body.houseIds)
+        ? body.houseIds.filter(x => typeof x === 'string' && x) : [];
+      if (!territory) return res.status(400).json({ error: 'Territory is required' });
+      if (!houseIds.length) return res.status(400).json({ error: 'Pick at least one house' });
+
+      const terrs = await readTab(sheets, TABS.territories);
+      const t = terrs.find(x => x.name === territory);
+      if (t && t.ownerId && t.ownerId !== me.id && me.role !== 'admin')
+        return res.status(403).json({ error: 'Only the person this territory is assigned to can hand out numbers' });
+
+      // Cap the lifetime server-side. A client asking for a year gets a day.
+      const asked = Number(body.expiresAt || 0);
+      const cap = now + AS.MAX_TTL_MS;
+      const expiresAt = asked && asked > now && asked < cap ? asked : cap;
+
+      const assigneeId = String(body.assigneeId || '').trim();
+      const guestName = String(body.guestName || '').trim();
+      if (!assigneeId && !guestName)
+        return res.status(400).json({ error: 'Name the person, or pick an account' });
+
+      const rec = {
+        id: AS.newId(), territory, ownerId: me.id,
+        assigneeId, guestName: assigneeId ? '' : guestName,
+        guestCode: assigneeId ? '' : AS.guestCode(),
+        houseIds: houseIds.join(','),
+        createdAt: nowIso, expiresAt: String(expiresAt), active: '1',
+      };
+      await appendRow(sheets, TABS.assignments, rec);
+
+      // Handing out numbers implies you are working the territory; not doing
+      // this silently produces packets that refuse to open.
+      const trec = {
+        name: territory, ownerId: t ? (t.ownerId || me.id) : me.id,
+        assigneeIds: t ? t.assigneeIds : '', updatedAt: nowIso, working: '1',
+      };
+      if (t) await writeRow(sheets, TABS.territories, t._row, trec);
+      else await appendRow(sheets, TABS.territories, trec);
+
+      return res.json({ ok: true, assignment: rec, guestCode: rec.guestCode, expiresAt });
+    }
+
+    if (action === 'listAssignments') {
+      const me = await requireUser();
+      const territory = String(body.territory || '').trim();
+      const [assigns, users, terrs] = await Promise.all([
+        readTab(sheets, TABS.assignments), readTab(sheets, TABS.users), readTab(sheets, TABS.territories),
+      ]);
+      const byId = {}; users.forEach(u => { byId[u.id] = publicUser(u); });
+      const t = terrs.find(x => x.name === territory);
+      const mine = assigns.filter(a =>
+        (!territory || a.territory === territory) &&
+        a.active !== '0' &&
+        Number(a.expiresAt || 0) > now &&
+        (a.ownerId === me.id || me.role === 'admin')
+      );
+      return res.json({
+        ok: true,
+        working: !!(t && t.working === '1'),
+        assignments: mine.map(a => ({
+          id: a.id, territory: a.territory,
+          assigneeId: a.assigneeId,
+          who: a.assigneeId ? ((byId[a.assigneeId] || {}).name || 'Someone') : a.guestName,
+          hasAccount: !!a.assigneeId,
+          guestCode: a.guestCode,
+          houseIds: AS.houseIdList(a),
+          expiresAt: Number(a.expiresAt || 0),
+        })),
+      });
+    }
+
+    /* What the signed-in helper sees: packets handed to them. */
+    if (action === 'myAssignments') {
+      const me = await requireUser();
+      const [assigns, terrs, users] = await Promise.all([
+        readTab(sheets, TABS.assignments), readTab(sheets, TABS.territories), readTab(sheets, TABS.users),
+      ]);
+      const byId = {}; users.forEach(u => { byId[u.id] = publicUser(u); });
+      const out = assigns.filter(a => a.assigneeId === me.id).map(a => {
+        const t = terrs.find(x => x.name === a.territory);
+        const st = AS.packetState(a, t, now);
+        return {
+          id: a.id, territory: a.territory, houseIds: AS.houseIdList(a),
+          from: (byId[a.ownerId] || {}).name || 'Someone',
+          expiresAt: Number(a.expiresAt || 0), usable: st.ok, reason: st.reason || '',
+        };
+      }).filter(a => a.usable);
+      return res.json({ ok: true, assignments: out });
+    }
+
+    if (action === 'revokeAssignment') {
+      const me = await requireUser();
+      const assigns = await readTab(sheets, TABS.assignments);
+      const a = assigns.find(x => x.id === String(body.id || ''));
+      if (!a) return res.status(404).json({ error: 'No such assignment' });
+      if (a.ownerId !== me.id && me.role !== 'admin')
+        return res.status(403).json({ error: 'Only the owner can withdraw this' });
+      await writeRow(sheets, TABS.assignments, a._row, Object.assign({}, a, { active: '0' }));
+      return res.json({ ok: true });
+    }
+
+    /* Guest entry point. Deliberately unauthenticated: the code IS the
+       credential, which is why it is single-purpose, scoped to a handful of
+       houses, and dies with the day. */
+    if (action === 'guestLogin') {
+      const code = String(body.code || '').trim().toUpperCase();
+      if (!code) return res.status(400).json({ error: 'No code' });
+      const [assigns, terrs, users] = await Promise.all([
+        readTab(sheets, TABS.assignments), readTab(sheets, TABS.territories), readTab(sheets, TABS.users),
+      ]);
+      const a = assigns.find(x => x.guestCode && x.guestCode === code);
+      const t = a ? terrs.find(x => x.name === a.territory) : null;
+      const st = AS.packetState(a, t, now);
+      if (!st.ok) return res.status(403).json({ error: st.reason });
+      const owner = users.find(u => u.id === a.ownerId);
+      return res.json({
+        ok: true,
+        token: sign({ g: a.id, exp: Math.min(Number(a.expiresAt), now + AS.MAX_TTL_MS) }),
+        guest: {
+          name: a.guestName, territory: a.territory,
+          from: owner ? owner.name : 'the territory holder',
+          houseIds: AS.houseIdList(a),
+          expiresAt: Number(a.expiresAt || 0),
+        },
+      });
+    }
+
+    /* Lets a guest app notice it has been cut off without waiting for a write. */
+    if (action === 'guestStatus') {
+      if (!claims || !claims.g) return res.status(401).json({ error: 'Not a guest session' });
+      const packet = await AS.loadPacket(sheets, claims.g, now);
+      if (!packet.state.ok) return res.status(403).json({ error: packet.state.reason });
+      return res.json({
+        ok: true,
+        territory: packet.assignment.territory,
+        houseIds: AS.houseIdList(packet.assignment),
+        expiresAt: Number(packet.assignment.expiresAt || 0),
+      });
     }
 
     /* ══ LIVE POSITION ══ */
 
     if (action === 'postPresence') {
-      const me = await requireUser();
-      const territory = String(body.territory || '').trim();
+      const me = await requireActor();
+      const territory = me.territory || String(body.territory || '').trim();
       const lat = Number(body.lat), lng = Number(body.lng);
       if (!territory || !isFinite(lat) || !isFinite(lng))
         return res.status(400).json({ error: 'territory, lat and lng are required' });
@@ -522,14 +721,15 @@ module.exports = async (req, res) => {
     }
 
     if (action === 'getPresence') {
-      const me = await requireUser();
-      const territory = String(body.territory || '').trim();
+      const me = await requireActor();
+      const territory = me.territory || String(body.territory || '').trim();
       const team = await teamFor(territory);
-      const [rows, users] = await Promise.all([
-        readTab(sheets, TABS.presence), readTab(sheets, TABS.users),
+      const [rows, users, assigns] = await Promise.all([
+        readTab(sheets, TABS.presence), readTab(sheets, TABS.users), readTab(sheets, TABS.assignments),
       ]);
       const byId = {};
       users.forEach(u => { byId[u.id] = publicUser(u); });
+      assigns.forEach(a => { byId['g:' + a.id] = { name: a.guestName || 'Guest' }; });
       const out = rows.filter(r =>
         r.territory === territory &&
         r.userId !== me.id &&
@@ -544,7 +744,7 @@ module.exports = async (req, res) => {
     }
 
     if (action === 'clearPresence') {
-      const me = await requireUser();
+      const me = await requireActor();
       const rows = await readTab(sheets, TABS.presence);
       const mine = rows.filter(r => r.userId === me.id).map(r => r._row);
       await deleteRows(sheets, TABS.presence, mine);
@@ -554,8 +754,8 @@ module.exports = async (req, res) => {
     /* ══ PUSH-TO-TALK ══ */
 
     if (action === 'postVoice') {
-      const me = await requireUser();
-      const territory = String(body.territory || '').trim();
+      const me = await requireActor();
+      const territory = me.territory || String(body.territory || '').trim();
       const audio = String(body.audio || '');
       if (!territory) return res.status(400).json({ error: 'Territory is required' });
       if (!audio) return res.status(400).json({ error: 'No audio' });
@@ -574,15 +774,16 @@ module.exports = async (req, res) => {
     }
 
     if (action === 'getVoice') {
-      const me = await requireUser();
-      const territory = String(body.territory || '').trim();
+      const me = await requireActor();
+      const territory = me.territory || String(body.territory || '').trim();
       const since = Number(body.since || 0);
       const team = await teamFor(territory);
-      const [rows, users] = await Promise.all([
-        readTab(sheets, TABS.voice), readTab(sheets, TABS.users),
+      const [rows, users, assigns] = await Promise.all([
+        readTab(sheets, TABS.voice), readTab(sheets, TABS.users), readTab(sheets, TABS.assignments),
       ]);
       const byId = {};
       users.forEach(u => { byId[u.id] = publicUser(u); });
+      assigns.forEach(a => { byId['g:' + a.id] = { name: a.guestName || 'Guest' }; });
       const clips = rows.filter(r =>
         r.territory === territory &&
         Number(r.ts || 0) > since &&
