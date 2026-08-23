@@ -272,6 +272,25 @@ module.exports = async (req, res) => {
       });
     }
 
+    /* First-run only. Creates the very first admin, and refuses once any user
+       exists — so it is open for exactly as long as there is nothing to protect. */
+    if (action === 'bootstrapAdmin') {
+      const users = await readTab(sheets, TABS.users);
+      if (users.length) return res.status(400).json({ error: 'Setup already completed' });
+      const name = String(body.name || '').trim();
+      const pw = String(body.password || '');
+      if (!name) return res.status(400).json({ error: 'Name is required' });
+      if (pw.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+      const { hash, salt } = hashPassword(pw);
+      const rec = {
+        id: uid(), name, phone: String(body.phone || '').trim(), email: String(body.email || '').trim(),
+        role: 'admin', passHash: hash, passSalt: salt, setupCode: '', mustSetup: '0', active: '1',
+        createdAt: nowIso, updatedAt: nowIso,
+      };
+      await appendRow(sheets, TABS.users, rec);
+      return res.json({ ok: true, token: sign({ uid: rec.id, exp: now + TOKEN_TTL_MS }), user: publicUser(rec) });
+    }
+
     if (action === 'login') {
       const users = await readTab(sheets, TABS.users);
       const login = norm(body.login);
