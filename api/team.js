@@ -249,7 +249,40 @@ module.exports = async (req, res) => {
        failing. The cache lives for one request only — module scope would serve
        one user another user's stale data. */
     const _cache = new Map();
+    /* Sheets counts REQUESTS, not rows, so pulling four small tabs in one
+       batchGet costs the same as pulling one. Almost every action here needs
+       two or more of them, so the first read fetches the whole set at once.
+       Voice is excluded on purpose: its rows carry base64 audio, and dragging
+       that through every unrelated request would be pointlessly expensive. */
+    const SMALL = [TABS.users, TABS.territories, TABS.assignments, TABS.presence];
+    let _prefetched = false;
+    async function prefetch() {
+      if (_prefetched) return;
+      _prefetched = true;
+      try {
+        const r = await sheets.spreadsheets.values.batchGet({
+          spreadsheetId: SHEET_ID,
+          ranges: SMALL.map(sp => `${sp.name}!A:${colLetter(sp.cols.length - 1)}`),
+        });
+        (r.data.valueRanges || []).forEach((vr, i) => {
+          const sp = SMALL[i];
+          const rows = vr.values || [];
+          const hdr = rows[0] || [];
+          // A tab whose header does not match yet needs the repairing path,
+          // so leave it uncached and let readTab handle it.
+          if (!rows.length || !sp.cols.every((c, j) => hdr[j] === c)) return;
+          _cache.set(sp.name, rows.slice(1)
+            .filter(rw => rw && rw[0] !== undefined && rw[0] !== '')
+            .map((rw, k) => {
+              const o = { _row: k + 2 };
+              sp.cols.forEach((c, j) => { o[c] = rw[j] !== undefined ? rw[j] : ''; });
+              return o;
+            }));
+        });
+      } catch (e) { /* fall back to per-tab reads */ }
+    }
     const rd = async spec => {
+      if (SMALL.indexOf(spec) !== -1) await prefetch();
       if (!_cache.has(spec.name)) _cache.set(spec.name, await readTab(sheets, spec));
       return _cache.get(spec.name);
     };
@@ -757,6 +790,54 @@ module.exports = async (req, res) => {
         lat: Number(r.lat), lng: Number(r.lng), acc: Number(r.acc || 0), ts: Number(r.ts || 0),
       }));
       return res.json({ ok: true, people: out, serverTime: now });
+    }
+
+    /* The field poll: where everyone is, and anything they said, in one call.
+       Two separate polls doubled both the request count and the tab reads for
+       information that is always wanted together. */
+    if (action === 'fieldPoll') {
+      const me = await requireActor();
+      const territory = me.territory || String(body.territory || '').trim();
+      const since = Number(body.since || 0);
+      const team = await teamFor(territory);
+      const [pres, users, assigns] = await Promise.all([
+        rd(TABS.presence), rd(TABS.users), rd(TABS.assignments),
+      ]);
+      const byId = {};
+      users.forEach(u => { byId[u.id] = publicUser(u); });
+      assigns.forEach(a => { byId['g:' + a.id] = { name: a.guestName || 'Guest' }; });
+
+      if (body.lat !== undefined && body.lng !== undefined) {
+        const lat = Number(body.lat), lng = Number(body.lng);
+        if (isFinite(lat) && isFinite(lng) && territory) {
+          const mine = pres.find(r => r.userId === me.id && r.territory === territory);
+          const rec = { userId: me.id, territory, lat: lat.toFixed(6), lng: lng.toFixed(6),
+                        acc: Math.round(Number(body.acc) || 0), ts: String(now) };
+          if (mine) await wr(TABS.presence, mine._row, rec);
+          else await ap(TABS.presence, rec);
+        }
+      }
+
+      const people = pres.filter(r =>
+        r.territory === territory && r.userId !== me.id &&
+        (!team || team.has(r.userId)) && now - Number(r.ts || 0) < PRESENCE_TTL_MS
+      ).map(r => ({
+        userId: r.userId, name: (byId[r.userId] && byId[r.userId].name) || 'Someone',
+        lat: Number(r.lat), lng: Number(r.lng), acc: Number(r.acc || 0), ts: Number(r.ts || 0),
+      }));
+
+      let clips = [];
+      if (body.voice !== false) {
+        const rows = await rd(TABS.voice);
+        clips = rows.filter(c =>
+          c.territory === territory && Number(c.ts || 0) > since && c.userId !== me.id &&
+          (!team || team.has(c.userId)) && now - Number(c.ts || 0) < VOICE_TTL_MS
+        ).sort((a, b) => Number(a.ts) - Number(b.ts)).slice(-5)
+         .map(c => ({ id: c.id, userId: c.userId,
+           name: (byId[c.userId] && byId[c.userId].name) || 'Someone',
+           ts: Number(c.ts), dur: Number(c.dur || 0), audio: c.audio }));
+      }
+      return res.json({ ok: true, people, clips, serverTime: now });
     }
 
     if (action === 'clearPresence') {
