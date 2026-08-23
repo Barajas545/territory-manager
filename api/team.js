@@ -11,6 +11,7 @@
 const crypto = require('crypto');
 const { google } = require('googleapis');
 const AS = require('./_assign');
+const SP = require('./_sp');
 
 const SHEET_ID = process.env.GOOGLE_SHEET_ID;
 
@@ -331,6 +332,41 @@ module.exports = async (req, res) => {
     };
 
     /* ══ ACCOUNTS ══ */
+
+    /* Migration diagnostic. Reports only whether each step works and what
+       failed -- never a secret, never any territory data. Removed once the
+       move to SharePoint is done. */
+    if (action === 'spCheck') {
+      const out = { configured: SP.configured(), steps: [] };
+      if (!out.configured) {
+        out.steps.push({ step: 'environment variables', ok: false,
+          detail: 'One of SP_TENANT_ID, SP_CLIENT_ID, SP_CLIENT_SECRET, SP_SITE_URL is missing on this deployment' });
+        return res.json(out);
+      }
+      out.steps.push({ step: 'environment variables', ok: true, detail: 'all four present' });
+      let sid = null;
+      try {
+        sid = await SP.siteId();
+        // The id is not a secret, but trim it so the response stays readable.
+        out.steps.push({ step: 'sign in and find the site', ok: true, detail: String(sid).slice(0, 60) + '…' });
+      } catch (e) {
+        out.steps.push({ step: 'sign in and find the site', ok: false, detail: String(e.message).slice(0, 300) });
+        return res.json(out);
+      }
+      try {
+        const lists = await SP.graph('/sites/' + sid + '/lists?$select=displayName&$top=50');
+        out.steps.push({ step: 'read the site', ok: true,
+          detail: (lists.value || []).length + ' lists visible' });
+        out.ready = true;
+      } catch (e) {
+        const msg = String(e.message);
+        out.steps.push({ step: 'read the site', ok: false,
+          detail: /accessDenied|Access denied|Either scp or roles/i.test(msg)
+            ? 'Signed in, but this app has not been granted access to the site yet — the Graph permission grant is still needed'
+            : msg.slice(0, 300) });
+      }
+      return res.json(out);
+    }
 
     if (action === 'status') {
       const users = await rd(TABS.users);
