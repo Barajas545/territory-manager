@@ -788,7 +788,7 @@ body.picking #fab{display:none;}
 
 /* ═══ CONFIG ═══ */
 var API="https://territory-manager-silk.vercel.app/api/territory";
-var APP_VERSION="2.5.0";
+var APP_VERSION="2.5.1";
 
 /* ═══════════════════════════════════════════════════════════════════════
    OFFLINE DATA LAYER
@@ -2574,7 +2574,8 @@ function userActions(id){
   $("#pSub").textContent=u.phone||u.email||"";
   $("#pBody").innerHTML=
     (u.mustSetup&&u.setupCode?'<div class="lbl" style="margin-top:0">Setup code — give this to them</div>'+
-      '<div class="code-box">'+esc(u.setupCode)+'</div>':"")+
+      '<div class="code-box">'+esc(u.setupCode)+'</div>'+
+      '<button class="btn" data-ua="qr" style="width:100%;margin-bottom:8px">Show the scannable code</button>':"")+
     '<button class="btn btn-s" data-ua="reset" style="width:100%;margin-bottom:8px">Reset password</button>'+
     '<button class="btn btn-s" data-ua="role" style="width:100%;margin-bottom:8px">'+
       (u.role==="admin"?"Remove admin":"Make admin")+'</button>'+
@@ -2585,6 +2586,14 @@ function userActions(id){
   $("#pBody").querySelectorAll("[data-ua]").forEach(function(b){
     b.addEventListener("click",function(){
       var a=b.dataset.ua,run,msg;
+      // Showing the code again is a pure re-render — it must NOT mint a new one,
+      // or the code already written down somewhere would quietly stop working.
+      if(a==="qr"){
+        showCode("Give them this code",u.name,
+          esc(u.name)+" can also open the app and tap <b>More → Sign in → I have a code</b>.",
+          u.setupCode);
+        return;
+      }
       if(a==="reset"){run=team("resetPassword",{id:id});msg="Password reset";}
       else if(a==="role"){run=team("setUserRole",{id:id,role:u.role==="admin"?"user":"admin"});msg="Role changed";}
       else if(a==="active"){run=team("setUserActive",{id:id,active:!u.active});msg="Updated";}
@@ -2623,7 +2632,7 @@ $("#adAdd").addEventListener("click",function(){
     team("createUser",{name:name,phone:$("#nuPhone").value.trim()}).then(function(r){
       drawAdmin();
       showCode("Give them this code",name,
-        esc(name)+" opens the app, taps <b>More → Sign in → I have a code</b>, and enters:",
+        esc(name)+" can also open the app and tap <b>More → Sign in → I have a code</b>.",
         r.setupCode);
     }).catch(function(e){$("#nuErr").textContent=e.message;b.disabled=false;});
   });

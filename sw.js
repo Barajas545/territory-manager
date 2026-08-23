@@ -2,7 +2,7 @@
    Lives at the GitHub Pages project subpath, so its scope is /territory-manager/.
    Bump CACHE_VERSION on every deploy that changes the shell. */
 
-const CACHE_VERSION = 'v15';
+const CACHE_VERSION = 'v16';
 const SHELL_CACHE = `tm-shell-${CACHE_VERSION}`;
 const VENDOR_CACHE = `tm-vendor-${CACHE_VERSION}`;
 const TILE_CACHE = 'tm-tiles-v1'; // survives shell upgrades; tiles never go stale
@@ -27,8 +27,12 @@ self.addEventListener('install', event => {
     // Let this reject. If the page cannot be cached, the install MUST fail so
     // the previous worker and its caches stay in place — otherwise activate
     // would delete a working offline copy and replace it with nothing.
-    await shell.add(CRITICAL);
-    await Promise.all(SHELL.filter(u => u !== CRITICAL).map(u => shell.add(u).catch(() => {})));
+    // Bypass the HTTP cache. GitHub Pages serves the page with a max-age, so a
+    // plain add() minutes after a deploy would bake the PREVIOUS page into this
+    // version's cache and serve it until the next deploy.
+    const fresh = u => new Request(u, { cache: 'reload' });
+    await shell.add(fresh(CRITICAL));
+    await Promise.all(SHELL.filter(u => u !== CRITICAL).map(u => shell.add(fresh(u)).catch(() => {})));
     const vendor = await caches.open(VENDOR_CACHE);
     await Promise.all(VENDOR.map(u => vendor.add(u).catch(() => {})));
   })());
@@ -110,7 +114,7 @@ self.addEventListener('fetch', event => {
     event.respondWith((async () => {
       const cache = await caches.open(SHELL_CACHE);
       const cached = await cache.match('./index.html') || await cache.match('./');
-      const network = fetch(req).then(res => {
+      const network = fetch(req, { cache: 'reload' }).then(res => {
         if (res && res.ok) cache.put('./index.html', res.clone()).catch(() => {});
         return res;
       }).catch(() => null);
