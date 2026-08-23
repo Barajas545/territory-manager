@@ -2,7 +2,7 @@
    Lives at the GitHub Pages project subpath, so its scope is /territory-manager/.
    Bump CACHE_VERSION on every deploy that changes the shell. */
 
-const CACHE_VERSION = 'v13';
+const CACHE_VERSION = 'v14';
 const SHELL_CACHE = `tm-shell-${CACHE_VERSION}`;
 const VENDOR_CACHE = `tm-vendor-${CACHE_VERSION}`;
 const TILE_CACHE = 'tm-tiles-v1'; // survives shell upgrades; tiles never go stale
@@ -14,6 +14,7 @@ const VENDOR = [
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
   'https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js',
+  'https://unpkg.com/qrcode-generator@1.4.4/qrcode.js',
   'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 ];
 

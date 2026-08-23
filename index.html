@@ -16,6 +16,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://unpkg.com/qrcode-generator@1.4.4/qrcode.js"></script>
 <style>
 /* ═══ DESIGN TOKENS ═══════════════════════════════════════════════════ */
 :root{
@@ -238,6 +239,53 @@ input,textarea,select{-webkit-appearance:none;appearance:none;}
 /* ═══ MAP ═════════════════════════════════════════════════════════════ */
 #map{flex:1;background:var(--surface-2);}
 .map-fabs{position:absolute;right:12px;bottom:14px;display:flex;flex-direction:column;gap:8px;z-index:400;}
+
+/* ── selecting houses to hand out ── */
+.tool-row{display:flex;align-items:center;gap:8px;margin-top:8px;}
+.tool-btn{height:34px;padding:0 12px;border-radius:var(--r-full);background:var(--surface-2);
+  font-size:13px;font-weight:700;color:var(--text-2);flex:0 0 auto;}
+.tool-btn[aria-pressed="true"]{background:var(--brand);color:var(--brand-ink);}
+.house .pick{width:26px;height:26px;border-radius:50%;border:2px solid var(--border-strong);
+  flex:0 0 auto;display:none;align-items:center;justify-content:center;font-size:14px;
+  color:transparent;background:var(--surface);}
+body.picking .house .pick{display:flex;}
+.house.on .pick{background:var(--brand);border-color:var(--brand);color:var(--brand-ink);}
+.house.on{background:var(--brand-soft);}
+#pickBar{
+  position:absolute;left:10px;right:10px;bottom:14px;z-index:70;display:none;
+  align-items:center;gap:10px;padding:11px 12px 11px 16px;border-radius:var(--r-lg);
+  background:var(--text);color:var(--bg);box-shadow:var(--shadow-2);
+}
+body.picking #pickBar{display:flex;}
+body.picking #fab{display:none;}
+#pickBar .pb-n{font-size:15px;font-weight:750;flex:1;}
+#pickBar button{height:40px;padding:0 16px;border-radius:var(--r-md);font-size:14px;font-weight:750;}
+#pbAssign{background:var(--brand);color:var(--brand-ink);}
+#pbCancel{background:rgba(255,255,255,.16);color:inherit;}
+
+.qr-wrap{display:flex;justify-content:center;padding:14px;background:#fff;border-radius:var(--r-md);margin:10px 0;}
+.qr-wrap img,.qr-wrap svg{width:210px;height:210px;display:block;}
+
+/* ── route ── */
+.route-pin{display:flex;align-items:center;justify-content:center;width:28px;height:28px;
+  border-radius:50%;background:#1565C0;color:#fff;border:3px solid #fff;
+  font-size:12px;font-weight:800;box-shadow:0 2px 8px rgba(0,0,0,.45);}
+.route-pin.done{background:var(--ok);}
+#nextCard{
+  position:absolute;left:10px;right:10px;top:10px;z-index:405;display:none;
+  padding:12px 14px;border-radius:var(--r-lg);background:var(--surface);
+  box-shadow:var(--shadow-2);
+}
+#nextCard.on{display:block;}
+#nextCard .nc-l{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3);}
+#nextCard .nc-a{font-size:19px;font-weight:800;margin-top:2px;}
+#nextCard .nc-m{font-size:12.5px;color:var(--text-2);margin-top:1px;}
+#nextCard .nc-row{display:flex;gap:8px;margin-top:10px;}
+#nextCard .nc-row button{flex:1;min-height:42px;border-radius:var(--r-md);font-size:14px;font-weight:750;}
+#ncDir{background:var(--surface-2);color:var(--text);}
+#ncDone{background:var(--brand);color:var(--brand-ink);}
+.guest-banner{padding:11px 14px;background:var(--unit-soft);color:var(--unit);
+  font-size:13.5px;font-weight:650;text-align:center;}
 
 /* ── team ── */
 .who{width:34px;height:34px;border-radius:var(--r-full);background:var(--brand);color:var(--brand-ink);
@@ -506,6 +554,10 @@ input,textarea,select{-webkit-appearance:none;appearance:none;}
           <input id="searchBox" type="search" placeholder="Search address, notes, language…" autocomplete="off">
           <button id="searchClear" aria-label="Clear search">✕</button>
         </div>
+        <div class="tool-row" id="toolRow">
+          <button class="tool-btn" id="btnPick" aria-pressed="false">☑ Select</button>
+          <button class="tool-btn" id="btnWorking" aria-pressed="false" style="display:none">▶ Start working</button>
+        </div>
         <div class="chips" id="filterChips">
           <button class="chip" data-f="all" aria-pressed="true"><span class="cdot"></span>All <span class="cnum" id="n-all"></span></button>
           <button class="chip" data-f="never" aria-pressed="false"><span class="cdot"></span>Never <span class="cnum" id="n-never"></span></button>
@@ -516,16 +568,28 @@ input,textarea,select{-webkit-appearance:none;appearance:none;}
       </div>
       <div class="scroller" id="houseList"></div>
       <button id="fab">＋ Add</button>
+      <div id="pickBar">
+        <span class="pb-n" id="pbCount">0 selected</span>
+        <button id="pbCancel">Cancel</button>
+        <button id="pbAssign">Assign</button>
+      </div>
     </section>
 
     <!-- ══ MAP ══ -->
     <section class="view" id="view-map">
       <div id="map"></div>
+      <div id="nextCard">
+        <div class="nc-l" id="ncLabel">Next stop</div>
+        <div class="nc-a" id="ncAddr"></div>
+        <div class="nc-m" id="ncMeta"></div>
+        <div class="nc-row"><button id="ncDir">🚗 Directions</button><button id="ncDone">Record visit</button></div>
+      </div>
       <div id="pttWrap"><div id="pttHint">Hold to talk</div>
         <button id="ptt"><span class="pi">🎤</span><span>TALK</span></button></div>
       <div class="map-fabs">
         <button class="map-fab" id="locateBtn" title="Find me">📍</button>
         <button class="map-fab" id="fitBtn" title="Fit all pins">⤢</button>
+        <button class="map-fab" id="routeBtn" title="Plan a route" aria-pressed="false">🧭</button>
       </div>
     </section>
 
@@ -724,7 +788,7 @@ input,textarea,select{-webkit-appearance:none;appearance:none;}
 
 /* ═══ CONFIG ═══ */
 var API="https://territory-manager-silk.vercel.app/api/territory";
-var APP_VERSION="2.3.0";
+var APP_VERSION="2.4.0";
 
 /* ═══════════════════════════════════════════════════════════════════════
    OFFLINE DATA LAYER
@@ -1449,8 +1513,9 @@ function renderHouses(){
 }
 
 function houseRow(h,label,isUnit){
-  return '<div class="house'+(isUnit?' unit':'')+'">'+
+  return '<div class="house'+(isUnit?' unit':'')+(picked[h.id]?' on':'')+'" data-hid="'+esc(h.id)+'">'+
     '<button class="house-main" data-act="detail" data-id="'+esc(h.id)+'">'+
+      '<span class="pick">✓</span>'+
       '<span class="house-dot dot-'+visitStatus(h.HouseLastVisitDate)+'"></span>'+
       '<span class="house-txt">'+
         '<span class="house-num">'+
@@ -1863,6 +1928,7 @@ function saveChanges(id,changes,msg){
 function afterLocalChange(){
   records=buildRecords();
   renderHouses();renderRV();refreshMapPins();updateSyncUI();
+  if(routeOn)drawRoute();
   if(openSheets.indexOf("#sh-detail")!==-1&&curId&&byId(curId))openDetail(curId);
 }
 
@@ -1983,7 +2049,8 @@ $("#pBody").addEventListener("click",function(e){
   var b=e.target.closest("[data-terr],[data-exp]");if(!b)return;
   if(b.dataset.terr!==undefined){
     terrFilter=b.dataset.terr;closeSheet("#sh-pick");renderHouses();fitPins();
-    stopPresence();updatePttVisibility();
+    stopPresence();updatePttVisibility();loadWorkingState();
+    if(routeOn)drawRoute();
     if($("#view-map").classList.contains("active"))startPresence();
   }else{
     var m=terrMap();closeSheet("#sh-pick");
@@ -2101,6 +2168,16 @@ document.querySelectorAll(".tab").forEach(function(t){
 
 /* delegated list actions */
 document.addEventListener("click",function(e){
+  if(picking){
+    var row=e.target.closest(".house[data-hid]");
+    if(row){
+      var hid=row.dataset.hid;
+      picked[hid]=!picked[hid];
+      row.classList.toggle("on",!!picked[hid]);
+      updatePickBar();
+      return;
+    }
+  }
   var b=e.target.closest("[data-act]");if(!b)return;
   var a=b.dataset.act,id=b.dataset.id;
   if(a==="detail")openDetail(id);
@@ -2263,6 +2340,24 @@ function refreshMe(){
 /* ── More tab card ── */
 function renderTeamCard(){
   var el=$("#teamCard");if(!el)return;
+  if(guestMode){
+    el.innerHTML=
+      '<div class="row"><span class="who">'+esc(initials(guestInfo.name||"Guest"))+'</span>'+
+        '<span class="row-txt"><span class="row-t">'+esc(guestInfo.name||"Guest")+'</span>'+
+        '<span class="row-s">Helping '+esc(guestInfo.from||"")+' \u00b7 '+
+        esc(guestInfo.territory||"")+'</span></span></div>'+
+      '<button class="row" id="tmLeave"><span class="row-ico">\u{1F6AA}</span>'+
+        '<span class="row-txt"><span class="row-t">Finish helping</span>'+
+        '<span class="row-s">Removes these numbers from this phone</span></span>'+
+        '<span class="row-act">\u203A</span></button>';
+    $("#tmLeave").addEventListener("click",function(){
+      var n=pendingCount();
+      if(confirm(n?("You have "+n+" visit"+(n===1?"":"s")+" not uploaded yet.\n\nThey will be lost. Finish anyway?")
+                  :"Finish helping?\n\nThese numbers are removed from this phone."))leaveGuest();
+    });
+    updatePttVisibility();
+    return;
+  }
   if(!me){
     el.innerHTML=
       '<button class="row" id="tmSignIn"><span class="row-ico">\u{1F464}</span>'+
@@ -2574,17 +2669,27 @@ var presTimer=null, mateMarkers={};
 function activeTerritory(){return terrFilter!=="all"?terrFilter:null;}
 
 function startPresence(){
-  if(presTimer||!me||!activeTerritory())return;
+  if(presTimer||(!me&&!guestMode)||!activeTerritory())return;
+  // One call posts our position and returns both everyone else's and any
+  // voice waiting. Two polls doubled the request count for information that
+  // is always wanted together, and the Sheets budget is shared by everyone.
   var tick=function(){
     var terr=activeTerritory();if(!terr)return;
-    if(meMarker){
-      var ll=meMarker.getLatLng();
-      team("postPresence",{territory:terr,lat:ll.lat,lng:ll.lng,acc:0}).catch(function(){});
-    }
-    team("getPresence",{territory:terr}).then(drawMates).catch(function(){});
+    var body={territory:terr};
+    if(meMarker){var ll=meMarker.getLatLng();body.lat=ll.lat;body.lng=ll.lng;}
+    if(!lastVoiceTs)lastVoiceTs=Date.now();
+    body.since=lastVoiceTs;
+    team("fieldPoll",body).then(function(r){
+      drawMates(r);
+      (r.clips||[]).forEach(function(c){
+        if(c.ts>lastVoiceTs)lastVoiceTs=c.ts;
+        audioQueue.push(c);
+      });
+      playNext();
+    }).catch(function(){});
   };
   tick();
-  presTimer=setInterval(tick,15000);
+  presTimer=setInterval(tick,12000);
 }
 function stopPresence(){
   if(presTimer){clearInterval(presTimer);presTimer=null;}
@@ -2592,7 +2697,7 @@ function stopPresence(){
     if(mapReady)map.removeLayer(mateMarkers[k]);
     delete mateMarkers[k];
   });
-  if(me)team("clearPresence",{}).catch(function(){});
+  if(me||guestMode)team("clearPresence",{}).catch(function(){});
 }
 function drawMates(r){
   if(!mapReady)return;
@@ -2619,7 +2724,7 @@ function pttSupported(){
 }
 function updatePttVisibility(){
   var w=$("#pttWrap");if(!w)return;
-  var on=!!me&&!!activeTerritory()&&pttSupported();
+  var on=(!!me||guestMode)&&!!activeTerritory()&&pttSupported();
   w.classList.toggle("on",on);
   if(on)startVoicePoll();else stopVoicePoll();
 }
@@ -2677,7 +2782,9 @@ function stopTalk(){
 }
 
 function startVoicePoll(){
-  if(voiceTimer||!me)return;
+  // Voice rides along with the position poll while that is running; this only
+  // covers the case where the map is open but no territory is being shared.
+  if(voiceTimer||presTimer||(!me&&!guestMode))return;
   // Only clips from now on — nobody wants a backlog replayed at them.
   if(!lastVoiceTs)lastVoiceTs=Date.now();
   var tick=function(){
@@ -2730,6 +2837,349 @@ function loadTeam(){
   }).catch(function(){});
 }
 
+
+/* ═══════════════════════════════════════════════════════════════════════
+   WORK PACKETS — picking house numbers, handing them out, and working them.
+
+   The owner selects numbers and assigns them to someone. Someone with an
+   account gets them in their own app; someone without scans a code and
+   gets a guest view holding exactly those numbers, for exactly today.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+var picking=false, picked={}, working=false;
+var guestMode=false, guestInfo=null;
+
+function pickedIds(){return Object.keys(picked).filter(function(k){return picked[k];});}
+function pickedCount(){return pickedIds().length;}
+
+function setPicking(on){
+  picking=on;
+  document.body.classList.toggle("picking",on);
+  $("#btnPick").setAttribute("aria-pressed",on?"true":"false");
+  if(!on)picked={};
+  updatePickBar();
+  renderHouses();
+}
+function updatePickBar(){
+  var n=pickedCount();
+  $("#pbCount").textContent=n+" selected";
+  $("#pbAssign").disabled=!n;
+  $("#pbAssign").style.opacity=n?"1":".5";
+}
+$("#btnPick").addEventListener("click",function(){setPicking(!picking);});
+$("#pbCancel").addEventListener("click",function(){setPicking(false);});
+
+/* Territory "in progress" switch. It is also the kill switch: turning it off
+   ends every guest's access at once, without revoking packets one by one. */
+function refreshWorkingBtn(){
+  var b=$("#btnWorking");
+  var can=me&&!guestMode&&terrFilter!=="all";
+  b.style.display=can?"block":"none";
+  b.setAttribute("aria-pressed",working?"true":"false");
+  b.textContent=working?"■ Stop working":"▶ Start working";
+}
+$("#btnWorking").addEventListener("click",function(){
+  if(terrFilter==="all"){toast("Pick one territory first",true);return;}
+  var next=!working;
+  if(!next&&!confirm("Stop working "+terrFilter+"?\n\nAnyone helping today loses access to their numbers straight away."))return;
+  var b=this;b.disabled=true;
+  team("setTerritoryWorking",{territory:terrFilter,working:next}).then(function(r){
+    working=r.working;refreshWorkingBtn();
+    toast(working?("Working "+terrFilter):"Stopped — helpers are signed out");
+  }).catch(function(e){toast(e.message,true);}).then(function(){b.disabled=false;});
+});
+
+function loadWorkingState(){
+  if(!me||guestMode||terrFilter==="all"){working=false;refreshWorkingBtn();return;}
+  team("listAssignments",{territory:terrFilter}).then(function(r){
+    working=!!r.working;refreshWorkingBtn();
+  }).catch(function(){refreshWorkingBtn();});
+}
+
+/* ── handing the numbers out ── */
+$("#pbAssign").addEventListener("click",function(){
+  var ids=pickedIds();
+  if(!ids.length)return;
+  if(!me){toast("Sign in first to hand out numbers",true);openAuth();return;}
+  var terr=terrFilter!=="all"?terrFilter:(byId(ids[0])||{}).HouseTerritoryNumber||"";
+  if(!terr){toast("These houses have no territory set",true);return;}
+  drawAssignPicker(ids,terr);
+  openSheet("#sh-pick");
+});
+
+function drawAssignPicker(ids,terr){
+  $("#pTitle").textContent="Assign "+ids.length+" number"+(ids.length===1?"":"s");
+  $("#pSub").textContent=terr;
+  var others=teamUsers.filter(function(u){return !me||u.id!==me.id;});
+  $("#pBody").innerHTML=
+    '<div class="lbl" style="margin-top:0">Someone with the app</div>'+
+    (others.length?'<div class="card">'+others.map(function(u){
+      return '<button class="user-row" data-give="'+esc(u.id)+'">'+
+        '<span class="who">'+esc(initials(u.name))+'</span>'+
+        '<span class="row-txt"><span class="ur-t">'+esc(u.name)+'</span>'+
+        '<span class="ur-s">'+esc(u.phone||u.email||"")+'</span></span>'+
+        '<span class="row-act">›</span></button>';
+    }).join("")+'</div>'
+    :'<p style="font-size:13.5px;color:var(--text-2)">Nobody else has an account yet.</p>')+
+    '<div class="lbl">Someone without the app</div>'+
+    '<div class="f"><label for="gvName">Their name</label>'+
+      '<input id="gvName" placeholder="Hermano Lopez" autocomplete="off"></div>'+
+    '<button class="btn btn-p" id="gvGo" style="width:100%">Create a code for them</button>'+
+    '<div id="gvErr" style="color:var(--bad);font-size:13.5px;margin-top:10px"></div>';
+
+  $("#pBody").querySelectorAll("[data-give]").forEach(function(b){
+    b.addEventListener("click",function(){
+      b.disabled=true;
+      makeAssignment({territory:terr,houseIds:ids,assigneeId:b.dataset.give},
+        (teamUsers.find(function(u){return u.id===b.dataset.give;})||{}).name);
+    });
+  });
+  $("#gvGo").addEventListener("click",function(){
+    var name=$("#gvName").value.trim();
+    if(!name){$("#gvErr").textContent="Type their name first";return;}
+    this.disabled=true;
+    makeAssignment({territory:terr,houseIds:ids,guestName:name},name);
+  });
+}
+
+function endOfDay(){
+  var d=new Date();d.setHours(23,59,59,999);return d.getTime();
+}
+
+function makeAssignment(payload,who){
+  payload.expiresAt=endOfDay();
+  team("createAssignment",payload).then(function(r){
+    setPicking(false);
+    working=true;refreshWorkingBtn();
+    if(r.guestCode)showGuestCode(who,r.guestCode,payload.houseIds.length);
+    else{
+      closeSheet("#sh-pick");
+      toast(payload.houseIds.length+" numbers sent to "+String(who).split(" ")[0]+" ✓");
+    }
+  }).catch(function(e){
+    var el=$("#gvErr");if(el)el.textContent=e.message;else toast(e.message,true);
+  });
+}
+
+function guestUrl(code){
+  return location.origin+location.pathname+"#g="+code;
+}
+
+function showGuestCode(name,code,count){
+  var url=guestUrl(code);
+  $("#pTitle").textContent="Give this to "+String(name).split(" ")[0];
+  $("#pSub").textContent=count+" number"+(count===1?"":"s")+" · expires tonight";
+  $("#pBody").innerHTML=
+    '<div class="qr-wrap" id="qrHere"></div>'+
+    '<p style="font-size:14px;text-align:center;margin-bottom:6px">'+
+      'They point their camera at this. No app or account needed.</p>'+
+    '<div class="lbl">Or they can type this code</div>'+
+    '<div class="code-box">'+esc(code)+'</div>'+
+    '<button class="btn btn-s" id="qrShare" style="width:100%;margin-bottom:8px">Send the link instead</button>'+
+    '<p style="font-size:12.5px;color:var(--text-2)">'+
+      'Their access ends tonight, or the moment you stop working this territory.</p>';
+
+  var box=$("#qrHere");
+  try{
+    // Fixed error correction and an auto-chosen version: the URL length varies
+    // with the host, and a fixed version would fail on longer ones.
+    var qr=qrcode(0,"M");
+    qr.addData(url);
+    qr.make();
+    box.innerHTML=qr.createSvgTag({cellSize:6,margin:2,scalable:true});
+  }catch(e){
+    box.innerHTML='<p style="color:#333;font-size:13px;text-align:center">'+
+      'Could not draw the code here — send the link instead.</p>';
+  }
+
+  $("#qrShare").addEventListener("click",function(){
+    var text=String(name).split(" ")[0]+", here are your numbers for today: "+url;
+    if(navigator.share)navigator.share({title:"Territory numbers",text:text,url:url}).catch(function(){});
+    else if(navigator.clipboard){
+      navigator.clipboard.writeText(url).then(function(){toast("Link copied ✓");})
+        .catch(function(){prompt("Copy this link:",url);});
+    }else prompt("Copy this link:",url);
+  });
+  openSheet("#sh-pick");
+}
+
+/* ── guest mode ───────────────────────────────────────────────────────── */
+function guestCodeFromUrl(){
+  var m=String(location.hash||"").match(/[#&]g=([A-Z0-9]+)/i);
+  if(m)return m[1].toUpperCase();
+  m=String(location.search||"").match(/[?&]g=([A-Z0-9]+)/i);
+  return m?m[1].toUpperCase():null;
+}
+
+function enterGuest(code){
+  return team("guestLogin",{code:code}).then(function(r){
+    guestMode=true;guestInfo=r.guest;
+    authToken=r.token;
+    try{localStorage.setItem("tm_guest",r.token);localStorage.setItem("tm_guest_info",JSON.stringify(r.guest));}catch(e){}
+    // Drop the code from the address bar so a shared screenshot does not hand
+    // it to someone else.
+    try{history.replaceState(null,"",location.pathname);}catch(e){}
+    applyGuestChrome();
+    needsAuth=false;
+    return doSync(false);
+  }).catch(function(e){
+    toast(e.message,true);
+    guestMode=false;
+    return null;
+  });
+}
+
+function applyGuestChrome(){
+  if(!guestMode)return;
+  terrFilter=guestInfo.territory||"all";
+  document.body.classList.add("guest");
+  // A guest owns nothing here: no adding houses, no handing numbers out.
+  $("#fab").style.display="none";
+  $("#btnPick").style.display="none";
+  $("#btnWorking").style.display="none";
+  var b=document.getElementById("guestBanner");
+  if(!b){
+    b=document.createElement("div");
+    b.id="guestBanner";b.className="guest-banner";
+    var tb=$("#topbar");tb.parentNode.insertBefore(b,tb.nextSibling);
+  }
+  b.textContent="Helping "+(guestInfo.from||"the territory holder")+" · "+
+    (guestInfo.houseIds||[]).length+" numbers · ends tonight";
+  $("#scopeName").textContent=guestInfo.territory||"My numbers";
+  renderTeamCard();
+  updatePttVisibility();
+}
+
+function restoreGuest(){
+  var t,i;
+  try{t=localStorage.getItem("tm_guest");i=JSON.parse(localStorage.getItem("tm_guest_info")||"null");}catch(e){}
+  if(!t||!i)return false;
+  guestMode=true;guestInfo=i;authToken=t;
+  applyGuestChrome();
+  // Confirm the packet is still live; if it was withdrawn, say so plainly.
+  team("guestStatus",{}).then(function(r){
+    guestInfo.houseIds=r.houseIds;applyGuestChrome();
+  }).catch(function(e){
+    toast(e.message,true);
+    leaveGuest();
+  });
+  return true;
+}
+function leaveGuest(){
+  guestMode=false;guestInfo=null;authToken="";
+  try{localStorage.removeItem("tm_guest");localStorage.removeItem("tm_guest_info");}catch(e){}
+  mirror={};pending={};records=[];needsAuth=true;
+  Promise.all([idb.clear(S_MIRROR),idb.clear(S_PENDING)]).catch(function(){});
+  var b=document.getElementById("guestBanner");if(b)b.remove();
+  document.body.classList.remove("guest");
+  $("#fab").style.display="";$("#btnPick").style.display="";
+  renderHouses();renderTeamCard();
+}
+
+/* ── route ────────────────────────────────────────────────────────────────
+   Nearest-neighbour from where you are standing. Not the shortest possible
+   tour, but it is computed instantly on a phone and never sends you back
+   across the street you just finished, which is the failure people notice. */
+var routeOn=false, routeOrder=[], routeLine=null, routeMarkers={};
+
+function planRoute(){
+  var pool=(terrFilter==="all"?records:records.filter(function(h){
+    return (h.HouseTerritoryNumber||"Unassigned")===terrFilter;
+  })).filter(function(h){return parseGPS(h.HouseGPSCoordinates);});
+  if(!pool.length)return[];
+  var start=null;
+  if(meMarker){var ll=meMarker.getLatLng();start={lat:ll.lat,lng:ll.lng};}
+  else{var g0=parseGPS(pool[0].HouseGPSCoordinates);start=g0;}
+
+  var left=pool.slice(),out=[],cur=start;
+  while(left.length){
+    var bi=0,bd=Infinity;
+    for(var i=0;i<left.length;i++){
+      var g=parseGPS(left[i].HouseGPSCoordinates);
+      var d=(g.lat-cur.lat)*(g.lat-cur.lat)+(g.lng-cur.lng)*(g.lng-cur.lng);
+      if(d<bd){bd=d;bi=i;}
+    }
+    var next=left.splice(bi,1)[0];
+    out.push(next);
+    cur=parseGPS(next.HouseGPSCoordinates);
+  }
+  return out;
+}
+
+function clearRoute(){
+  if(routeLine){map.removeLayer(routeLine);routeLine=null;}
+  Object.keys(routeMarkers).forEach(function(k){map.removeLayer(routeMarkers[k]);delete routeMarkers[k];});
+  $("#nextCard").classList.remove("on");
+}
+
+function drawRoute(){
+  if(!mapReady)return;
+  clearRoute();
+  routeOrder=planRoute();
+  if(!routeOrder.length){toast("No houses with a location yet",true);routeOn=false;
+    $("#routeBtn").setAttribute("aria-pressed","false");return;}
+  var pts=[];
+  routeOrder.forEach(function(h,i){
+    var g=parseGPS(h.HouseGPSCoordinates);
+    pts.push([g.lat,g.lng]);
+    var done=!!h.HouseLastVisitDate&&daysSince(h.HouseLastVisitDate)<=0;
+    routeMarkers[h.id]=L.marker([g.lat,g.lng],{zIndexOffset:400,icon:L.divIcon({
+      className:"",iconSize:[28,28],iconAnchor:[14,14],
+      html:'<div class="route-pin'+(done?" done":"")+'">'+(done?"✓":(i+1))+'</div>'})}).addTo(map);
+  });
+  routeLine=L.polyline(pts,{color:"#1565C0",weight:3,opacity:.65,dashArray:"6 6"}).addTo(map);
+  map.fitBounds(pts,{padding:[60,60],maxZoom:17});
+  showNext();
+}
+
+function nextStop(){
+  for(var i=0;i<routeOrder.length;i++){
+    var h=byId(routeOrder[i].id);
+    if(!h)continue;
+    if(!h.HouseLastVisitDate||daysSince(h.HouseLastVisitDate)>0)return h;
+  }
+  return null;
+}
+
+function showNext(){
+  var card=$("#nextCard");
+  if(!routeOn){card.classList.remove("on");return;}
+  var h=nextStop();
+  var doneN=routeOrder.filter(function(r){
+    var x=byId(r.id);return x&&x.HouseLastVisitDate&&daysSince(x.HouseLastVisitDate)<=0;
+  }).length;
+  if(!h){
+    card.classList.add("on");
+    $("#ncLabel").textContent="All done";
+    $("#ncAddr").textContent=routeOrder.length+" of "+routeOrder.length+" finished";
+    $("#ncMeta").textContent="Nothing left on this route.";
+    $("#ncDir").style.display="none";$("#ncDone").style.display="none";
+    return;
+  }
+  $("#ncDir").style.display="";$("#ncDone").style.display="";
+  card.classList.add("on");
+  $("#ncLabel").textContent="Next stop · "+doneN+" of "+routeOrder.length+" done";
+  $("#ncAddr").textContent=h.HouseAddress||"No address";
+  $("#ncMeta").textContent=[h.HouseNotes,h.HouseLanguage].filter(Boolean).join(" · ")||
+    [h.HouseCity,h.HouseState].filter(Boolean).join(", ");
+  card.dataset.hid=h.id;
+}
+
+$("#routeBtn").addEventListener("click",function(){
+  routeOn=!routeOn;
+  this.setAttribute("aria-pressed",routeOn?"true":"false");
+  if(routeOn)drawRoute();else clearRoute();
+});
+$("#ncDir").addEventListener("click",function(){
+  var h=byId($("#nextCard").dataset.hid);if(!h)return;
+  var q=h.HouseGPSCoordinates||fullAddr(h);
+  window.open("https://www.google.com/maps/dir/?api=1&destination="+encodeURIComponent(q),"_blank");
+});
+$("#ncDone").addEventListener("click",function(){
+  var h=byId($("#nextCard").dataset.hid);if(!h)return;
+  openLog(h.id,null);
+});
+
 /* ═══ BOOT ═══ */
 function boot(){
   offlineMode=localStorage.getItem("tm_offline")==="1";
@@ -2770,7 +3220,12 @@ function boot(){
   });
 
   registerSW();
-  refreshMe().then(loadTeam);
+
+  // A guest link always wins: someone handed this phone a code just now.
+  var gc=guestCodeFromUrl();
+  if(gc){ enterGuest(gc); return; }
+  if(restoreGuest()){ return; }
+  refreshMe().then(function(){loadTeam();loadWorkingState();});
 }
 
 window.addEventListener("online",function(){if(!offlineMode)doSync(false);updateSyncUI();});
