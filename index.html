@@ -788,7 +788,7 @@ body.picking #fab{display:none;}
 
 /* ═══ CONFIG ═══ */
 var API="https://territory-manager-silk.vercel.app/api/territory";
-var APP_VERSION="2.4.0";
+var APP_VERSION="2.5.0";
 
 /* ═══════════════════════════════════════════════════════════════════════
    OFFLINE DATA LAYER
@@ -2285,6 +2285,7 @@ var TEAM_API=API.replace(/\/territory$/,"/team");
 var me=null, authToken="";
 try{authToken=localStorage.getItem("tm_token")||"";}catch(e){}
 var teamUsers=[], teamTerritories=[], teamHasUsers=true;
+var pendingSetupCode=null;   // carried in from a scanned QR or a shared link
 
 function initials(name){
   var p=String(name||"?").trim().split(/\s+/);
@@ -2426,7 +2427,7 @@ function drawAuth(mode){
       '<div class="f"><label for="auPw">Choose a password</label><input id="auPw" type="password" autocomplete="new-password"></div>'+
       '<button class="btn btn-p" id="auGo" style="width:100%">Create admin account</button>';
   }else if(mode==="code"){
-    form='<div class="f"><label for="auCode">Setup code</label><input id="auCode" autocapitalize="characters" placeholder="ABC123"></div>'+
+    form='<div class="f"><label for="auCode">Setup code</label><input id="auCode" autocapitalize="characters" placeholder="ABC123" value="'+esc(pendingSetupCode||"")+'"></div>'+
       '<div class="f"><label for="auName">Your name</label><input id="auName" autocomplete="name"></div>'+
       '<div class="f"><label for="auPhone">Phone</label><input id="auPhone" type="tel" autocomplete="tel"></div>'+
       '<div class="f"><label for="auEmail">Email (optional)</label><input id="auEmail" type="email" autocomplete="email"></div>'+
@@ -2471,6 +2472,7 @@ function drawAuth(mode){
       // now. Without this the app sits on an empty locked screen until the
       // next sync tick, which looks exactly like the sign-in having failed.
       needsAuth=false;
+      pendingSetupCode=null;
       loadTeam();
       doSync(false);
     }).catch(function(e){
@@ -2522,13 +2524,48 @@ function drawAdmin(){
     $("#adBody").innerHTML='<div class="empty">'+esc(e.message)+'</div>';
   });
 }
+function setupUrl(code){
+  return location.origin+location.pathname+"#s="+code;
+}
+
+/* The code is offered three ways because the situation varies: a QR when you
+   are standing together, a link when you are not, and the characters
+   themselves when someone would rather just type them. */
 function showCode(title,sub,intro,code){
+  var url=setupUrl(code);
   $("#pTitle").textContent=title;
   $("#pSub").textContent=sub;
-  $("#pBody").innerHTML='<p style="font-size:14.5px;margin-bottom:2px">'+intro+'</p>'+
+  $("#pBody").innerHTML=
+    '<p style="font-size:14.5px;margin-bottom:2px">Point their camera at this. It opens '+
+      'the app with the code already filled in — they only choose a password.</p>'+
+    '<div class="qr-wrap" id="qrSetup"></div>'+
+    '<button class="btn btn-s" id="setupShare" style="width:100%;margin-bottom:12px">Send the link instead</button>'+
+    '<div class="lbl">Or they can type this code</div>'+
     '<div class="code-box">'+esc(code)+'</div>'+
-    '<p style="font-size:13px;color:var(--text-2)">They choose their own password. '+
-    'The code stops working once it is used.</p>';
+    '<p style="font-size:13px;color:var(--text-2)">'+intro+'<br>'+
+    'They choose their own password. The code stops working once it is used.</p>';
+
+  var box=$("#qrSetup");
+  try{
+    // Auto version: the URL length varies with the host, and a fixed version
+    // would fail on longer ones.
+    var qr=qrcode(0,"M");
+    qr.addData(url);
+    qr.make();
+    box.innerHTML=qr.createSvgTag({cellSize:6,margin:2,scalable:true});
+  }catch(e){
+    box.innerHTML='<p style="color:#333;font-size:13px;text-align:center">'+
+      'Could not draw the code here — send the link or read out the characters.</p>';
+  }
+
+  $("#setupShare").addEventListener("click",function(){
+    var text=String(sub||"").split(" ")[0]+", set up the territory app here: "+url;
+    if(navigator.share)navigator.share({title:"Territory Manager",text:text,url:url}).catch(function(){});
+    else if(navigator.clipboard){
+      navigator.clipboard.writeText(url).then(function(){toast("Link copied ✓");})
+        .catch(function(){prompt("Copy this link:",url);});
+    }else prompt("Copy this link:",url);
+  });
   openSheet("#sh-pick");
 }
 function userActions(id){
@@ -3004,6 +3041,13 @@ function showGuestCode(name,code,count){
 }
 
 /* ── guest mode ───────────────────────────────────────────────────────── */
+function setupCodeFromUrl(){
+  var m=String(location.hash||"").match(/[#&]s=([A-Z0-9]+)/i);
+  if(m)return m[1].toUpperCase();
+  m=String(location.search||"").match(/[?&]s=([A-Z0-9]+)/i);
+  return m?m[1].toUpperCase():null;
+}
+
 function guestCodeFromUrl(){
   var m=String(location.hash||"").match(/[#&]g=([A-Z0-9]+)/i);
   if(m)return m[1].toUpperCase();
@@ -3225,6 +3269,22 @@ function boot(){
   var gc=guestCodeFromUrl();
   if(gc){ enterGuest(gc); return; }
   if(restoreGuest()){ return; }
+
+  // A scanned setup link opens straight onto the code step with the code
+  // already entered, so the newcomer only has to choose a password.
+  var sc=setupCodeFromUrl();
+  if(sc){
+    pendingSetupCode=sc;
+    // Drop it from the address bar: a credential should not sit in a URL that
+    // a screenshot or a shared tab would carry along.
+    try{history.replaceState(null,"",location.pathname);}catch(e){}
+    setTimeout(function(){
+      teamHasUsers=true;
+      openSheet("#sh-auth");
+      drawAuth("code");
+      var n=$("#auName");if(n)n.focus();
+    },400);
+  }
   refreshMe().then(function(){loadTeam();loadWorkingState();});
 }
 
