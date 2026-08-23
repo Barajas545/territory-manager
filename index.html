@@ -724,7 +724,7 @@ input,textarea,select{-webkit-appearance:none;appearance:none;}
 
 /* ═══ CONFIG ═══ */
 var API="https://territory-manager-silk.vercel.app/api/territory";
-var APP_VERSION="2.2.0";
+var APP_VERSION="2.2.1";
 
 /* ═══════════════════════════════════════════════════════════════════════
    OFFLINE DATA LAYER
@@ -924,16 +924,28 @@ function sync(opts) {
   });
 
   var nothingToPush = !sent.creates.length && !sent.updates.length && !sent.deletes.length;
+  var authHeaders = authToken ? { Authorization: 'Bearer ' + authToken } : {};
+  var on401 = function (r) {
+    // Signed out or expired. Flag it, but never touch what is already on the
+    // device: the queue must survive to be uploaded after signing back in.
+    if (r.status === 401 || r.status === 403) {
+      var e = new Error('AUTH');
+      e.needsAuth = true;
+      throw e;
+    }
+  };
   var request = nothingToPush && !opts.force
-    ? fetch(API, { method: 'GET' }).then(function (r) {
+    ? fetch(API, { method: 'GET', headers: authHeaders }).then(function (r) {
+        on401(r);
         if (!r.ok) throw new Error('HTTP ' + r.status);
         return r.json();
       }).then(function (records) { return { records: records, conflicts: [] }; })
     : fetch(API, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders),
         body: JSON.stringify({ creates: sent.creates, updates: sent.updates, deletes: sent.deletes }),
       }).then(function (r) {
+        on401(r);
         if (!r.ok) return r.text().then(function (t) { throw new Error('HTTP ' + r.status + ': ' + t.slice(0, 200)); });
         return r.json();
       });
@@ -971,8 +983,10 @@ function sync(opts) {
       return { ok: true, conflicts: res.conflicts || [], pushed: sent.creates.length + sent.updates.length + sent.deletes.length };
     });
   }).catch(function (e) {
-    // Offline or server error: pending is untouched and still on disk. Nothing lost.
+    // Offline, signed out, or a server error: pending is untouched and still on
+    // disk either way. Nothing is ever lost here.
     lastSyncError = e.message;
+    if (e.needsAuth) return { ok: false, needsAuth: true, error: 'Sign in to sync' };
     return { ok: false, offline: !navigator.onLine || /Failed to fetch|NetworkError|Load failed/i.test(e.message), error: e.message };
   }).then(function (r) { syncing = false; inFlightIds = {}; return r; });
 }
@@ -982,7 +996,7 @@ function sync(opts) {
 var records=[],view=[],filter="all",searchTerm="",terrFilter="all";
 var map=null,markerMap={},mapReady=false;
 var curId=null,curSlot=null,curOutcome=null;
-var offlineMode=false, deferredInstall=null, storageBroken=false;
+var offlineMode=false, deferredInstall=null, storageBroken=false, needsAuth=false;
 
 /* ═══ HELPERS ═══ */
 function $(s){return document.querySelector(s);}
@@ -1392,6 +1406,15 @@ function renderHouses(){
   applyFilters();updateCounts();
   var el=$("#houseList");
   if(!view.length){
+    if(needsAuth&&!records.length){
+      el.innerHTML='<div class="empty"><span class="big">🔒</span>'+
+        'Sign in to see your territory.<br>'+
+        '<span style="font-size:13.5px">Your notes are private to your group.</span>'+
+        '<div style="max-width:240px;margin:18px auto 0">'+
+        '<button class="btn btn-p" id="gateIn" style="width:100%">Sign in</button></div></div>';
+      var g=$("#gateIn");if(g)g.addEventListener("click",openAuth);
+      return;
+    }
     el.innerHTML='<div class="empty"><span class="big">🔍</span>'+
       (records.length?"No houses match this filter.":"No houses yet. Tap Add to create one.")+'</div>';
     return;
@@ -1865,9 +1888,13 @@ function doSync(manual){
       }else if(manual){
         toast(r.pushed?("Synced "+r.pushed+" change"+(r.pushed===1?"":"s")+" ✓"):"Up to date ✓");
       }
+    }else if(r.needsAuth){
+      needsAuth=true;renderHouses();
+      if(manual)openAuth();
     }else if(manual){
       toast(r.offline?"You're offline — changes are saved on this phone":("Sync failed: "+r.error),true);
     }
+    if(r.ok)needsAuth=false;
     updateSyncUI();
   });
 }
@@ -2208,6 +2235,12 @@ function setSession(tok,user){
 function signOut(silent){
   stopPresence();stopVoicePoll();
   setSession("",null);
+  // Wipe the local copy. Leaving it behind means the territory stays readable
+  // to whoever next picks up the phone, which is the thing signing out is for.
+  mirror={};pending={};needsAuth=true;records=[];
+  Promise.all([idb.clear(S_MIRROR),idb.clear(S_PENDING)]).catch(function(){});
+  renderHouses();renderRV();updateSyncUI();
+  if(mapReady)refreshMapPins();
   if(!silent)toast("Signed out");
 }
 
@@ -2258,7 +2291,12 @@ function renderTeamCard(){
   var pe=$("#tmPeople");if(pe)pe.addEventListener("click",openAdmin);
   $("#tmPw").addEventListener("click",openChangePassword);
   $("#tmOut").addEventListener("click",function(){
-    if(confirm("Sign out of this phone?"))signOut();
+    var n=pendingCount();
+    var warn=n
+      ?("You have "+n+" change"+(n===1?"":"s")+" not yet uploaded.\n\n"+
+        "Signing out removes the copy on this phone and those changes will be lost.\n\nSign out anyway?")
+      :"Sign out?\n\nThe territory is removed from this phone until you sign back in.";
+    if(confirm(warn))signOut();
   });
   updatePttVisibility();
 }
@@ -2705,7 +2743,7 @@ function boot(){
     // at a loading skeleton forever.
     console.error("local store unavailable",e);
     storageBroken=true;
-    fetch(API).then(function(r){
+    fetch(API,{headers:authToken?{Authorization:"Bearer "+authToken}:{}}).then(function(r){
       if(!r.ok)throw new Error("HTTP "+r.status);
       return r.json();
     }).then(function(list){
