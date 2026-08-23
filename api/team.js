@@ -10,7 +10,6 @@
 
 const crypto = require('crypto');
 const AS = require('./_assign');
-const SP = require('./_sp');
 const { makeStore } = require('./_store');
 // Session tokens are signed and verified in _auth.js, so the territory
 // endpoint validates them with exactly the code that issues them here.
@@ -147,50 +146,6 @@ module.exports = async (req, res) => {
     };
 
     /* ══ ACCOUNTS ══ */
-
-    /* Migration diagnostic. Reports only whether each step works and what
-       failed -- never a secret, never any territory data. Removed once the
-       move to SharePoint is done. */
-    if (action === 'spCheck') {
-      const out = { configured: SP.configured(), backend: makeStore().backend, steps: [] };
-      // Which names the runtime can actually see. Presence and length only —
-      // enough to tell "not set" from "set to something odd", and nothing more.
-      const seen = {};
-      ['SP_TENANT_ID','SP_CLIENT_ID','SP_CLIENT_SECRET','SP_SITE_URL','SP_SITE_ID'].forEach(k => {
-        const v = process.env[k];
-        seen[k] = v ? (String(v).length + ' chars') : 'MISSING';
-      });
-      out.visible = seen;
-      out.spKeysInEnv = Object.keys(process.env).filter(k => k.indexOf('SP_') === 0);
-      if (!out.configured) {
-        out.steps.push({ step: 'environment variables', ok: false,
-          detail: 'Missing: ' + Object.keys(seen).filter(k => seen[k] === 'MISSING' && k !== 'SP_SITE_ID').join(', ') });
-        return res.json(out);
-      }
-      out.steps.push({ step: 'environment variables', ok: true, detail: 'all four present' });
-      let sid = null;
-      try {
-        sid = await SP.siteId();
-        // The id is not a secret, but trim it so the response stays readable.
-        out.steps.push({ step: 'sign in and find the site', ok: true, detail: String(sid).slice(0, 60) + '…' });
-      } catch (e) {
-        out.steps.push({ step: 'sign in and find the site', ok: false, detail: String(e.message).slice(0, 300) });
-        return res.json(out);
-      }
-      try {
-        const lists = await SP.graph('/sites/' + sid + '/lists?$select=displayName&$top=50');
-        out.steps.push({ step: 'read the site', ok: true,
-          detail: (lists.value || []).length + ' lists visible' });
-        out.ready = true;
-      } catch (e) {
-        const msg = String(e.message);
-        out.steps.push({ step: 'read the site', ok: false,
-          detail: /accessDenied|Access denied|Either scp or roles/i.test(msg)
-            ? 'Signed in, but this app has not been granted access to the site yet — the Graph permission grant is still needed'
-            : msg.slice(0, 300) });
-      }
-      return res.json(out);
-    }
 
     if (action === 'status') {
       const users = await rd(TABS.users);
