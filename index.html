@@ -238,6 +238,53 @@ input,textarea,select{-webkit-appearance:none;appearance:none;}
 /* ═══ MAP ═════════════════════════════════════════════════════════════ */
 #map{flex:1;background:var(--surface-2);}
 .map-fabs{position:absolute;right:12px;bottom:14px;display:flex;flex-direction:column;gap:8px;z-index:400;}
+
+/* ── team ── */
+.who{width:34px;height:34px;border-radius:var(--r-full);background:var(--brand);color:var(--brand-ink);
+  display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex:0 0 auto;}
+.who.sm{width:26px;height:26px;font-size:11px;}
+.who.gray{background:var(--surface-3);color:var(--text-2);}
+.mate-pin{display:flex;flex-direction:column;align-items:center;}
+.mate-pin .mp-dot{width:26px;height:26px;border-radius:50%;background:#7C3AED;color:#fff;border:3px solid #fff;
+  display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;
+  box-shadow:0 2px 8px rgba(0,0,0,.45);}
+.mate-pin .mp-name{margin-top:3px;background:rgba(20,20,28,.86);color:#fff;font-size:10.5px;font-weight:700;
+  padding:2px 6px;border-radius:var(--r-full);white-space:nowrap;}
+
+/* push to talk */
+#pttWrap{position:absolute;left:0;right:0;bottom:14px;z-index:410;display:none;
+  flex-direction:column;align-items:center;gap:7px;pointer-events:none;}
+#pttWrap.on{display:flex;}
+#pttHint{background:rgba(20,20,28,.86);color:#fff;font-size:12px;font-weight:650;
+  padding:5px 12px;border-radius:var(--r-full);pointer-events:none;}
+#ptt{
+  width:76px;height:76px;border-radius:var(--r-full);pointer-events:auto;
+  background:var(--brand);color:var(--brand-ink);box-shadow:var(--shadow-2);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+  font-size:10px;font-weight:800;letter-spacing:.03em;touch-action:none;user-select:none;
+  -webkit-user-select:none;transition:transform .12s,background .12s;
+}
+#ptt .pi{font-size:24px;line-height:1;}
+#ptt.rec{background:var(--bad);color:#fff;transform:scale(1.12);}
+#ptt[disabled]{opacity:.5;}
+
+.user-row{display:flex;align-items:center;gap:11px;width:100%;padding:13px 14px;text-align:left;
+  border-bottom:1px solid var(--border);min-height:58px;}
+.user-row:last-child{border-bottom:none;}
+.user-row:active{background:var(--surface-2);}
+.ur-t{font-size:15px;font-weight:700;display:block;}
+.ur-s{font-size:12.5px;color:var(--text-2);display:block;margin-top:1px;}
+.pill-tag{font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:var(--r-full);
+  background:var(--surface-3);color:var(--text-2);letter-spacing:.03em;text-transform:uppercase;}
+.pill-tag.admin{background:var(--brand-soft);color:var(--brand);}
+.pill-tag.pend{background:var(--warn-soft);color:var(--warn);}
+.pill-tag.off{background:var(--bad-soft);color:var(--bad);}
+.code-box{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:30px;font-weight:800;
+  letter-spacing:.16em;text-align:center;padding:16px;border-radius:var(--r-md);
+  background:var(--brand-soft);color:var(--brand);margin:10px 0;}
+.seg{display:flex;gap:6px;background:var(--surface-2);padding:4px;border-radius:var(--r-md);margin-bottom:14px;}
+.seg button{flex:1;min-height:38px;border-radius:10px;font-size:13.5px;font-weight:700;color:var(--text-2);}
+.seg button[aria-selected="true"]{background:var(--surface);color:var(--text);box-shadow:var(--shadow-1);}
 .map-fab{width:46px;height:46px;border-radius:var(--r-full);background:var(--surface);
   box-shadow:var(--shadow-2);display:flex;align-items:center;justify-content:center;font-size:19px;}
 .map-fab:active{background:var(--surface-2);}
@@ -474,6 +521,8 @@ input,textarea,select{-webkit-appearance:none;appearance:none;}
     <!-- ══ MAP ══ -->
     <section class="view" id="view-map">
       <div id="map"></div>
+      <div id="pttWrap"><div id="pttHint">Hold to talk</div>
+        <button id="ptt"><span class="pi">🎤</span><span>TALK</span></button></div>
       <div class="map-fabs">
         <button class="map-fab" id="locateBtn" title="Find me">📍</button>
         <button class="map-fab" id="fitBtn" title="Fit all pins">⤢</button>
@@ -488,6 +537,10 @@ input,textarea,select{-webkit-appearance:none;appearance:none;}
     <!-- ══ MORE ══ -->
     <section class="view" id="view-more">
       <div class="scroller">
+        <div class="sec">
+          <div class="sec-t">Team</div>
+          <div class="card" id="teamCard"></div>
+        </div>
         <div class="sec">
           <div class="sec-t">Data</div>
           <div class="card">
@@ -629,6 +682,34 @@ input,textarea,select{-webkit-appearance:none;appearance:none;}
   <div class="sheet-ft"><button class="btn btn-p" id="fSave">Save</button></div>
 </div>
 
+<!-- sign in / setup code / first-run admin -->
+<div class="sheet" id="sh-auth" style="max-height:92dvh">
+  <div class="grab" data-drag></div>
+  <div class="sheet-hd"><div class="st"><div class="sheet-t" id="auTitle">Sign in</div>
+    <div class="sheet-s" id="auSub">So your group can see where you are</div></div>
+    <button class="x-btn" data-close>✕</button></div>
+  <div class="sheet-bd" id="auBody"></div>
+</div>
+
+<!-- manage people (admin) -->
+<div class="sheet" id="sh-admin" style="height:88dvh">
+  <div class="grab" data-drag></div>
+  <div class="sheet-hd"><div class="st"><div class="sheet-t">People</div>
+    <div class="sheet-s" id="adSub"></div></div>
+    <button class="x-btn" data-close>✕</button></div>
+  <div class="sheet-bd" id="adBody" style="padding:10px 12px 20px"></div>
+  <div class="sheet-ft"><button class="btn btn-p" id="adAdd">＋ Add person</button></div>
+</div>
+
+<!-- who works this territory -->
+<div class="sheet" id="sh-assign" style="height:82dvh">
+  <div class="grab" data-drag></div>
+  <div class="sheet-hd"><div class="st"><div class="sheet-t">Who works this territory</div>
+    <div class="sheet-s" id="asSub"></div></div>
+    <button class="x-btn" data-close>✕</button></div>
+  <div class="sheet-bd" id="asBody" style="padding:10px 12px 20px"></div>
+</div>
+
 <!-- generic picker (territories / export / pending) -->
 <div class="sheet" id="sh-pick" style="max-height:80dvh">
   <div class="grab" data-drag></div>
@@ -643,7 +724,7 @@ input,textarea,select{-webkit-appearance:none;appearance:none;}
 
 /* ═══ CONFIG ═══ */
 var API="https://territory-manager-silk.vercel.app/api/territory";
-var APP_VERSION="2.1.0";
+var APP_VERSION="2.2.0";
 
 /* ═══════════════════════════════════════════════════════════════════════
    OFFLINE DATA LAYER
@@ -1869,6 +1950,8 @@ $("#pBody").addEventListener("click",function(e){
   var b=e.target.closest("[data-terr],[data-exp]");if(!b)return;
   if(b.dataset.terr!==undefined){
     terrFilter=b.dataset.terr;closeSheet("#sh-pick");renderHouses();fitPins();
+    stopPresence();updatePttVisibility();
+    if($("#view-map").classList.contains("active"))startPresence();
   }else{
     var m=terrMap();closeSheet("#sh-pick");
     if(b.dataset.exp==="__all__")Object.keys(m).sort().forEach(function(t){generateTerritoryPDF(t,m[t]);});
@@ -1972,8 +2055,10 @@ $("#locateBtn").addEventListener("click",function(){
 function showView(name){
   document.querySelectorAll(".view").forEach(function(v){v.classList.toggle("active",v.id==="view-"+name);});
   document.querySelectorAll(".tab").forEach(function(t){t.setAttribute("aria-selected",t.dataset.view===name?"true":"false");});
-  if(name==="map"){initMap();startMeWatch();setTimeout(function(){if(map)map.invalidateSize();},60);}
-  else stopMeWatch();
+  if(name==="map"){
+    initMap();startMeWatch();updatePttVisibility();startPresence();
+    setTimeout(function(){if(map)map.invalidateSize();},60);
+  }else{stopMeWatch();stopPresence();stopVoicePoll();}
   if(name==="rv")renderRV();
   if(name==="more"){buildTerrSub();updateSyncUI();showStorage();}
 }
@@ -2078,6 +2163,524 @@ function registerSW(){
   }).catch(function(){});
 }
 
+
+/* ═══════════════════════════════════════════════════════════════════════
+   TEAM — accounts, territory assignment, live positions, push-to-talk.
+
+   Everything here is additive: the house list, map and notes all work
+   signed out exactly as before. Signing in only adds the shared parts.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+var TEAM_API=API.replace(/\/territory$/,"/team");
+var me=null, authToken="";
+try{authToken=localStorage.getItem("tm_token")||"";}catch(e){}
+var teamUsers=[], teamTerritories=[], teamHasUsers=true;
+
+function initials(name){
+  var p=String(name||"?").trim().split(/\s+/);
+  return ((p[0]||"?")[0]+(p.length>1?p[p.length-1][0]:"")).toUpperCase();
+}
+
+function team(action,payload){
+  return fetch(TEAM_API,{
+    method:"POST",
+    headers:Object.assign({"Content-Type":"application/json"},
+      authToken?{Authorization:"Bearer "+authToken}:{}),
+    body:JSON.stringify(Object.assign({action:action},payload||{}))
+  }).then(function(r){
+    return r.text().then(function(t){
+      var j;try{j=JSON.parse(t);}catch(e){j={error:t.slice(0,200)};}
+      if(!r.ok){
+        // A dead session should sign you out cleanly, not fail silently forever.
+        if(r.status===401&&authToken&&action!=="login"&&action!=="redeemSetup")signOut(true);
+        var e2=new Error(j.error||("HTTP "+r.status));e2.status=r.status;throw e2;
+      }
+      return j;
+    });
+  });
+}
+
+function setSession(tok,user){
+  authToken=tok||"";me=user||null;
+  try{tok?localStorage.setItem("tm_token",tok):localStorage.removeItem("tm_token");}catch(e){}
+  renderTeamCard();
+}
+function signOut(silent){
+  stopPresence();stopVoicePoll();
+  setSession("",null);
+  if(!silent)toast("Signed out");
+}
+
+function refreshMe(){
+  return team("status",{}).then(function(r){
+    teamHasUsers=!!r.hasUsers;
+    me=(r.me&&r.me.id)?r.me:null;
+    if(!me)authToken="";
+    renderTeamCard();
+    return r;
+  }).catch(function(){renderTeamCard();});
+}
+
+/* ── More tab card ── */
+function renderTeamCard(){
+  var el=$("#teamCard");if(!el)return;
+  if(!me){
+    el.innerHTML=
+      '<button class="row" id="tmSignIn"><span class="row-ico">\u{1F464}</span>'+
+        '<span class="row-txt"><span class="row-t">'+(teamHasUsers?"Sign in":"Set up this phone")+'</span>'+
+        '<span class="row-s">Share your location and talk to your group</span></span>'+
+        '<span class="row-act">›</span></button>';
+    $("#tmSignIn").addEventListener("click",openAuth);
+    updatePttVisibility();
+    return;
+  }
+  el.innerHTML=
+    '<div class="row"><span class="who">'+esc(initials(me.name))+'</span>'+
+      '<span class="row-txt"><span class="row-t">'+esc(me.name)+'</span>'+
+      '<span class="row-s">'+esc(me.phone||me.email||"Signed in")+
+      (me.role==="admin"?" · Admin":"")+'</span></span></div>'+
+    '<button class="row" id="tmAssign"><span class="row-ico">\u{1F465}</span>'+
+      '<span class="row-txt"><span class="row-t">Who works this territory</span>'+
+      '<span class="row-s">Share a territory with others</span></span>'+
+      '<span class="row-act">›</span></button>'+
+    (me.role==="admin"?
+      '<button class="row" id="tmPeople"><span class="row-ico">\u{1F5C2}\u{FE0F}</span>'+
+        '<span class="row-txt"><span class="row-t">People</span>'+
+        '<span class="row-s">Add someone, or reset a password</span></span>'+
+        '<span class="row-act">›</span></button>':"")+
+    '<button class="row" id="tmPw"><span class="row-ico">\u{1F511}</span>'+
+      '<span class="row-txt"><span class="row-t">Change my password</span></span>'+
+      '<span class="row-act">›</span></button>'+
+    '<button class="row" id="tmOut"><span class="row-ico">\u{1F6AA}</span>'+
+      '<span class="row-txt"><span class="row-t">Sign out</span></span>'+
+      '<span class="row-act">›</span></button>';
+  $("#tmAssign").addEventListener("click",openAssign);
+  var pe=$("#tmPeople");if(pe)pe.addEventListener("click",openAdmin);
+  $("#tmPw").addEventListener("click",openChangePassword);
+  $("#tmOut").addEventListener("click",function(){
+    if(confirm("Sign out of this phone?"))signOut();
+  });
+  updatePttVisibility();
+}
+
+/* ── sign in / setup code / first admin ── */
+function openAuth(){
+  team("status",{}).then(function(r){teamHasUsers=!!r.hasUsers;drawAuth(teamHasUsers?"in":"first");})
+    .catch(function(){drawAuth("in");});
+  openSheet("#sh-auth");
+}
+function drawAuth(mode){
+  $("#auTitle").textContent=mode==="first"?"Set up the first account":mode==="code"?"Use a setup code":"Sign in";
+  $("#auSub").textContent=mode==="first"
+    ?"This becomes the admin who can add everyone else"
+    :mode==="code"?"Enter the code the admin gave you":"So your group can see where you are";
+
+  var seg=teamHasUsers
+    ? '<div class="seg"><button data-am="in" aria-selected="'+(mode==="in")+'">Sign in</button>'+
+      '<button data-am="code" aria-selected="'+(mode==="code")+'">I have a code</button></div>'
+    : "";
+
+  var form;
+  if(mode==="first"){
+    form='<div class="f"><label for="auName">Your name</label><input id="auName" autocomplete="name"></div>'+
+      '<div class="f"><label for="auPhone">Phone</label><input id="auPhone" type="tel" autocomplete="tel"></div>'+
+      '<div class="f"><label for="auPw">Choose a password</label><input id="auPw" type="password" autocomplete="new-password"></div>'+
+      '<button class="btn btn-p" id="auGo" style="width:100%">Create admin account</button>';
+  }else if(mode==="code"){
+    form='<div class="f"><label for="auCode">Setup code</label><input id="auCode" autocapitalize="characters" placeholder="ABC123"></div>'+
+      '<div class="f"><label for="auName">Your name</label><input id="auName" autocomplete="name"></div>'+
+      '<div class="f"><label for="auPhone">Phone</label><input id="auPhone" type="tel" autocomplete="tel"></div>'+
+      '<div class="f"><label for="auEmail">Email (optional)</label><input id="auEmail" type="email" autocomplete="email"></div>'+
+      '<div class="f"><label for="auPw">Choose a password</label><input id="auPw" type="password" autocomplete="new-password"></div>'+
+      '<button class="btn btn-p" id="auGo" style="width:100%">Set up my account</button>';
+  }else{
+    form='<div class="f"><label for="auLogin">Your name or phone</label><input id="auLogin" autocomplete="username"></div>'+
+      '<div class="f"><label for="auPw">Password</label><input id="auPw" type="password" autocomplete="current-password"></div>'+
+      '<button class="btn btn-p" id="auGo" style="width:100%">Sign in</button>';
+  }
+  $("#auBody").innerHTML=seg+form+'<div id="auErr" style="color:var(--bad);font-size:13.5px;margin-top:10px"></div>';
+
+  $("#auBody").querySelectorAll("[data-am]").forEach(function(b){
+    b.addEventListener("click",function(){drawAuth(b.dataset.am);});
+  });
+
+  $("#auGo").addEventListener("click",function(){
+    var btn=this,err=$("#auErr");err.textContent="";
+    var pwEl=$("#auPw"),pw=pwEl?pwEl.value:"";
+    var payload,act,label=btn.textContent;
+    if(mode==="first"){
+      act="bootstrapAdmin";
+      payload={name:$("#auName").value.trim(),phone:$("#auPhone").value.trim(),password:pw};
+      if(!payload.name){err.textContent="Please enter your name";return;}
+    }else if(mode==="code"){
+      act="redeemSetup";
+      payload={setupCode:$("#auCode").value.trim().toUpperCase(),name:$("#auName").value.trim(),
+        phone:$("#auPhone").value.trim(),email:$("#auEmail").value.trim(),password:pw};
+      if(!payload.setupCode){err.textContent="Enter the code the admin gave you";return;}
+    }else{
+      act="login";
+      payload={login:$("#auLogin").value.trim(),password:pw};
+      if(!payload.login){err.textContent="Enter your name or phone";return;}
+    }
+    if(act!=="login"&&pw.length<6){err.textContent="Password must be at least 6 characters";return;}
+    btn.disabled=true;btn.textContent="Please wait…";
+    team(act,payload).then(function(r){
+      setSession(r.token,r.user);
+      closeSheet("#sh-auth");
+      toast("Hello, "+String(r.user.name).split(" ")[0]+" ✓");
+      loadTeam();
+    }).catch(function(e){
+      err.textContent=e.message;
+      btn.disabled=false;btn.textContent=label;
+    });
+  });
+}
+
+function openChangePassword(){
+  $("#pTitle").textContent="Change my password";
+  $("#pSub").textContent=me?me.name:"";
+  $("#pBody").innerHTML=
+    '<div class="f"><label for="cpOld">Current password</label><input id="cpOld" type="password" autocomplete="current-password"></div>'+
+    '<div class="f"><label for="cpNew">New password</label><input id="cpNew" type="password" autocomplete="new-password"></div>'+
+    '<button class="btn btn-p" id="cpGo" style="width:100%">Save new password</button>'+
+    '<div id="cpErr" style="color:var(--bad);font-size:13.5px;margin-top:10px"></div>';
+  $("#cpGo").addEventListener("click",function(){
+    var b=this;$("#cpErr").textContent="";
+    b.disabled=true;
+    team("changePassword",{currentPassword:$("#cpOld").value,newPassword:$("#cpNew").value})
+      .then(function(){closeSheet("#sh-pick");toast("Password changed ✓");})
+      .catch(function(e){$("#cpErr").textContent=e.message;b.disabled=false;});
+  });
+  openSheet("#sh-pick");
+}
+
+/* ── admin: people ── */
+function openAdmin(){openSheet("#sh-admin");drawAdmin();}
+function drawAdmin(){
+  $("#adBody").innerHTML='<div class="empty">Loading…</div>';
+  team("listUsers",{}).then(function(r){
+    teamUsers=r.users||[];
+    $("#adSub").textContent=teamUsers.length+" "+(teamUsers.length===1?"person":"people");
+    $("#adBody").innerHTML='<div class="card">'+teamUsers.map(function(u){
+      var tags=(u.role==="admin"?'<span class="pill-tag admin">admin</span> ':"")+
+        (u.mustSetup?'<span class="pill-tag pend">code '+esc(u.setupCode||"")+'</span> ':"")+
+        (!u.active?'<span class="pill-tag off">off</span>':"");
+      return '<button class="user-row" data-u="'+esc(u.id)+'">'+
+        '<span class="who '+(u.active?"":"gray")+'">'+esc(initials(u.name))+'</span>'+
+        '<span class="row-txt"><span class="ur-t">'+esc(u.name)+'</span>'+
+        '<span class="ur-s">'+esc(u.phone||u.email||"No contact details")+'</span></span>'+
+        '<span style="display:flex;gap:4px;align-items:center;flex:0 0 auto">'+tags+'</span></button>';
+    }).join("")+'</div>';
+    $("#adBody").querySelectorAll("[data-u]").forEach(function(b){
+      b.addEventListener("click",function(){userActions(b.dataset.u);});
+    });
+  }).catch(function(e){
+    $("#adBody").innerHTML='<div class="empty">'+esc(e.message)+'</div>';
+  });
+}
+function showCode(title,sub,intro,code){
+  $("#pTitle").textContent=title;
+  $("#pSub").textContent=sub;
+  $("#pBody").innerHTML='<p style="font-size:14.5px;margin-bottom:2px">'+intro+'</p>'+
+    '<div class="code-box">'+esc(code)+'</div>'+
+    '<p style="font-size:13px;color:var(--text-2)">They choose their own password. '+
+    'The code stops working once it is used.</p>';
+  openSheet("#sh-pick");
+}
+function userActions(id){
+  var u=teamUsers.find(function(x){return x.id===id;});if(!u)return;
+  $("#pTitle").textContent=u.name;
+  $("#pSub").textContent=u.phone||u.email||"";
+  $("#pBody").innerHTML=
+    (u.mustSetup&&u.setupCode?'<div class="lbl" style="margin-top:0">Setup code — give this to them</div>'+
+      '<div class="code-box">'+esc(u.setupCode)+'</div>':"")+
+    '<button class="btn btn-s" data-ua="reset" style="width:100%;margin-bottom:8px">Reset password</button>'+
+    '<button class="btn btn-s" data-ua="role" style="width:100%;margin-bottom:8px">'+
+      (u.role==="admin"?"Remove admin":"Make admin")+'</button>'+
+    '<button class="btn btn-s" data-ua="active" style="width:100%;margin-bottom:8px">'+
+      (u.active?"Deactivate":"Reactivate")+'</button>'+
+    '<button class="btn btn-d" data-ua="del" style="width:100%">Delete this person</button>'+
+    '<div id="uaErr" style="color:var(--bad);font-size:13.5px;margin-top:10px"></div>';
+  $("#pBody").querySelectorAll("[data-ua]").forEach(function(b){
+    b.addEventListener("click",function(){
+      var a=b.dataset.ua,run,msg;
+      if(a==="reset"){run=team("resetPassword",{id:id});msg="Password reset";}
+      else if(a==="role"){run=team("setUserRole",{id:id,role:u.role==="admin"?"user":"admin"});msg="Role changed";}
+      else if(a==="active"){run=team("setUserActive",{id:id,active:!u.active});msg="Updated";}
+      else{
+        if(!confirm("Delete "+u.name+"?\n\nThis cannot be undone."))return;
+        run=team("deleteUser",{id:id});msg="Deleted";
+      }
+      b.disabled=true;
+      run.then(function(r){
+        closeSheet("#sh-pick");
+        drawAdmin();
+        if(a==="reset"&&r.setupCode){
+          setTimeout(function(){
+            showCode("New setup code",u.name,"Give this code to "+esc(u.name)+
+              ". They enter it to set a new password.",r.setupCode);
+          },280);
+        }else toast(msg+" ✓");
+      }).catch(function(e){$("#uaErr").textContent=e.message;b.disabled=false;});
+    });
+  });
+  openSheet("#sh-pick");
+}
+
+$("#adAdd").addEventListener("click",function(){
+  $("#pTitle").textContent="Add a person";
+  $("#pSub").textContent="They choose their own password using the code";
+  $("#pBody").innerHTML=
+    '<div class="f"><label for="nuName">Name</label><input id="nuName" autocomplete="off"></div>'+
+    '<div class="f"><label for="nuPhone">Phone (optional)</label><input id="nuPhone" type="tel"></div>'+
+    '<button class="btn btn-p" id="nuGo" style="width:100%">Create and get code</button>'+
+    '<div id="nuErr" style="color:var(--bad);font-size:13.5px;margin-top:10px"></div>';
+  $("#nuGo").addEventListener("click",function(){
+    var b=this,name=$("#nuName").value.trim();
+    if(!name){$("#nuErr").textContent="Name is required";return;}
+    b.disabled=true;
+    team("createUser",{name:name,phone:$("#nuPhone").value.trim()}).then(function(r){
+      drawAdmin();
+      showCode("Give them this code",name,
+        esc(name)+" opens the app, taps <b>More → Sign in → I have a code</b>, and enters:",
+        r.setupCode);
+    }).catch(function(e){$("#nuErr").textContent=e.message;b.disabled=false;});
+  });
+  openSheet("#sh-pick");
+});
+
+/* ── assignment ── */
+function openAssign(){openSheet("#sh-assign");drawAssign();}
+function drawAssign(pick){
+  $("#asBody").innerHTML='<div class="empty">Loading…</div>';
+  team("listTerritories",{}).then(function(r){
+    teamUsers=r.users||[];teamTerritories=r.territories||[];
+    var names={};
+    records.forEach(function(h){names[h.HouseTerritoryNumber||"Unassigned"]=1;});
+    teamTerritories.forEach(function(t){names[t.name]=1;});
+    var keys=Object.keys(names).sort();
+    if(!keys.length){$("#asBody").innerHTML='<div class="empty">No territories yet.</div>';return;}
+    var cur=pick||(terrFilter!=="all"&&names[terrFilter]?terrFilter:keys[0]);
+    $("#asSub").textContent=cur;
+    var t=teamTerritories.find(function(x){return x.name===cur;})||{name:cur,ownerId:"",assigneeIds:[]};
+    var canEdit=me&&(me.role==="admin"||!t.ownerId||t.ownerId===me.id);
+    var ownerName=(t.owner&&t.owner.name)||"";
+
+    $("#asBody").innerHTML=
+      '<div class="f"><label for="asTerr">Territory</label><select id="asTerr">'+
+        keys.map(function(k){return '<option value="'+esc(k)+'"'+(k===cur?" selected":"")+'>'+esc(k)+'</option>';}).join("")+
+      '</select></div>'+
+      '<div class="lbl">Assigned to</div>'+
+      '<div class="card"><div class="row"><span class="who '+(ownerName?"":"gray")+'">'+
+        esc(ownerName?initials(ownerName):"?")+'</span>'+
+        '<span class="row-txt"><span class="row-t">'+esc(ownerName||"Not claimed yet")+'</span>'+
+        '<span class="row-s">'+(t.ownerId?"Runs this territory":"Nobody is running this one")+'</span></span></div></div>'+
+      (!t.ownerId?'<button class="btn btn-p" id="asClaim" style="width:100%;margin-top:10px">Take this territory</button>':"")+
+      '<div class="lbl">Helpers</div>'+
+      (canEdit?"":'<p style="font-size:13px;color:var(--text-2);margin-bottom:8px">Only '+
+        esc(ownerName||"the owner")+' can change this.</p>')+
+      '<div class="card">'+teamUsers.filter(function(u){return u.id!==t.ownerId;}).map(function(u){
+        var on=(t.assigneeIds||[]).indexOf(u.id)!==-1;
+        return '<div class="row"><span class="who '+(on?"":"gray")+'">'+esc(initials(u.name))+'</span>'+
+          '<span class="row-txt"><span class="row-t">'+esc(u.name)+'</span>'+
+          '<span class="row-s">'+esc(u.phone||u.email||"")+'</span></span>'+
+          '<button class="sw" role="switch" data-as="'+esc(u.id)+'" aria-checked="'+on+'"'+
+          (canEdit?"":' disabled style="opacity:.4"')+'></button></div>';
+      }).join("")+'</div>'+
+      '<p style="font-size:13px;color:var(--text-2);margin-top:12px">'+
+      'Helpers see each other on the map and can talk with the button there, '+
+      'while the Map tab is open.</p>';
+
+    $("#asTerr").addEventListener("change",function(){drawAssign(this.value);});
+    var cl=$("#asClaim");
+    if(cl)cl.addEventListener("click",function(){
+      cl.disabled=true;
+      team("assignTerritory",{territory:cur,ownerId:me.id}).then(function(){
+        toast("Territory is yours ✓");drawAssign(cur);
+      }).catch(function(e){toast(e.message,true);cl.disabled=false;});
+    });
+    $("#asBody").querySelectorAll("[data-as]").forEach(function(b){
+      b.addEventListener("click",function(){
+        if(b.disabled)return;
+        b.setAttribute("aria-checked",b.getAttribute("aria-checked")!=="true"?"true":"false");
+        var ids=[];
+        $("#asBody").querySelectorAll("[data-as]").forEach(function(x){
+          if(x.getAttribute("aria-checked")==="true")ids.push(x.dataset.as);
+        });
+        team("assignTerritory",{territory:cur,assigneeIds:ids})
+          .then(function(){toast("Saved ✓");})
+          .catch(function(e){toast(e.message,true);drawAssign(cur);});
+      });
+    });
+  }).catch(function(e){
+    $("#asBody").innerHTML='<div class="empty">'+esc(e.message)+'</div>';
+  });
+}
+
+/* ── live positions ─────────────────────────────────────────────────────
+   Posting and polling run only while the Map tab is open and a specific
+   territory is selected. A background position feed is both a battery
+   drain and a privacy problem. */
+var presTimer=null, mateMarkers={};
+function activeTerritory(){return terrFilter!=="all"?terrFilter:null;}
+
+function startPresence(){
+  if(presTimer||!me||!activeTerritory())return;
+  var tick=function(){
+    var terr=activeTerritory();if(!terr)return;
+    if(meMarker){
+      var ll=meMarker.getLatLng();
+      team("postPresence",{territory:terr,lat:ll.lat,lng:ll.lng,acc:0}).catch(function(){});
+    }
+    team("getPresence",{territory:terr}).then(drawMates).catch(function(){});
+  };
+  tick();
+  presTimer=setInterval(tick,15000);
+}
+function stopPresence(){
+  if(presTimer){clearInterval(presTimer);presTimer=null;}
+  Object.keys(mateMarkers).forEach(function(k){
+    if(mapReady)map.removeLayer(mateMarkers[k]);
+    delete mateMarkers[k];
+  });
+  if(me)team("clearPresence",{}).catch(function(){});
+}
+function drawMates(r){
+  if(!mapReady)return;
+  var seen={};
+  (r.people||[]).forEach(function(p){
+    seen[p.userId]=1;
+    var icon=L.divIcon({className:"",iconSize:[26,40],iconAnchor:[13,13],
+      html:'<div class="mate-pin"><div class="mp-dot">'+esc(initials(p.name))+'</div>'+
+           '<div class="mp-name">'+esc(String(p.name).split(" ")[0])+'</div></div>'});
+    if(mateMarkers[p.userId])mateMarkers[p.userId].setLatLng([p.lat,p.lng]).setIcon(icon);
+    else mateMarkers[p.userId]=L.marker([p.lat,p.lng],{icon:icon,zIndexOffset:500}).addTo(map);
+  });
+  Object.keys(mateMarkers).forEach(function(k){
+    if(!seen[k]){map.removeLayer(mateMarkers[k]);delete mateMarkers[k];}
+  });
+}
+
+/* ── push to talk ───────────────────────────────────────────────────── */
+var mediaRec=null, chunks=[], recStop=null, lastVoiceTs=0, voiceTimer=null;
+var audioQueue=[], playing=false;
+
+function pttSupported(){
+  return !!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia&&window.MediaRecorder);
+}
+function updatePttVisibility(){
+  var w=$("#pttWrap");if(!w)return;
+  var on=!!me&&!!activeTerritory()&&pttSupported();
+  w.classList.toggle("on",on);
+  if(on)startVoicePoll();else stopVoicePoll();
+}
+function pickMime(){
+  var opts=["audio/webm;codecs=opus","audio/webm","audio/mp4","audio/ogg;codecs=opus"];
+  for(var i=0;i<opts.length;i++)
+    if(window.MediaRecorder&&MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(opts[i]))return opts[i];
+  return "";
+}
+function pttHint(t,resetMs){
+  var h=$("#pttHint");if(!h)return;
+  h.textContent=t;
+  if(resetMs)setTimeout(function(){h.textContent="Hold to talk";},resetMs);
+}
+
+function startTalk(){
+  if(mediaRec||!pttSupported()||!me||!activeTerritory())return;
+  var btn=$("#ptt");
+  navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
+    var mime=pickMime();
+    try{mediaRec=new MediaRecorder(stream,mime?{mimeType:mime,audioBitsPerSecond:16000}:undefined);}
+    catch(e){mediaRec=new MediaRecorder(stream);}
+    chunks=[];
+    var started=Date.now();
+    mediaRec.ondataavailable=function(e){if(e.data&&e.data.size)chunks.push(e.data);};
+    mediaRec.onstop=function(){
+      stream.getTracks().forEach(function(t){t.stop();});
+      var blob=new Blob(chunks,{type:mediaRec&&mediaRec.mimeType||mime||"audio/webm"});
+      mediaRec=null;
+      btn.classList.remove("rec");
+      var secs=Math.round((Date.now()-started)/1000);
+      if(secs<1||blob.size<800){pttHint("Hold to talk");return;}
+      pttHint("Sending…");
+      var fr=new FileReader();
+      fr.onload=function(){
+        var dataUrl=String(fr.result);
+        if(dataUrl.length>44000){pttHint("Too long — keep it under 10s",2600);return;}
+        team("postVoice",{territory:activeTerritory(),audio:dataUrl,dur:secs})
+          .then(function(){pttHint("Sent ✓",1600);})
+          .catch(function(e){pttHint(String(e.message).slice(0,44),2800);});
+      };
+      fr.readAsDataURL(blob);
+    };
+    mediaRec.start();
+    btn.classList.add("rec");
+    pttHint("Listening… release to send");
+    haptic(15);
+    // Hard stop: a stuck button must not record until the battery dies.
+    recStop=setTimeout(stopTalk,10000);
+  }).catch(function(){pttHint("Microphone blocked",2800);});
+}
+function stopTalk(){
+  if(recStop){clearTimeout(recStop);recStop=null;}
+  if(mediaRec&&mediaRec.state!=="inactive"){try{mediaRec.stop();}catch(e){mediaRec=null;}}
+}
+
+function startVoicePoll(){
+  if(voiceTimer||!me)return;
+  // Only clips from now on — nobody wants a backlog replayed at them.
+  if(!lastVoiceTs)lastVoiceTs=Date.now();
+  var tick=function(){
+    var terr=activeTerritory();if(!terr)return;
+    team("getVoice",{territory:terr,since:lastVoiceTs}).then(function(r){
+      (r.clips||[]).forEach(function(c){
+        if(c.ts>lastVoiceTs)lastVoiceTs=c.ts;
+        audioQueue.push(c);
+      });
+      playNext();
+    }).catch(function(){});
+  };
+  voiceTimer=setInterval(tick,8000);
+  tick();
+}
+function stopVoicePoll(){
+  if(voiceTimer){clearInterval(voiceTimer);voiceTimer=null;}
+  audioQueue=[];
+}
+function playNext(){
+  if(playing||!audioQueue.length)return;
+  var c=audioQueue.shift();
+  playing=true;
+  toast("\u{1F50A} "+String(c.name).split(" ")[0]);
+  var a=new Audio(c.audio);
+  a.onended=a.onerror=function(){playing=false;playNext();};
+  var pr=a.play();
+  if(pr&&pr.catch)pr.catch(function(){
+    // Autoplay stays blocked until the page has been interacted with.
+    playing=false;
+    audioQueue.unshift(c);
+    toast("Tap the screen to hear "+String(c.name).split(" ")[0],true);
+  });
+}
+
+(function bindPtt(){
+  var b=$("#ptt");if(!b)return;
+  b.addEventListener("touchstart",function(e){e.preventDefault();startTalk();},{passive:false});
+  b.addEventListener("touchend",function(e){e.preventDefault();stopTalk();});
+  b.addEventListener("touchcancel",stopTalk);
+  b.addEventListener("mousedown",startTalk);
+  b.addEventListener("mouseup",stopTalk);
+  b.addEventListener("mouseleave",stopTalk);
+})();
+
+function loadTeam(){
+  if(!me)return;
+  team("listTerritories",{}).then(function(r){
+    teamUsers=r.users||[];teamTerritories=r.territories||[];
+  }).catch(function(){});
+}
+
 /* ═══ BOOT ═══ */
 function boot(){
   offlineMode=localStorage.getItem("tm_offline")==="1";
@@ -2118,6 +2721,7 @@ function boot(){
   });
 
   registerSW();
+  refreshMe().then(loadTeam);
 }
 
 window.addEventListener("online",function(){if(!offlineMode)doSync(false);updateSyncUI();});
