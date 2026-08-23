@@ -27,7 +27,10 @@
   /* Apartment units. Indigo: distinct from the visit-status colours (green,
      amber, red, grey) and from return-visit violet, so a unit number never
      reads as a status. */
-  --unit:#2E35C4; --unit-soft:#EAECFF;
+  /* Apartment building number. Blue, distinct from every status colour. */
+  --unit:#1565C0; --unit-soft:#E3F0FC;
+  /* Street headings. */
+  --street:#C0392B;
   --ok:#12805C; --ok-soft:#E4F5EE;
   --warn:#B54708; --warn-soft:#FDF0E6;
   --bad:#B42318; --bad-soft:#FDECEA;
@@ -48,7 +51,8 @@
     --border:#293039; --border-strong:#3A424E;
     --brand:#3FB68B; --brand-soft:#12301F; --brand-ink:#05150E;
     --rv:#A98BFF; --rv-soft:#241B3A;
-    --unit:#93A4FF; --unit-soft:#1B1F45;
+    --unit:#6BB6FF; --unit-soft:#12283C;
+    --street:#FF8577;
     --ok:#3FB68B; --ok-soft:#12301F;
     --warn:#E8944A; --warn-soft:#33210F;
     --bad:#F27267; --bad-soft:#331815;
@@ -155,8 +159,8 @@ input,textarea,select{-webkit-appearance:none;appearance:none;}
 /* ═══ HOUSE LIST ══════════════════════════════════════════════════════ */
 .street-hd{
   position:sticky;top:0;z-index:2;padding:11px 16px 9px;
-  background:var(--bg);color:var(--text);
-  font-size:17px;font-weight:800;letter-spacing:.01em;line-height:1.2;
+  background:var(--bg);color:var(--street);
+  font-size:21px;font-weight:800;letter-spacing:-.01em;line-height:1.2;
   border-bottom:1px solid var(--border);
 }
 .street-hd .st-count{font-size:13px;font-weight:700;color:var(--text-3);letter-spacing:0;}
@@ -167,7 +171,7 @@ input,textarea,select{-webkit-appearance:none;appearance:none;}
   display:flex;align-items:center;gap:7px;padding:11px 16px 5px;
   font-size:16px;font-weight:800;color:var(--unit);letter-spacing:-.01em;
 }
-.apt-hd .apt-ico{font-size:17px;line-height:1;}
+.apt-hd .apt-ico{width:22px;height:22px;flex:0 0 auto;display:block;color:var(--unit);}
 .apt-hd .apt-n{font-size:12px;font-weight:700;color:var(--text-3);letter-spacing:.04em;text-transform:uppercase;}
 .house{
   display:flex;align-items:center;gap:10px;padding:9px 12px 9px 14px;min-height:62px;
@@ -176,14 +180,10 @@ input,textarea,select{-webkit-appearance:none;appearance:none;}
 .house:active{background:var(--surface-2);}
 /* Unit rows sit under their building header, marked by a coloured rail so the
    group reads as one address rather than a run of separate houses. */
-.house.unit{padding-left:14px;border-left:3px solid var(--unit-soft);}
-.house.unit .house-num{
-  font-size:26px;font-weight:850;color:var(--unit);letter-spacing:-.02em;
-  display:flex;align-items:center;gap:6px;
-}
-.house.unit .house-num .u-ico{font-size:18px;line-height:1;flex:0 0 auto;}
-.house.unit .house-num .u-num{white-space:nowrap;}
-.house.unit .house-num .u-hash{font-size:18px;font-weight:700;opacity:.5;}
+/* Units sit under their building header: a small indent and italics mark them
+   as part of that building, without competing with the house numbers. */
+.house.unit{padding-left:30px;border-left:3px solid var(--unit-soft);}
+.house.unit .house-num{font-style:italic;}
 .house-main{flex:1;min-width:0;display:flex;align-items:center;gap:10px;text-align:left;}
 .house-dot{width:10px;height:10px;border-radius:50%;flex:0 0 auto;}
 .dot-recent{background:var(--ok);} .dot-due{background:var(--warn);}
@@ -194,11 +194,7 @@ input,textarea,select{-webkit-appearance:none;appearance:none;}
 .house-sub{display:block;font-size:12.5px;color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px;}
 .house-sub .rv-tag{color:var(--rv);font-weight:700;}
 .house-sub .pend{color:var(--warn);font-weight:700;}
-.log-btn{
-  flex:0 0 auto;height:40px;min-width:64px;padding:0 14px;border-radius:var(--r-md);
-  background:var(--brand);color:var(--brand-ink);font-size:14px;font-weight:700;
-}
-.log-btn:active{filter:brightness(.92);}
+/* the list row is one full-width target now; logging lives on the detail sheet */
 .empty{padding:56px 24px;text-align:center;color:var(--text-3);font-size:15px;}
 .empty .big{font-size:34px;display:block;margin-bottom:10px;}
 
@@ -647,7 +643,7 @@ input,textarea,select{-webkit-appearance:none;appearance:none;}
 
 /* ═══ CONFIG ═══ */
 var API="https://territory-manager-silk.vercel.app/api/territory";
-var APP_VERSION="2.0.3";
+var APP_VERSION="2.1.0";
 
 /* ═══════════════════════════════════════════════════════════════════════
    OFFLINE DATA LAYER
@@ -1307,6 +1303,10 @@ function houseSubtitle(h){
   return bits.join(" · ");
 }
 
+var BLDG_SVG='<svg class="apt-ico" viewBox="0 0 24 24" fill="currentColor" fill-rule="evenodd" aria-hidden="true">'+
+  '<path d="M1 1h13.2v22H1V1zm2.2 2.2v3h3.3v-3H3.2zm5.5 0v3H12v-3H8.7zM3.2 8.4v3h3.3v-3H3.2zm5.5 0v3H12v-3H8.7zM3.2 13.6v3h3.3v-3H3.2zm5.5 0v3H12v-3H8.7zM5.6 18.6V23h4v-4.4h-4z"/>'+
+  '<path d="M15.4 7.2H23V23h-7.6V7.2zm1.9 2.1v3h3.8v-3h-3.8zm0 5.1v3h3.8v-3h-3.8zm0 5.1V23h3.8v-3.6h-3.8z"/></svg>';
+
 function renderHouses(){
   applyFilters();updateCounts();
   var el=$("#houseList");
@@ -1332,7 +1332,7 @@ function renderHouses(){
     });
     groups.forEach(function(gr){
       var multi=gr.items.length>1&&gr.items.some(function(h){return hasApt(h.HouseAddress);});
-      if(multi)html+='<div class="apt-hd"><span class="apt-ico">🏢</span>'+esc(gr.num)+
+      if(multi)html+='<div class="apt-hd">'+BLDG_SVG+esc(gr.num)+
         '<span class="apt-n">'+gr.items.length+' units</span></div>';
       gr.items.forEach(function(h){
         var apt=extractApt(h.HouseAddress);
@@ -1350,14 +1350,12 @@ function houseRow(h,label,isUnit){
       '<span class="house-dot dot-'+visitStatus(h.HouseLastVisitDate)+'"></span>'+
       '<span class="house-txt">'+
         '<span class="house-num">'+
-          (isUnit?'<span class="u-ico">🏢</span><span class="u-num"><span class="u-hash">#</span>'+esc(label)+'</span>'
-                 :esc(label))+
+          esc(label)+
           (h.HouseVerifiedOnMaps==="No"?'<span class="warn-mark" title="Not found on maps">⚠</span>':'')+
         '</span>'+
         '<span class="house-sub">'+houseSubtitle(h)+'</span>'+
       '</span>'+
     '</button>'+
-    '<button class="log-btn" data-act="log" data-id="'+esc(h.id)+'">Log</button>'+
   '</div>';
 }
 
@@ -1927,6 +1925,31 @@ function refreshMapPins(){
     markerMap[h.id]=m;
   });
 }
+/* Own position, live. watchPosition only runs while the Map tab is showing —
+   a GPS watch left running in the background is the fastest way to flatten a
+   phone battery mid-territory. */
+var meWatch=null,meMarker=null,meAccuracy=null;
+function startMeWatch(){
+  if(meWatch!==null||!navigator.geolocation||!mapReady)return;
+  meWatch=navigator.geolocation.watchPosition(function(p){
+    var lat=p.coords.latitude,lng=p.coords.longitude,acc=p.coords.accuracy||0;
+    if(!meMarker){
+      meAccuracy=L.circle([lat,lng],{radius:acc,color:"#2563EB",weight:1,
+        fillColor:"#2563EB",fillOpacity:.12,interactive:false}).addTo(map);
+      meMarker=L.circleMarker([lat,lng],{radius:8,color:"#fff",weight:3,
+        fillColor:"#2563EB",fillOpacity:1,interactive:false}).addTo(map);
+      map.setView([lat,lng],Math.max(map.getZoom(),16));
+    }else{
+      meMarker.setLatLng([lat,lng]);
+      meAccuracy.setLatLng([lat,lng]).setRadius(acc);
+    }
+  },function(){},{enableHighAccuracy:true,maximumAge:5000,timeout:20000});
+}
+function stopMeWatch(){
+  if(meWatch===null)return;
+  navigator.geolocation.clearWatch(meWatch);meWatch=null;
+}
+
 function fitPins(){
   if(!mapReady)return;
   var pts=[];
@@ -1941,9 +1964,7 @@ $("#locateBtn").addEventListener("click",function(){
   navigator.geolocation.getCurrentPosition(function(p){
     b.style.opacity="";
     map.setView([p.coords.latitude,p.coords.longitude],17);
-    if(window._meMarker)map.removeLayer(window._meMarker);
-    window._meMarker=L.circleMarker([p.coords.latitude,p.coords.longitude],
-      {radius:8,color:"#fff",weight:3,fillColor:"#2563EB",fillOpacity:1}).addTo(map);
+    startMeWatch();
   },function(){b.style.opacity="";toast("Could not get location",true);},{enableHighAccuracy:true,timeout:15000});
 });
 
@@ -1951,7 +1972,8 @@ $("#locateBtn").addEventListener("click",function(){
 function showView(name){
   document.querySelectorAll(".view").forEach(function(v){v.classList.toggle("active",v.id==="view-"+name);});
   document.querySelectorAll(".tab").forEach(function(t){t.setAttribute("aria-selected",t.dataset.view===name?"true":"false");});
-  if(name==="map"){initMap();setTimeout(function(){if(map)map.invalidateSize();},60);}
+  if(name==="map"){initMap();startMeWatch();setTimeout(function(){if(map)map.invalidateSize();},60);}
+  else stopMeWatch();
   if(name==="rv")renderRV();
   if(name==="more"){buildTerrSub();updateSyncUI();showStorage();}
 }

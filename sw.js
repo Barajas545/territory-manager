@@ -2,7 +2,7 @@
    Lives at the GitHub Pages project subpath, so its scope is /territory-manager/.
    Bump CACHE_VERSION on every deploy that changes the shell. */
 
-const CACHE_VERSION = 'v9';
+const CACHE_VERSION = 'v10';
 const SHELL_CACHE = `tm-shell-${CACHE_VERSION}`;
 const VENDOR_CACHE = `tm-vendor-${CACHE_VERSION}`;
 const TILE_CACHE = 'tm-tiles-v1'; // survives shell upgrades; tiles never go stale
