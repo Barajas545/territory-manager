@@ -242,9 +242,25 @@ module.exports = async (req, res) => {
     const bearer = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
     const claims = verify(bearer);
 
+    /* Sheets allows only 60 reads a minute for the whole service account, and
+       several actions here legitimately need the same tab more than once
+       (teamFor re-reads what its caller already read). Without this, a couple
+       of people working together exhaust the quota and every request starts
+       failing. The cache lives for one request only — module scope would serve
+       one user another user's stale data. */
+    const _cache = new Map();
+    const rd = async spec => {
+      if (!_cache.has(spec.name)) _cache.set(spec.name, await readTab(sheets, spec));
+      return _cache.get(spec.name);
+    };
+    const wr = async (spec, row, obj) => { _cache.delete(spec.name); return writeRow(sheets, spec, row, obj); };
+    const ap = async (spec, obj) => { _cache.delete(spec.name); return appendRow(sheets, spec, obj); };
+    const dl = async (spec, rows) => { _cache.delete(spec.name); return deleteRows(sheets, spec, rows); };
+    const wrs = async (spec, entries) => { _cache.delete(spec.name); return writeRows(sheets, spec, entries); };
+
     async function currentUser() {
       if (!claims || !claims.uid) return null;
-      const users = await readTab(sheets, TABS.users);
+      const users = await rd(TABS.users);
       const u = users.find(x => x.id === claims.uid);
       return u && u.active !== '0' ? u : null;
     }
@@ -284,7 +300,7 @@ module.exports = async (req, res) => {
     /* ══ ACCOUNTS ══ */
 
     if (action === 'status') {
-      const users = await readTab(sheets, TABS.users);
+      const users = await rd(TABS.users);
       return res.json({
         ok: true,
         hasUsers: users.length > 0,
@@ -296,7 +312,7 @@ module.exports = async (req, res) => {
     /* First-run only. Creates the very first admin, and refuses once any user
        exists — so it is open for exactly as long as there is nothing to protect. */
     if (action === 'bootstrapAdmin') {
-      const users = await readTab(sheets, TABS.users);
+      const users = await rd(TABS.users);
       if (users.length) return res.status(400).json({ error: 'Setup already completed' });
       const name = String(body.name || '').trim();
       const pw = String(body.password || '');
@@ -308,12 +324,12 @@ module.exports = async (req, res) => {
         role: 'admin', passHash: hash, passSalt: salt, setupCode: '', mustSetup: '0', active: '1',
         createdAt: nowIso, updatedAt: nowIso,
       };
-      await appendRow(sheets, TABS.users, rec);
+      await ap(TABS.users, rec);
       return res.json({ ok: true, token: sign({ uid: rec.id, exp: now + TOKEN_TTL_MS }), user: publicUser(rec) });
     }
 
     if (action === 'login') {
-      const users = await readTab(sheets, TABS.users);
+      const users = await rd(TABS.users);
       const login = norm(body.login);
       const u = users.find(x => x.active !== '0' &&
         (norm(x.name) === login || norm(x.phone) === login ||
@@ -332,7 +348,7 @@ module.exports = async (req, res) => {
     /* First run for an invited person: they present the code the admin gave
        them, fill in their own contact details, and choose their password. */
     if (action === 'redeemSetup') {
-      const users = await readTab(sheets, TABS.users);
+      const users = await rd(TABS.users);
       const code = String(body.setupCode || '').trim().toUpperCase();
       const u = users.find(x => x.setupCode && x.setupCode === code && x.active !== '0');
       if (!u) return res.status(400).json({ error: 'That setup code is not valid' });
@@ -347,7 +363,7 @@ module.exports = async (req, res) => {
         passHash: hash, passSalt: salt,
         setupCode: '', mustSetup: '0', updatedAt: nowIso,
       });
-      await writeRow(sheets, TABS.users, u._row, updated);
+      await wr(TABS.users, u._row, updated);
       return res.json({
         ok: true,
         token: sign({ uid: u.id, exp: now + TOKEN_TTL_MS }),
@@ -362,7 +378,7 @@ module.exports = async (req, res) => {
       const pw = String(body.newPassword || '');
       if (pw.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
       const { hash, salt } = hashPassword(pw);
-      await writeRow(sheets, TABS.users, u._row,
+      await wr(TABS.users, u._row,
         Object.assign({}, u, { passHash: hash, passSalt: salt, updatedAt: nowIso }));
       return res.json({ ok: true });
     }
@@ -375,7 +391,7 @@ module.exports = async (req, res) => {
         email: String(body.email !== undefined ? body.email : u.email).trim(),
         updatedAt: nowIso,
       });
-      await writeRow(sheets, TABS.users, u._row, updated);
+      await wr(TABS.users, u._row, updated);
       return res.json({ ok: true, user: publicUser(updated) });
     }
 
@@ -383,7 +399,7 @@ module.exports = async (req, res) => {
 
     if (action === 'listUsers') {
       await requireAdmin();
-      const users = await readTab(sheets, TABS.users);
+      const users = await rd(TABS.users);
       // The pending setup code is shown to the admin only, so they can pass it on.
       return res.json({ ok: true, users: users.map(u => Object.assign(publicUser(u),
         { setupCode: u.mustSetup === '1' ? u.setupCode : '' })) });
@@ -391,7 +407,7 @@ module.exports = async (req, res) => {
 
     if (action === 'createUser') {
       await requireAdmin();
-      const users = await readTab(sheets, TABS.users);
+      const users = await rd(TABS.users);
       const name = String(body.name || '').trim();
       if (!name) return res.status(400).json({ error: 'Name is required' });
       if (users.some(u => norm(u.name) === norm(name) && u.active !== '0'))
@@ -403,24 +419,24 @@ module.exports = async (req, res) => {
         passHash: '', passSalt: '', setupCode: code, mustSetup: '1', active: '1',
         createdAt: nowIso, updatedAt: nowIso,
       };
-      await appendRow(sheets, TABS.users, rec);
+      await ap(TABS.users, rec);
       return res.json({ ok: true, user: publicUser(rec), setupCode: code });
     }
 
     if (action === 'resetPassword') {
       await requireAdmin();
-      const users = await readTab(sheets, TABS.users);
+      const users = await rd(TABS.users);
       const u = users.find(x => x.id === body.id);
       if (!u) return res.status(404).json({ error: 'No such user' });
       const code = setupCode();
-      await writeRow(sheets, TABS.users, u._row, Object.assign({}, u,
+      await wr(TABS.users, u._row, Object.assign({}, u,
         { passHash: '', passSalt: '', setupCode: code, mustSetup: '1', updatedAt: nowIso }));
       return res.json({ ok: true, setupCode: code });
     }
 
     if (action === 'setUserActive') {
       const me = await requireAdmin();
-      const users = await readTab(sheets, TABS.users);
+      const users = await rd(TABS.users);
       const u = users.find(x => x.id === body.id);
       if (!u) return res.status(404).json({ error: 'No such user' });
       const active = body.active ? '1' : '0';
@@ -429,44 +445,44 @@ module.exports = async (req, res) => {
       if (active === '0' && u.role === 'admin' &&
           users.filter(x => x.role === 'admin' && x.active !== '0').length <= 1)
         return res.status(400).json({ error: 'That is the only admin left' });
-      await writeRow(sheets, TABS.users, u._row, Object.assign({}, u, { active, updatedAt: nowIso }));
+      await wr(TABS.users, u._row, Object.assign({}, u, { active, updatedAt: nowIso }));
       return res.json({ ok: true });
     }
 
     if (action === 'deleteUser') {
       const me = await requireAdmin();
-      const users = await readTab(sheets, TABS.users);
+      const users = await rd(TABS.users);
       const u = users.find(x => x.id === body.id);
       if (!u) return res.status(404).json({ error: 'No such user' });
       if (u.id === me.id) return res.status(400).json({ error: 'You cannot delete yourself' });
       if (u.role === 'admin' && users.filter(x => x.role === 'admin' && x.active !== '0').length <= 1)
         return res.status(400).json({ error: 'That is the only admin left' });
-      await deleteRows(sheets, TABS.users, [u._row]);
+      await dl(TABS.users, [u._row]);
       // Take their position row with them; a ghost pin on the map is worse
       // than no pin.
-      const pres = await readTab(sheets, TABS.presence);
-      await deleteRows(sheets, TABS.presence, pres.filter(p => p.userId === u.id).map(p => p._row));
+      const pres = await rd(TABS.presence);
+      await dl(TABS.presence, pres.filter(p => p.userId === u.id).map(p => p._row));
       return res.json({ ok: true });
     }
 
     if (action === 'deleteTerritory') {
       await requireAdmin();
-      const terrs = await readTab(sheets, TABS.territories);
+      const terrs = await rd(TABS.territories);
       const t = terrs.find(x => x.name === String(body.territory || ''));
       if (!t) return res.status(404).json({ error: 'No such territory' });
-      await deleteRows(sheets, TABS.territories, [t._row]);
+      await dl(TABS.territories, [t._row]);
       return res.json({ ok: true });
     }
 
     if (action === 'setUserRole') {
       const me = await requireAdmin();
-      const users = await readTab(sheets, TABS.users);
+      const users = await rd(TABS.users);
       const u = users.find(x => x.id === body.id);
       if (!u) return res.status(404).json({ error: 'No such user' });
       const role = body.role === 'admin' ? 'admin' : 'user';
       if (u.id === me.id && role !== 'admin')
         return res.status(400).json({ error: 'You cannot remove your own admin access' });
-      await writeRow(sheets, TABS.users, u._row, Object.assign({}, u, { role, updatedAt: nowIso }));
+      await wr(TABS.users, u._row, Object.assign({}, u, { role, updatedAt: nowIso }));
       return res.json({ ok: true });
     }
 
@@ -475,7 +491,7 @@ module.exports = async (req, res) => {
     if (action === 'listTerritories') {
       const me = await requireUser();
       const [terrs, users] = await Promise.all([
-        readTab(sheets, TABS.territories), readTab(sheets, TABS.users),
+        rd(TABS.territories), rd(TABS.users),
       ]);
       const byId = {};
       users.forEach(u => { byId[u.id] = publicUser(u); });
@@ -499,7 +515,7 @@ module.exports = async (req, res) => {
       const me = await requireUser();
       const name = String(body.territory || '').trim();
       if (!name) return res.status(400).json({ error: 'Territory is required' });
-      const terrs = await readTab(sheets, TABS.territories);
+      const terrs = await rd(TABS.territories);
       const existing = terrs.find(t => t.name === name);
       if (existing && existing.ownerId && existing.ownerId !== me.id && me.role !== 'admin')
         return res.status(403).json({ error: 'Only the person this territory is assigned to can change it' });
@@ -509,15 +525,15 @@ module.exports = async (req, res) => {
         ? body.assigneeIds.filter(x => typeof x === 'string' && x).join(',')
         : (existing ? existing.assigneeIds : '');
       const rec = { name, ownerId, assigneeIds, updatedAt: nowIso };
-      if (existing) await writeRow(sheets, TABS.territories, existing._row, rec);
-      else await appendRow(sheets, TABS.territories, rec);
+      if (existing) await wr(TABS.territories, existing._row, rec);
+      else await ap(TABS.territories, rec);
       return res.json({ ok: true });
     }
 
     /* Everyone the territory is shared with — owner plus assignees. */
     async function teamFor(territory) {
       const [terrs, assigns] = await Promise.all([
-        readTab(sheets, TABS.territories), readTab(sheets, TABS.assignments),
+        rd(TABS.territories), rd(TABS.assignments),
       ]);
       const t = terrs.find(x => x.name === territory);
       if (!t) return null;
@@ -544,7 +560,7 @@ module.exports = async (req, res) => {
       const me = await requireUser();
       const name = String(body.territory || '').trim();
       if (!name) return res.status(400).json({ error: 'Territory is required' });
-      const terrs = await readTab(sheets, TABS.territories);
+      const terrs = await rd(TABS.territories);
       const t = terrs.find(x => x.name === name);
       if (t && t.ownerId && t.ownerId !== me.id && me.role !== 'admin')
         return res.status(403).json({ error: 'Only the person this territory is assigned to can start it' });
@@ -555,8 +571,8 @@ module.exports = async (req, res) => {
         updatedAt: nowIso,
         working: body.working ? '1' : '0',
       };
-      if (t) await writeRow(sheets, TABS.territories, t._row, rec);
-      else await appendRow(sheets, TABS.territories, rec);
+      if (t) await wr(TABS.territories, t._row, rec);
+      else await ap(TABS.territories, rec);
       return res.json({ ok: true, working: rec.working === '1' });
     }
 
@@ -568,7 +584,7 @@ module.exports = async (req, res) => {
       if (!territory) return res.status(400).json({ error: 'Territory is required' });
       if (!houseIds.length) return res.status(400).json({ error: 'Pick at least one house' });
 
-      const terrs = await readTab(sheets, TABS.territories);
+      const terrs = await rd(TABS.territories);
       const t = terrs.find(x => x.name === territory);
       if (t && t.ownerId && t.ownerId !== me.id && me.role !== 'admin')
         return res.status(403).json({ error: 'Only the person this territory is assigned to can hand out numbers' });
@@ -590,7 +606,7 @@ module.exports = async (req, res) => {
         houseIds: houseIds.join(','),
         createdAt: nowIso, expiresAt: String(expiresAt), active: '1',
       };
-      await appendRow(sheets, TABS.assignments, rec);
+      await ap(TABS.assignments, rec);
 
       // Handing out numbers implies you are working the territory; not doing
       // this silently produces packets that refuse to open.
@@ -598,8 +614,8 @@ module.exports = async (req, res) => {
         name: territory, ownerId: t ? (t.ownerId || me.id) : me.id,
         assigneeIds: t ? t.assigneeIds : '', updatedAt: nowIso, working: '1',
       };
-      if (t) await writeRow(sheets, TABS.territories, t._row, trec);
-      else await appendRow(sheets, TABS.territories, trec);
+      if (t) await wr(TABS.territories, t._row, trec);
+      else await ap(TABS.territories, trec);
 
       return res.json({ ok: true, assignment: rec, guestCode: rec.guestCode, expiresAt });
     }
@@ -608,7 +624,7 @@ module.exports = async (req, res) => {
       const me = await requireUser();
       const territory = String(body.territory || '').trim();
       const [assigns, users, terrs] = await Promise.all([
-        readTab(sheets, TABS.assignments), readTab(sheets, TABS.users), readTab(sheets, TABS.territories),
+        rd(TABS.assignments), rd(TABS.users), rd(TABS.territories),
       ]);
       const byId = {}; users.forEach(u => { byId[u.id] = publicUser(u); });
       const t = terrs.find(x => x.name === territory);
@@ -637,7 +653,7 @@ module.exports = async (req, res) => {
     if (action === 'myAssignments') {
       const me = await requireUser();
       const [assigns, terrs, users] = await Promise.all([
-        readTab(sheets, TABS.assignments), readTab(sheets, TABS.territories), readTab(sheets, TABS.users),
+        rd(TABS.assignments), rd(TABS.territories), rd(TABS.users),
       ]);
       const byId = {}; users.forEach(u => { byId[u.id] = publicUser(u); });
       const out = assigns.filter(a => a.assigneeId === me.id).map(a => {
@@ -654,12 +670,12 @@ module.exports = async (req, res) => {
 
     if (action === 'revokeAssignment') {
       const me = await requireUser();
-      const assigns = await readTab(sheets, TABS.assignments);
+      const assigns = await rd(TABS.assignments);
       const a = assigns.find(x => x.id === String(body.id || ''));
       if (!a) return res.status(404).json({ error: 'No such assignment' });
       if (a.ownerId !== me.id && me.role !== 'admin')
         return res.status(403).json({ error: 'Only the owner can withdraw this' });
-      await writeRow(sheets, TABS.assignments, a._row, Object.assign({}, a, { active: '0' }));
+      await wr(TABS.assignments, a._row, Object.assign({}, a, { active: '0' }));
       return res.json({ ok: true });
     }
 
@@ -670,7 +686,7 @@ module.exports = async (req, res) => {
       const code = String(body.code || '').trim().toUpperCase();
       if (!code) return res.status(400).json({ error: 'No code' });
       const [assigns, terrs, users] = await Promise.all([
-        readTab(sheets, TABS.assignments), readTab(sheets, TABS.territories), readTab(sheets, TABS.users),
+        rd(TABS.assignments), rd(TABS.territories), rd(TABS.users),
       ]);
       const a = assigns.find(x => x.guestCode && x.guestCode === code);
       const t = a ? terrs.find(x => x.name === a.territory) : null;
@@ -711,12 +727,12 @@ module.exports = async (req, res) => {
       if (!territory || !isFinite(lat) || !isFinite(lng))
         return res.status(400).json({ error: 'territory, lat and lng are required' });
 
-      const rows = await readTab(sheets, TABS.presence);
+      const rows = await rd(TABS.presence);
       const mine = rows.find(r => r.userId === me.id && r.territory === territory);
       const rec = { userId: me.id, territory, lat: lat.toFixed(6), lng: lng.toFixed(6),
                     acc: Math.round(Number(body.acc) || 0), ts: String(now) };
-      if (mine) await writeRow(sheets, TABS.presence, mine._row, rec);
-      else await appendRow(sheets, TABS.presence, rec);
+      if (mine) await wr(TABS.presence, mine._row, rec);
+      else await ap(TABS.presence, rec);
       return res.json({ ok: true });
     }
 
@@ -725,7 +741,7 @@ module.exports = async (req, res) => {
       const territory = me.territory || String(body.territory || '').trim();
       const team = await teamFor(territory);
       const [rows, users, assigns] = await Promise.all([
-        readTab(sheets, TABS.presence), readTab(sheets, TABS.users), readTab(sheets, TABS.assignments),
+        rd(TABS.presence), rd(TABS.users), rd(TABS.assignments),
       ]);
       const byId = {};
       users.forEach(u => { byId[u.id] = publicUser(u); });
@@ -745,9 +761,9 @@ module.exports = async (req, res) => {
 
     if (action === 'clearPresence') {
       const me = await requireActor();
-      const rows = await readTab(sheets, TABS.presence);
+      const rows = await rd(TABS.presence);
       const mine = rows.filter(r => r.userId === me.id).map(r => r._row);
-      await deleteRows(sheets, TABS.presence, mine);
+      await dl(TABS.presence, mine);
       return res.json({ ok: true });
     }
 
@@ -762,14 +778,14 @@ module.exports = async (req, res) => {
       if (audio.length > MAX_AUDIO_CHARS)
         return res.status(413).json({ error: 'That message is too long — keep it under about 10 seconds' });
 
-      const rows = await readTab(sheets, TABS.voice);
+      const rows = await rd(TABS.voice);
       // Prune expired clips in the same pass, so the tab cannot grow forever.
       const stale = rows.filter(r => now - Number(r.ts || 0) > VOICE_TTL_MS).map(r => r._row);
-      if (stale.length) await deleteRows(sheets, TABS.voice, stale);
+      if (stale.length) await dl(TABS.voice, stale);
 
       const rec = { id: uid(), territory, userId: me.id, ts: String(now),
                     dur: Math.round(Number(body.dur) || 0), audio };
-      await appendRow(sheets, TABS.voice, rec);
+      await ap(TABS.voice, rec);
       return res.json({ ok: true, id: rec.id, ts: now });
     }
 
@@ -779,7 +795,7 @@ module.exports = async (req, res) => {
       const since = Number(body.since || 0);
       const team = await teamFor(territory);
       const [rows, users, assigns] = await Promise.all([
-        readTab(sheets, TABS.voice), readTab(sheets, TABS.users), readTab(sheets, TABS.assignments),
+        rd(TABS.voice), rd(TABS.users), rd(TABS.assignments),
       ]);
       const byId = {};
       users.forEach(u => { byId[u.id] = publicUser(u); });
@@ -803,8 +819,10 @@ module.exports = async (req, res) => {
 
     return res.status(400).json({ error: 'Unknown action: ' + action });
   } catch (err) {
-    const code = err && err.code === 401 ? 401 : err && err.code === 403 ? 403 : 500;
+    const msg = (err && err.message) || 'Server error';
+    let code = err && err.code === 401 ? 401 : err && err.code === 403 ? 403 : 500;
+    if (/quota/i.test(msg)) { code = 429; }
     if (code === 500) console.error(err);
-    res.status(code).json({ error: err.message || 'Server error' });
+    res.status(code).json({ error: code === 429 ? 'Too busy right now — try again in a moment' : msg });
   }
 };

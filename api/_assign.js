@@ -120,10 +120,40 @@ function packetState(assignment, territoryRow, now) {
   return { ok: true };
 }
 
+/* Parse a batchGet range back into records. */
+function rowsToRecords(values, spec) {
+  const rows = values || [];
+  const hdr = rows[0] || [];
+  if (!rows.length || !spec.cols.every((c, i) => hdr[i] === c)) return null; // needs repair
+  return rows.slice(1).filter(r => r && r[0] !== undefined && r[0] !== '')
+    .map((r, i) => {
+      const o = { _row: i + 2 };
+      spec.cols.forEach((c, j) => { o[c] = r[j] !== undefined ? r[j] : ''; });
+      return o;
+    });
+}
+
+/* One Sheets call for both tabs. This runs on every guest request, and the
+   service account shares a 60-reads-per-minute budget across everyone, so
+   halving it here is the difference between working and rate-limited. */
 async function loadPacket(sheets, assignmentId, now) {
-  const [assigns, terrs] = await Promise.all([
-    readTab(sheets, ASSIGN_TAB), readTab(sheets, TERR_TAB),
-  ]);
+  let assigns = null, terrs = null;
+  try {
+    const r = await sheets.spreadsheets.values.batchGet({
+      spreadsheetId: SHEET_ID,
+      ranges: [
+        `${ASSIGN_TAB.name}!A:${colLetter(ASSIGN_TAB.cols.length - 1)}`,
+        `${TERR_TAB.name}!A:${colLetter(TERR_TAB.cols.length - 1)}`,
+      ],
+    });
+    const vr = r.data.valueRanges || [];
+    assigns = rowsToRecords(vr[0] && vr[0].values, ASSIGN_TAB);
+    terrs = rowsToRecords(vr[1] && vr[1].values, TERR_TAB);
+  } catch (e) { /* fall through to the per-tab path, which also repairs headers */ }
+
+  if (!assigns) assigns = await readTab(sheets, ASSIGN_TAB);
+  if (!terrs) terrs = await readTab(sheets, TERR_TAB);
+
   const a = assigns.find(x => x.id === assignmentId);
   const t = a ? terrs.find(x => x.name === a.territory) : null;
   return { assignment: a || null, territory: t || null, state: packetState(a, t, now) };
