@@ -1,4 +1,5 @@
 const { google } = require('googleapis');
+const { claimsFrom } = require('./_auth');
 
 const SHEET_ID = process.env.GOOGLE_SHEET_ID;
 const SHEET_NAME = 'Houses';
@@ -214,6 +215,14 @@ module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
+
+  /* Every method needs a session. These are real households with real notes
+     about them; an open endpoint meant anyone holding the URL could read the
+     lot. Auth actions live on /api/team, which stays reachable so a signed-out
+     app can still get back in. */
+  if (!claimsFrom(req)) {
+    return res.status(401).json({ error: 'Sign in to use this territory' });
+  }
 
   try {
     const auth = getAuth();
