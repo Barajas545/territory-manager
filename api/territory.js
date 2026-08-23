@@ -1,50 +1,38 @@
-const { google } = require('googleapis');
+/* House records.
+
+   Storage runs through _store.js, so this file no longer knows or cares
+   whether the rows live in SharePoint or a Google Sheet. Records are
+   addressed by their opaque `_key`; the row arithmetic that used to live here
+   — and the corruption it caused when a delete shifted a neighbour — is gone
+   by construction. */
+
 const { claimsFrom } = require('./_auth');
+const { makeStore } = require('./_store');
 const AS = require('./_assign');
 
-const SHEET_ID = process.env.GOOGLE_SHEET_ID;
-const SHEET_NAME = 'Houses';
-const FIELDS = [
-  'id','HouseAddress','HouseCity','HouseState','HouseZIP',
-  'HouseTerritoryNumber','HouseTerritoryAssingnedTo','HouseLanguage',
-  'HouseLastVisitDate','HouseGPSCoordinates','HouseNotes','HousePersonalNotes',
-  'HouseResutsOnVisit1','HouseResutsOnVisit2','HouseResutsOnVisit3',
-  'HouseResutsOnVisit4','HouseResutsOnVisit5','HouseVerifiedOnMaps',
-  'HouseReturnVisits','HouseUpdatedAt','HouseVisitLog','HouseDeleted'
-];
-const LAST_COL = 'V'; // 22 fields = A–V
-const RANGE = `${SHEET_NAME}!A:${LAST_COL}`;
+const HOUSES = {
+  name: 'Houses',
+  cols: [
+    'id','HouseAddress','HouseCity','HouseState','HouseZIP',
+    'HouseTerritoryNumber','HouseTerritoryAssingnedTo','HouseLanguage',
+    'HouseLastVisitDate','HouseGPSCoordinates','HouseNotes','HousePersonalNotes',
+    'HouseResutsOnVisit1','HouseResutsOnVisit2','HouseResutsOnVisit3',
+    'HouseResutsOnVisit4','HouseResutsOnVisit5','HouseVerifiedOnMaps',
+    'HouseReturnVisits','HouseUpdatedAt','HouseVisitLog','HouseDeleted',
+  ],
+};
 
 // Server-owned. A client may not write these directly.
 const SERVER_FIELDS = new Set(['HouseUpdatedAt']);
 
-/* Append-only JSON logs. These are merged by UNION of entry id, never
-   overwritten wholesale — that is what makes two offline phones safe.
-   Field-level last-write-wins cannot protect these: both devices write the
-   same key, so one device's notes would simply vanish. */
+/* Append-only JSON logs, merged by UNION of entry id rather than overwritten.
+   Field-level last-write-wins cannot protect these: two devices write the same
+   key, so one device's notes would simply vanish. */
 const ARRAY_FIELDS = new Set(['HouseReturnVisits', 'HouseVisitLog']);
 
 // Derived from HouseVisitLog on every write; clients never set them.
 const DERIVED_SLOTS = ['HouseResutsOnVisit1','HouseResutsOnVisit2','HouseResutsOnVisit3',
   'HouseResutsOnVisit4','HouseResutsOnVisit5'];
-
-function getAuth() {
-  const key = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY);
-  return new google.auth.GoogleAuth({
-    credentials: key,
-    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-  });
-}
-
-function rowToRecord(row) {
-  const rec = {};
-  FIELDS.forEach((f, i) => { rec[f] = (row[i] !== undefined ? row[i] : ''); });
-  return rec;
-}
-
-function recordToRow(rec) {
-  return FIELDS.map(f => rec[f] !== undefined && rec[f] !== null ? String(rec[f]) : '');
-}
 
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -53,7 +41,7 @@ function uid() {
 function sanitize(updates) {
   const clean = {};
   Object.keys(updates || {}).forEach(k => {
-    if (k !== 'id' && !SERVER_FIELDS.has(k) && FIELDS.includes(k)) clean[k] = updates[k];
+    if (k !== 'id' && !SERVER_FIELDS.has(k) && HOUSES.cols.includes(k)) clean[k] = updates[k];
   });
   return clean;
 }
@@ -87,14 +75,11 @@ function unionLog(existingStr, incomingStr) {
   return JSON.stringify(out);
 }
 
-/* A record predating the visit log has history only in the five slot columns.
-   Seed a log from them once, so the first append does not appear to erase them. */
-/* Seed ids must be derived from the slot's CONTENT, not just its position.
-   With a positional id, a device holding a stale copy of the row re-seeds
-   'legacy2' with the old text and the union overwrites an edit made elsewhere.
-   Keyed by content, a stale re-seed simply produces a different entry — a
-   duplicate is recoverable, an overwritten note is not.
-   The client computes this identically, or every sync would duplicate. */
+/* Seed ids are derived from the slot's CONTENT, not its position. With a
+   positional id, a device holding a stale copy re-seeds 'legacy2' with the old
+   text and the union overwrites an edit made elsewhere. Keyed by content, a
+   stale re-seed produces a separate entry — a duplicate is recoverable, an
+   overwritten note is not. The client computes this identically. */
 function legacyId(i, text) {
   const s = String(text || '');
   let h = 0;
@@ -102,6 +87,8 @@ function legacyId(i, text) {
   return 'lg' + (i + 1) + '-' + (h >>> 0).toString(36);
 }
 
+/* A record predating the visit log has history only in the five slot columns.
+   Seed a log from them once, so the first append does not appear to erase them. */
 function seedLog(rec) {
   const existing = parseArr(rec.HouseVisitLog);
   if (existing.length) return rec.HouseVisitLog;
@@ -131,8 +118,8 @@ function deriveSlots(rec) {
   }
 }
 
-/* The one place merge policy lives. Runs against the row the server just read,
-   not a snapshot the client fetched seconds ago. */
+/* The one place merge policy lives. Runs against the record the store just
+   read, not a snapshot the client fetched seconds ago. */
 function mergeRow(existing, updates, now) {
   const merged = Object.assign({}, existing);
   Object.keys(updates).forEach(k => {
@@ -163,53 +150,13 @@ async function parseBody(req) {
   });
 }
 
-async function getTabId(sheets) {
-  const meta = await sheets.spreadsheets.get({ spreadsheetId: SHEET_ID });
-  const tab = meta.data.sheets.find(s => s.properties.title === SHEET_NAME);
-  return tab ? tab.properties.sheetId : 0;
-}
-
-async function readAll(sheets) {
-  const resp = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: RANGE });
-  const rows = resp.data.values || [];
-  const hdr = rows[0] || [];
-  const isHeaderRow = hdr[0] === 'id';
-  const headerOk = isHeaderRow && FIELDS.every((f, i) => hdr[i] === f);
-
-  if (!rows.length || (isHeaderRow && !headerOk)) {
-    await sheets.spreadsheets.values.update({
-      spreadsheetId: SHEET_ID,
-      range: `${SHEET_NAME}!A1:${LAST_COL}1`,
-      valueInputOption: 'RAW',
-      requestBody: { values: [FIELDS] },
-    });
-    return { dataRows: rows.slice(1), headerOffset: 1 };
-  }
-
-  if (rows.length && !isHeaderRow) {
-    await sheets.spreadsheets.batchUpdate({
-      spreadsheetId: SHEET_ID,
-      requestBody: {
-        requests: [{
-          insertDimension: {
-            range: { sheetId: await getTabId(sheets), dimension: 'ROWS', startIndex: 0, endIndex: 1 },
-          },
-        }],
-      },
-    });
-    await sheets.spreadsheets.values.update({
-      spreadsheetId: SHEET_ID,
-      range: `${SHEET_NAME}!A1:${LAST_COL}1`,
-      valueInputOption: 'RAW',
-      requestBody: { values: [FIELDS] },
-    });
-    return { dataRows: rows, headerOffset: 1 };
-  }
-
-  return { dataRows: rows.slice(1), headerOffset: 1 };
-}
-
 const isLive = rec => rec && rec.id && rec.HouseDeleted !== '1';
+// Strip storage bookkeeping before anything reaches a client.
+const publicRec = rec => {
+  const o = {};
+  HOUSES.cols.forEach(c => { o[c] = rec[c] !== undefined ? rec[c] : ''; });
+  return o;
+};
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -225,13 +172,10 @@ module.exports = async (req, res) => {
      lot. Auth actions live on /api/team, which stays reachable so a signed-out
      app can still get back in. */
   const claims = claimsFrom(req);
-  if (!claims) {
-    return res.status(401).json({ error: 'Sign in to use this territory' });
-  }
+  if (!claims) return res.status(401).json({ error: 'Sign in to use this territory' });
 
   try {
-    const auth = getAuth();
-    const sheets = google.sheets({ version: 'v4', auth });
+    const store = makeStore();
     const now = new Date().toISOString();
 
     /* A guest token carries a work packet rather than an account. It may only
@@ -240,7 +184,7 @@ module.exports = async (req, res) => {
        runs, rather than trusted to each branch remembering to check. */
     let scope = null;
     if (claims.g) {
-      const packet = await AS.loadPacket(sheets, claims.g, Date.now());
+      const packet = await AS.loadPacket(store, claims.g, Date.now());
       if (!packet.state.ok) return res.status(403).json({ error: packet.state.reason });
       scope = new Set(AS.houseIdList(packet.assignment));
       if (req.method === 'DELETE' || req.method === 'POST') {
@@ -251,25 +195,22 @@ module.exports = async (req, res) => {
 
     /* ── GET ── */
     if (req.method === 'GET') {
-      const { dataRows } = await readAll(sheets);
-      const all = dataRows.filter(r => r && r[0]).map(rowToRecord).filter(isLive);
-      return res.json(scope ? all.filter(r => scope.has(r.id)) : all);
+      const all = (await store.read(HOUSES)).filter(isLive);
+      const visible = scope ? all.filter(r => scope.has(r.id)) : all;
+      return res.json(visible.map(publicRec));
     }
 
     /* ── POST: create one ── */
     if (req.method === 'POST') {
       const body = await parseBody(req);
       const rec = sanitize(body);
+      // Honour a client-supplied id so a house created offline keeps its
+      // identity after sync, instead of needing an id remap.
       rec.id = (typeof body.id === 'string' && body.id.trim()) ? body.id.trim() : uid();
+      rec.HouseVisitLog = seedLog(rec) || rec.HouseVisitLog || '';
       deriveSlots(rec);
       rec.HouseUpdatedAt = now;
-      await sheets.spreadsheets.values.append({
-        spreadsheetId: SHEET_ID,
-        range: RANGE,
-        valueInputOption: 'RAW',
-        insertDataOption: 'INSERT_ROWS',
-        requestBody: { values: [recordToRow(rec)] },
-      });
+      await store.create(HOUSES, rec);
       return res.json({ id: rec.id, HouseUpdatedAt: now });
     }
 
@@ -277,50 +218,34 @@ module.exports = async (req, res) => {
     if (req.method === 'PATCH') {
       const body = await parseBody(req);
       if (!inScope(body.id)) return res.status(403).json({ error: 'That house is not on your list' });
-      const { dataRows, headerOffset } = await readAll(sheets);
-      const idx = dataRows.findIndex(r => r && r[0] === body.id);
-      if (idx === -1) return res.status(404).json({ error: 'Not found' });
+      const rows = await store.read(HOUSES);
+      const existing = rows.find(r => r.id === body.id);
+      if (!existing) return res.status(404).json({ error: 'Not found' });
 
-      const merged = mergeRow(rowToRecord(dataRows[idx]), sanitize(body), now);
+      const merged = mergeRow(existing, sanitize(body), now);
       merged.id = body.id;
-      const sheetRow = idx + headerOffset + 1;
-      await sheets.spreadsheets.values.update({
-        spreadsheetId: SHEET_ID,
-        range: `${SHEET_NAME}!A${sheetRow}:${LAST_COL}${sheetRow}`,
-        valueInputOption: 'RAW',
-        requestBody: { values: [recordToRow(merged)] },
-      });
+      await store.update(HOUSES, existing._key, merged);
       return res.json({ ok: true, HouseUpdatedAt: now });
     }
 
     /* ── DELETE: soft ──
-       Never removes the row. Deleting shifts every later row's index, and a
-       concurrent write that resolved its index a moment earlier would then land
-       on the wrong house — corrupting one record with another's data. A flag
-       cannot do that. */
+       Never removes the row. A hard delete used to shift every later row's
+       index, so a concurrent write resolved a moment earlier landed on the
+       wrong house. A flag cannot do that. */
     if (req.method === 'DELETE') {
       const body = await parseBody(req);
-      const { dataRows, headerOffset } = await readAll(sheets);
-      const idx = dataRows.findIndex(r => r && r[0] === body.id);
-      if (idx === -1) return res.status(404).json({ error: 'Not found' });
-
-      const rec = rowToRecord(dataRows[idx]);
-      rec.HouseDeleted = '1';
-      rec.HouseUpdatedAt = now;
-      const sheetRow = idx + headerOffset + 1;
-      await sheets.spreadsheets.values.update({
-        spreadsheetId: SHEET_ID,
-        range: `${SHEET_NAME}!A${sheetRow}:${LAST_COL}${sheetRow}`,
-        valueInputOption: 'RAW',
-        requestBody: { values: [recordToRow(rec)] },
-      });
+      const rows = await store.read(HOUSES);
+      const existing = rows.find(r => r.id === body.id);
+      if (!existing) return res.status(404).json({ error: 'Not found' });
+      const rec = Object.assign({}, existing, { HouseDeleted: '1', HouseUpdatedAt: now });
+      await store.update(HOUSES, existing._key, rec);
       return res.json({ ok: true });
     }
 
     /* ── PUT: bulk sync ──
        { creates:[rec], updates:[{id,...fields,_base}], deletes:[id] }
-       Costs a fixed 3 Sheets calls no matter how deep the queue, so a long
-       offline session uploads in one round trip. */
+       One read, one batched write, one read back, however deep the queue —
+       so a long offline session uploads in one round trip. */
     if (req.method === 'PUT') {
       const body = await parseBody(req);
       let creates = Array.isArray(body.creates) ? body.creates : [];
@@ -334,84 +259,70 @@ module.exports = async (req, res) => {
         updates = updates.filter(u => u && inScope(u.id));
       }
 
-      const { dataRows, headerOffset } = await readAll(sheets);
-      const rowById = new Map();
-      dataRows.forEach((r, i) => { if (r && r[0]) rowById.set(r[0], i); });
+      const rows = await store.read(HOUSES);
+      const byId = new Map();
+      rows.forEach(r => { if (r.id) byId.set(r.id, r); });
 
       const deleteSet = new Set(deletes);
       const conflicts = [];
       const applied = { created: [], updated: [], deleted: [], missing: [] };
-      const writes = new Map(); // rowIndex -> merged record (one write per row)
+      const pending = new Map(); // id -> merged record, one write per record
 
       for (const u of updates) {
         if (!u || typeof u.id !== 'string' || deleteSet.has(u.id)) continue;
-        const idx = rowById.get(u.id);
-        if (idx === undefined) { applied.missing.push(u.id); continue; }
-        const existing = writes.get(idx) || rowToRecord(dataRows[idx]);
+        const existing = pending.get(u.id) || byId.get(u.id);
+        if (!existing) { applied.missing.push(u.id); continue; }
         if (u._base && existing.HouseUpdatedAt && existing.HouseUpdatedAt > u._base) {
-          conflicts.push({ id: u.id, remote: existing });
+          conflicts.push({ id: u.id, remote: publicRec(existing) });
         }
         const merged = mergeRow(existing, sanitize(u), now);
         merged.id = u.id;
-        writes.set(idx, merged);
+        merged._key = existing._key;
+        pending.set(u.id, merged);
         applied.updated.push(u.id);
       }
 
       for (const id of deletes) {
-        const idx = rowById.get(id);
-        if (idx === undefined) { applied.missing.push(id); continue; }
-        const rec = writes.get(idx) || rowToRecord(dataRows[idx]);
-        rec.HouseDeleted = '1';
-        rec.HouseUpdatedAt = now;
-        writes.set(idx, rec);
+        const existing = pending.get(id) || byId.get(id);
+        if (!existing) { applied.missing.push(id); continue; }
+        const rec = Object.assign({}, existing, { HouseDeleted: '1', HouseUpdatedAt: now });
+        rec._key = existing._key;
+        pending.set(id, rec);
         applied.deleted.push(id);
       }
 
-      if (writes.size) {
-        const data = [];
-        writes.forEach((rec, idx) => {
-          const sheetRow = idx + headerOffset + 1;
-          data.push({ range: `${SHEET_NAME}!A${sheetRow}:${LAST_COL}${sheetRow}`, values: [recordToRow(rec)] });
-        });
-        await sheets.spreadsheets.values.batchUpdate({
-          spreadsheetId: SHEET_ID,
-          requestBody: { valueInputOption: 'RAW', data },
-        });
+      if (pending.size) {
+        await store.updateMany(HOUSES,
+          Array.from(pending.values()).map(r => ({ key: r._key, obj: r })));
       }
 
-      // Creates last. Appends land after existing rows, so the indices above
-      // stay valid. Existing ids are skipped, making a retried sync harmless.
+      // Creates last. Existing ids are skipped, so a retried sync — one whose
+      // response was lost — cannot duplicate a house.
       const newRows = [];
       for (const c of creates) {
         if (!c) continue;
         const rec = sanitize(c);
         rec.id = (typeof c.id === 'string' && c.id.trim()) ? c.id.trim() : uid();
-        if (rowById.has(rec.id) || deleteSet.has(rec.id)) continue;
+        if (byId.has(rec.id) || deleteSet.has(rec.id)) continue;
         rec.HouseVisitLog = seedLog(rec) || rec.HouseVisitLog || '';
         deriveSlots(rec);
         rec.HouseUpdatedAt = now;
-        newRows.push(recordToRow(rec));
+        newRows.push(rec);
         applied.created.push(rec.id);
       }
-      if (newRows.length) {
-        await sheets.spreadsheets.values.append({
-          spreadsheetId: SHEET_ID,
-          range: RANGE,
-          valueInputOption: 'RAW',
-          insertDataOption: 'INSERT_ROWS',
-          requestBody: { values: newRows },
-        });
-      }
+      if (newRows.length) await store.createMany(HOUSES, newRows);
 
-      const after = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: RANGE });
-      let records = (after.data.values || []).slice(1).filter(r => r && r[0]).map(rowToRecord).filter(isLive);
-      if (scope) records = records.filter(r => scope.has(r.id));
+      // Read back so the client ends the sync in a known-good state.
+      const after = (await store.readFresh(HOUSES)).filter(isLive);
+      const records = (scope ? after.filter(r => scope.has(r.id)) : after).map(publicRec);
       return res.json({ ok: true, applied, conflicts, records, serverTime: now });
     }
 
     res.status(405).json({ error: 'Method not allowed' });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: err.message });
+    const msg = (err && err.message) || 'Server error';
+    res.status(/throttl|quota|429/i.test(msg) ? 429 : 500)
+      .json({ error: /throttl|quota|429/i.test(msg) ? 'Too busy right now — try again in a moment' : msg });
   }
 };

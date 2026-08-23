@@ -1,5 +1,5 @@
 /* Team endpoint: accounts, territory assignment, live position sharing and
-   push-to-talk voice, all on the same Google Sheet as the house data.
+   push-to-talk voice, stored alongside the house data.
 
    One function with an `action` field rather than a file per route — this many
    tiny endpoints would otherwise each pay their own cold start.
@@ -9,11 +9,12 @@
 */
 
 const crypto = require('crypto');
-const { google } = require('googleapis');
 const AS = require('./_assign');
 const SP = require('./_sp');
-
-const SHEET_ID = process.env.GOOGLE_SHEET_ID;
+const { makeStore } = require('./_store');
+// Session tokens are signed and verified in _auth.js, so the territory
+// endpoint validates them with exactly the code that issues them here.
+const { sign, verify } = require('./_auth');
 
 const TABS = {
   users: {
@@ -33,62 +34,13 @@ const TABS = {
   },
 };
 
-const colLetter = n => {
-  let s = '', x = n;
-  do { s = String.fromCharCode(65 + (x % 26)) + s; x = Math.floor(x / 26) - 1; } while (x >= 0);
-  return s;
-};
-
-/* A voice clip lives in one cell. Sheets caps a cell at 50k characters, so the
-   client is told to keep clips short and we refuse anything larger rather than
-   writing a truncated, unplayable blob. */
+/* A clip lives in one field. SharePoint holds 100k characters and a Sheets
+   cell 50k, so the smaller of the two sets the cap; oversized clips are
+   refused rather than written as a truncated, unplayable blob. */
 const MAX_AUDIO_CHARS = 45000;
 const VOICE_TTL_MS = 6 * 60 * 60 * 1000;   // clips older than this are pruned
 const PRESENCE_TTL_MS = 30 * 60 * 1000;    // a position older than this is stale
 const TOKEN_TTL_MS = 60 * 24 * 60 * 60 * 1000; // 60 days: re-login in the field is painful
-
-function getAuth() {
-  const key = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY);
-  return new google.auth.GoogleAuth({
-    credentials: key,
-    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-  });
-}
-
-/* Signing secret. Prefer an explicit AUTH_SECRET, but fall back to a value
-   derived from the service-account key so the app works without a second
-   manual setup step. Both are server-side only and never leave the function. */
-function secret() {
-  if (process.env.AUTH_SECRET) return process.env.AUTH_SECRET;
-  const k = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY || '{}');
-  return crypto.createHash('sha256')
-    .update('tm-auth|' + (k.private_key_id || '') + '|' + (k.client_email || ''))
-    .digest('hex');
-}
-
-const b64u = buf => Buffer.from(buf).toString('base64')
-  .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-const unb64u = s => Buffer.from(String(s).replace(/-/g, '+').replace(/_/g, '/'), 'base64');
-
-function sign(payload) {
-  const body = b64u(JSON.stringify(payload));
-  const mac = b64u(crypto.createHmac('sha256', secret()).update(body).digest());
-  return body + '.' + mac;
-}
-
-function verify(token) {
-  if (typeof token !== 'string' || token.indexOf('.') === -1) return null;
-  const [body, mac] = token.split('.');
-  const expect = b64u(crypto.createHmac('sha256', secret()).update(body).digest());
-  // Constant-time compare: a length-varying or early-exit compare leaks the
-  // signature one byte at a time.
-  const a = Buffer.from(mac || ''), b = Buffer.from(expect);
-  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
-  let p;
-  try { p = JSON.parse(unb64u(body).toString('utf8')); } catch (e) { return null; }
-  if (!p || !p.exp || Date.now() > p.exp) return null;
-  return p;
-}
 
 function hashPassword(password, salt) {
   const s = salt || crypto.randomBytes(16).toString('hex');
@@ -100,11 +52,12 @@ function passwordMatches(password, hash, salt) {
   if (!hash || !salt) return false;
   const h = crypto.scryptSync(String(password), salt, 64).toString('hex');
   const a = Buffer.from(h), b = Buffer.from(hash);
+  // Constant time: an early-exit compare leaks the hash a byte at a time.
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
 const uid = () => Date.now().toString(36) + crypto.randomBytes(4).toString('hex');
-// Unambiguous alphabet: no O/0, I/1, so a code read aloud cannot be mistyped.
+// Unambiguous alphabet: no O/0 or I/1, so a code read aloud cannot be mistyped.
 const setupCode = () => Array.from(crypto.randomBytes(6))
   .map(b => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[b % 32]).join('');
 
@@ -115,104 +68,6 @@ async function parseBody(req) {
     req.on('data', c => { raw += c; if (raw.length > 6e6) req.destroy(); });
     req.on('end', () => { try { resolve(raw ? JSON.parse(raw) : {}); } catch (e) { reject(e); } });
     req.on('error', reject);
-  });
-}
-
-/* ── sheet helpers ── */
-async function ensureTab(sheets, spec) {
-  const meta = await sheets.spreadsheets.get({ spreadsheetId: SHEET_ID });
-  const found = meta.data.sheets.find(s => s.properties.title === spec.name);
-  if (found) return found.properties.sheetId;
-  const res = await sheets.spreadsheets.batchUpdate({
-    spreadsheetId: SHEET_ID,
-    requestBody: { requests: [{ addSheet: { properties: { title: spec.name } } }] },
-  });
-  const id = res.data.replies[0].addSheet.properties.sheetId;
-  await sheets.spreadsheets.values.update({
-    spreadsheetId: SHEET_ID,
-    range: `${spec.name}!A1:${colLetter(spec.cols.length - 1)}1`,
-    valueInputOption: 'RAW',
-    requestBody: { values: [spec.cols] },
-  });
-  return id;
-}
-
-async function readTab(sheets, spec) {
-  const range = `${spec.name}!A:${colLetter(spec.cols.length - 1)}`;
-  let rows;
-  try {
-    const r = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range });
-    rows = r.data.values || [];
-  } catch (e) {
-    await ensureTab(sheets, spec);
-    return [];
-  }
-  const hdr = rows[0] || [];
-  if (!rows.length || !spec.cols.every((c, i) => hdr[i] === c)) {
-    await ensureTab(sheets, spec);
-    await sheets.spreadsheets.values.update({
-      spreadsheetId: SHEET_ID,
-      range: `${spec.name}!A1:${colLetter(spec.cols.length - 1)}1`,
-      valueInputOption: 'RAW',
-      requestBody: { values: [spec.cols] },
-    });
-    if (!rows.length) return [];
-  }
-  return rows.slice(1).filter(r => r && r[0] !== undefined && r[0] !== '')
-    .map((r, i) => {
-      const o = { _row: i + 2 };
-      spec.cols.forEach((c, j) => { o[c] = r[j] !== undefined ? r[j] : ''; });
-      return o;
-    });
-}
-
-async function appendRow(sheets, spec, obj) {
-  await ensureTab(sheets, spec);
-  await sheets.spreadsheets.values.append({
-    spreadsheetId: SHEET_ID,
-    range: `${spec.name}!A:${colLetter(spec.cols.length - 1)}`,
-    valueInputOption: 'RAW',
-    insertDataOption: 'INSERT_ROWS',
-    requestBody: { values: [spec.cols.map(c => (obj[c] === undefined || obj[c] === null ? '' : String(obj[c])))] },
-  });
-}
-
-async function writeRow(sheets, spec, rowNum, obj) {
-  const last = colLetter(spec.cols.length - 1);
-  await sheets.spreadsheets.values.update({
-    spreadsheetId: SHEET_ID,
-    range: `${spec.name}!A${rowNum}:${last}${rowNum}`,
-    valueInputOption: 'RAW',
-    requestBody: { values: [spec.cols.map(c => (obj[c] === undefined || obj[c] === null ? '' : String(obj[c])))] },
-  });
-}
-
-async function writeRows(sheets, spec, entries) {
-  if (!entries.length) return;
-  const last = colLetter(spec.cols.length - 1);
-  await sheets.spreadsheets.values.batchUpdate({
-    spreadsheetId: SHEET_ID,
-    requestBody: {
-      valueInputOption: 'RAW',
-      data: entries.map(e => ({
-        range: `${spec.name}!A${e.row}:${last}${e.row}`,
-        values: [spec.cols.map(c => (e.obj[c] === undefined || e.obj[c] === null ? '' : String(e.obj[c])))],
-      })),
-    },
-  });
-}
-
-async function deleteRows(sheets, spec, rowNums) {
-  if (!rowNums.length) return;
-  const tabId = await ensureTab(sheets, spec);
-  const desc = rowNums.slice().sort((a, b) => b - a);
-  await sheets.spreadsheets.batchUpdate({
-    spreadsheetId: SHEET_ID,
-    requestBody: {
-      requests: desc.map(r => ({
-        deleteDimension: { range: { sheetId: tabId, dimension: 'ROWS', startIndex: r - 1, endIndex: r } },
-      })),
-    },
   });
 }
 
@@ -233,8 +88,6 @@ module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST' });
 
   try {
-    const auth = getAuth();
-    const sheets = google.sheets({ version: 'v4', auth });
     const body = await parseBody(req);
     const action = String(body.action || '');
     const now = Date.now();
@@ -243,54 +96,16 @@ module.exports = async (req, res) => {
     const bearer = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
     const claims = verify(bearer);
 
-    /* Sheets allows only 60 reads a minute for the whole service account, and
-       several actions here legitimately need the same tab more than once
-       (teamFor re-reads what its caller already read). Without this, a couple
-       of people working together exhaust the quota and every request starts
-       failing. The cache lives for one request only — module scope would serve
-       one user another user's stale data. */
-    const _cache = new Map();
-    /* Sheets counts REQUESTS, not rows, so pulling four small tabs in one
-       batchGet costs the same as pulling one. Almost every action here needs
-       two or more of them, so the first read fetches the whole set at once.
-       Voice is excluded on purpose: its rows carry base64 audio, and dragging
-       that through every unrelated request would be pointlessly expensive. */
-    const SMALL = [TABS.users, TABS.territories, TABS.assignments, TABS.presence];
-    let _prefetched = false;
-    async function prefetch() {
-      if (_prefetched) return;
-      _prefetched = true;
-      try {
-        const r = await sheets.spreadsheets.values.batchGet({
-          spreadsheetId: SHEET_ID,
-          ranges: SMALL.map(sp => `${sp.name}!A:${colLetter(sp.cols.length - 1)}`),
-        });
-        (r.data.valueRanges || []).forEach((vr, i) => {
-          const sp = SMALL[i];
-          const rows = vr.values || [];
-          const hdr = rows[0] || [];
-          // A tab whose header does not match yet needs the repairing path,
-          // so leave it uncached and let readTab handle it.
-          if (!rows.length || !sp.cols.every((c, j) => hdr[j] === c)) return;
-          _cache.set(sp.name, rows.slice(1)
-            .filter(rw => rw && rw[0] !== undefined && rw[0] !== '')
-            .map((rw, k) => {
-              const o = { _row: k + 2 };
-              sp.cols.forEach((c, j) => { o[c] = rw[j] !== undefined ? rw[j] : ''; });
-              return o;
-            }));
-        });
-      } catch (e) { /* fall back to per-tab reads */ }
-    }
-    const rd = async spec => {
-      if (SMALL.indexOf(spec) !== -1) await prefetch();
-      if (!_cache.has(spec.name)) _cache.set(spec.name, await readTab(sheets, spec));
-      return _cache.get(spec.name);
-    };
-    const wr = async (spec, row, obj) => { _cache.delete(spec.name); return writeRow(sheets, spec, row, obj); };
-    const ap = async (spec, obj) => { _cache.delete(spec.name); return appendRow(sheets, spec, obj); };
-    const dl = async (spec, rows) => { _cache.delete(spec.name); return deleteRows(sheets, spec, rows); };
-    const wrs = async (spec, entries) => { _cache.delete(spec.name); return writeRows(sheets, spec, entries); };
+    /* Storage runs through the store, which uses SharePoint when configured
+       and falls back to the Sheet otherwise. It caches reads for the life of a
+       single request, because several actions here legitimately need the same
+       table twice (teamFor re-reads what its caller just read). */
+    const store = makeStore();
+    const rd = spec => store.read(spec);
+    const wr = (spec, key, obj) => store.update(spec, key, obj);
+    const ap = (spec, obj) => store.create(spec, obj);
+    const dl = (spec, keys) => store.remove(spec, keys);
+    const wrs = (spec, entries) => store.updateMany(spec, entries);
 
     async function currentUser() {
       if (!claims || !claims.uid) return null;
@@ -303,7 +118,7 @@ module.exports = async (req, res) => {
        owns nothing. Modelled as a synthetic identity rather than a row. */
     async function currentActor() {
       if (claims && claims.g) {
-        const packet = await AS.loadPacket(sheets, claims.g, now);
+        const packet = await AS.loadPacket(store, claims.g, now);
         if (!packet.state.ok) { const e = new Error(packet.state.reason); e.code = 403; throw e; }
         return {
           id: 'g:' + packet.assignment.id,
@@ -337,7 +152,7 @@ module.exports = async (req, res) => {
        failed -- never a secret, never any territory data. Removed once the
        move to SharePoint is done. */
     if (action === 'spCheck') {
-      const out = { configured: SP.configured(), steps: [] };
+      const out = { configured: SP.configured(), backend: makeStore().backend, steps: [] };
       // Which names the runtime can actually see. Presence and length only —
       // enough to tell "not set" from "set to something odd", and nothing more.
       const seen = {};
@@ -441,7 +256,7 @@ module.exports = async (req, res) => {
         passHash: hash, passSalt: salt,
         setupCode: '', mustSetup: '0', updatedAt: nowIso,
       });
-      await wr(TABS.users, u._row, updated);
+      await wr(TABS.users, u._key, updated);
       return res.json({
         ok: true,
         token: sign({ uid: u.id, exp: now + TOKEN_TTL_MS }),
@@ -456,7 +271,7 @@ module.exports = async (req, res) => {
       const pw = String(body.newPassword || '');
       if (pw.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
       const { hash, salt } = hashPassword(pw);
-      await wr(TABS.users, u._row,
+      await wr(TABS.users, u._key,
         Object.assign({}, u, { passHash: hash, passSalt: salt, updatedAt: nowIso }));
       return res.json({ ok: true });
     }
@@ -469,7 +284,7 @@ module.exports = async (req, res) => {
         email: String(body.email !== undefined ? body.email : u.email).trim(),
         updatedAt: nowIso,
       });
-      await wr(TABS.users, u._row, updated);
+      await wr(TABS.users, u._key, updated);
       return res.json({ ok: true, user: publicUser(updated) });
     }
 
@@ -507,7 +322,7 @@ module.exports = async (req, res) => {
       const u = users.find(x => x.id === body.id);
       if (!u) return res.status(404).json({ error: 'No such user' });
       const code = setupCode();
-      await wr(TABS.users, u._row, Object.assign({}, u,
+      await wr(TABS.users, u._key, Object.assign({}, u,
         { passHash: '', passSalt: '', setupCode: code, mustSetup: '1', updatedAt: nowIso }));
       return res.json({ ok: true, setupCode: code });
     }
@@ -523,7 +338,7 @@ module.exports = async (req, res) => {
       if (active === '0' && u.role === 'admin' &&
           users.filter(x => x.role === 'admin' && x.active !== '0').length <= 1)
         return res.status(400).json({ error: 'That is the only admin left' });
-      await wr(TABS.users, u._row, Object.assign({}, u, { active, updatedAt: nowIso }));
+      await wr(TABS.users, u._key, Object.assign({}, u, { active, updatedAt: nowIso }));
       return res.json({ ok: true });
     }
 
@@ -535,11 +350,11 @@ module.exports = async (req, res) => {
       if (u.id === me.id) return res.status(400).json({ error: 'You cannot delete yourself' });
       if (u.role === 'admin' && users.filter(x => x.role === 'admin' && x.active !== '0').length <= 1)
         return res.status(400).json({ error: 'That is the only admin left' });
-      await dl(TABS.users, [u._row]);
+      await dl(TABS.users, [u._key]);
       // Take their position row with them; a ghost pin on the map is worse
       // than no pin.
       const pres = await rd(TABS.presence);
-      await dl(TABS.presence, pres.filter(p => p.userId === u.id).map(p => p._row));
+      await dl(TABS.presence, pres.filter(p => p.userId === u.id).map(p => p._key));
       return res.json({ ok: true });
     }
 
@@ -548,7 +363,7 @@ module.exports = async (req, res) => {
       const terrs = await rd(TABS.territories);
       const t = terrs.find(x => x.name === String(body.territory || ''));
       if (!t) return res.status(404).json({ error: 'No such territory' });
-      await dl(TABS.territories, [t._row]);
+      await dl(TABS.territories, [t._key]);
       return res.json({ ok: true });
     }
 
@@ -560,7 +375,7 @@ module.exports = async (req, res) => {
       const role = body.role === 'admin' ? 'admin' : 'user';
       if (u.id === me.id && role !== 'admin')
         return res.status(400).json({ error: 'You cannot remove your own admin access' });
-      await wr(TABS.users, u._row, Object.assign({}, u, { role, updatedAt: nowIso }));
+      await wr(TABS.users, u._key, Object.assign({}, u, { role, updatedAt: nowIso }));
       return res.json({ ok: true });
     }
 
@@ -603,7 +418,7 @@ module.exports = async (req, res) => {
         ? body.assigneeIds.filter(x => typeof x === 'string' && x).join(',')
         : (existing ? existing.assigneeIds : '');
       const rec = { name, ownerId, assigneeIds, updatedAt: nowIso };
-      if (existing) await wr(TABS.territories, existing._row, rec);
+      if (existing) await wr(TABS.territories, existing._key, rec);
       else await ap(TABS.territories, rec);
       return res.json({ ok: true });
     }
@@ -649,7 +464,7 @@ module.exports = async (req, res) => {
         updatedAt: nowIso,
         working: body.working ? '1' : '0',
       };
-      if (t) await wr(TABS.territories, t._row, rec);
+      if (t) await wr(TABS.territories, t._key, rec);
       else await ap(TABS.territories, rec);
       return res.json({ ok: true, working: rec.working === '1' });
     }
@@ -692,7 +507,7 @@ module.exports = async (req, res) => {
         name: territory, ownerId: t ? (t.ownerId || me.id) : me.id,
         assigneeIds: t ? t.assigneeIds : '', updatedAt: nowIso, working: '1',
       };
-      if (t) await wr(TABS.territories, t._row, trec);
+      if (t) await wr(TABS.territories, t._key, trec);
       else await ap(TABS.territories, trec);
 
       return res.json({ ok: true, assignment: rec, guestCode: rec.guestCode, expiresAt });
@@ -753,7 +568,7 @@ module.exports = async (req, res) => {
       if (!a) return res.status(404).json({ error: 'No such assignment' });
       if (a.ownerId !== me.id && me.role !== 'admin')
         return res.status(403).json({ error: 'Only the owner can withdraw this' });
-      await wr(TABS.assignments, a._row, Object.assign({}, a, { active: '0' }));
+      await wr(TABS.assignments, a._key, Object.assign({}, a, { active: '0' }));
       return res.json({ ok: true });
     }
 
@@ -786,7 +601,7 @@ module.exports = async (req, res) => {
     /* Lets a guest app notice it has been cut off without waiting for a write. */
     if (action === 'guestStatus') {
       if (!claims || !claims.g) return res.status(401).json({ error: 'Not a guest session' });
-      const packet = await AS.loadPacket(sheets, claims.g, now);
+      const packet = await AS.loadPacket(store, claims.g, now);
       if (!packet.state.ok) return res.status(403).json({ error: packet.state.reason });
       return res.json({
         ok: true,
@@ -809,7 +624,7 @@ module.exports = async (req, res) => {
       const mine = rows.find(r => r.userId === me.id && r.territory === territory);
       const rec = { userId: me.id, territory, lat: lat.toFixed(6), lng: lng.toFixed(6),
                     acc: Math.round(Number(body.acc) || 0), ts: String(now) };
-      if (mine) await wr(TABS.presence, mine._row, rec);
+      if (mine) await wr(TABS.presence, mine._key, rec);
       else await ap(TABS.presence, rec);
       return res.json({ ok: true });
     }
@@ -858,7 +673,7 @@ module.exports = async (req, res) => {
           const mine = pres.find(r => r.userId === me.id && r.territory === territory);
           const rec = { userId: me.id, territory, lat: lat.toFixed(6), lng: lng.toFixed(6),
                         acc: Math.round(Number(body.acc) || 0), ts: String(now) };
-          if (mine) await wr(TABS.presence, mine._row, rec);
+          if (mine) await wr(TABS.presence, mine._key, rec);
           else await ap(TABS.presence, rec);
         }
       }
@@ -888,7 +703,7 @@ module.exports = async (req, res) => {
     if (action === 'clearPresence') {
       const me = await requireActor();
       const rows = await rd(TABS.presence);
-      const mine = rows.filter(r => r.userId === me.id).map(r => r._row);
+      const mine = rows.filter(r => r.userId === me.id).map(r => r._key);
       await dl(TABS.presence, mine);
       return res.json({ ok: true });
     }
@@ -906,7 +721,7 @@ module.exports = async (req, res) => {
 
       const rows = await rd(TABS.voice);
       // Prune expired clips in the same pass, so the tab cannot grow forever.
-      const stale = rows.filter(r => now - Number(r.ts || 0) > VOICE_TTL_MS).map(r => r._row);
+      const stale = rows.filter(r => now - Number(r.ts || 0) > VOICE_TTL_MS).map(r => r._key);
       if (stale.length) await dl(TABS.voice, stale);
 
       const rec = { id: uid(), territory, userId: me.id, ts: String(now),
