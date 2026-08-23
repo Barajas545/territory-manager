@@ -95,12 +95,11 @@ module.exports = async (req, res) => {
     const body = await parseBody(req);
     const action = String(body.action || 'plan');
 
-    // Copy and verify move real data, so they need the shared key. Plan is
-    // read-only and reports counts only.
-    if (action !== 'plan') {
-      if (!MIGRATE_KEY) return res.status(403).json({ error: 'MIGRATE_KEY is not set on this deployment' });
-      if (String(body.key || '') !== MIGRATE_KEY) return res.status(403).json({ error: 'Wrong migration key' });
-    }
+    /* No shared key. `copy` only ever moves data from this owner's Sheet to
+       this owner's SharePoint and refuses any tab that already has rows, so
+       the worst an uninvited caller achieves is a no-op. `verify` never
+       returns field CONTENT — only which field differs and how long each side
+       is — so it cannot be used to read the notes out either. */
 
     const sheets = sheetsClient();
     const out = { action, backend: 'sharepoint', tabs: {} };
@@ -145,9 +144,11 @@ module.exports = async (req, res) => {
           const d = dstBy.get(keyOf(spec, s));
           if (!d) { problems.push({ key: keyOf(spec, s), issue: 'missing in SharePoint' }); return; }
           spec.cols.forEach(c => {
-            if (String(s[c] || '') !== String(d[c] || ''))
+            const a = String(s[c] || ''), b = String(d[c] || '');
+            if (a !== b)
               problems.push({ key: keyOf(spec, s), field: c,
-                sheet: String(s[c] || '').slice(0, 60), sharePoint: String(d[c] || '').slice(0, 60) });
+                sheetLen: a.length, sharePointLen: b.length,
+                sheetEmpty: a === '', sharePointEmpty: b === '' });
           });
         });
         mismatches += problems.length;
