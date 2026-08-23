@@ -107,9 +107,15 @@ module.exports = async (req, res) => {
     if (action === 'plan') {
       for (const spec of SPECS) {
         const src = await readSheet(sheets, spec);
-        let dst = [];
-        try { dst = await SP.readList(spec); } catch (e) { dst = []; }
-        out.tabs[spec.name] = { inSheet: src.length, inSharePoint: dst.length };
+        // Surface the failure instead of reporting an empty destination.
+        // Swallowing it made "list is missing and cannot be created" look
+        // identical to "list exists and has no rows".
+        let dst = null, err = null;
+        try { dst = await SP.readList(spec); }
+        catch (e) { err = String(e.message).slice(0, 200); }
+        out.tabs[spec.name] = err
+          ? { inSheet: src.length, sharePointError: err }
+          : { inSheet: src.length, inSharePoint: dst.length };
       }
       return res.json(out);
     }
