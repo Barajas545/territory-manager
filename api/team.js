@@ -412,6 +412,31 @@ module.exports = async (req, res) => {
       return res.json({ ok: true });
     }
 
+    if (action === 'deleteUser') {
+      const me = await requireAdmin();
+      const users = await readTab(sheets, TABS.users);
+      const u = users.find(x => x.id === body.id);
+      if (!u) return res.status(404).json({ error: 'No such user' });
+      if (u.id === me.id) return res.status(400).json({ error: 'You cannot delete yourself' });
+      if (u.role === 'admin' && users.filter(x => x.role === 'admin' && x.active !== '0').length <= 1)
+        return res.status(400).json({ error: 'That is the only admin left' });
+      await deleteRows(sheets, TABS.users, [u._row]);
+      // Take their position row with them; a ghost pin on the map is worse
+      // than no pin.
+      const pres = await readTab(sheets, TABS.presence);
+      await deleteRows(sheets, TABS.presence, pres.filter(p => p.userId === u.id).map(p => p._row));
+      return res.json({ ok: true });
+    }
+
+    if (action === 'deleteTerritory') {
+      await requireAdmin();
+      const terrs = await readTab(sheets, TABS.territories);
+      const t = terrs.find(x => x.name === String(body.territory || ''));
+      if (!t) return res.status(404).json({ error: 'No such territory' });
+      await deleteRows(sheets, TABS.territories, [t._row]);
+      return res.json({ ok: true });
+    }
+
     if (action === 'setUserRole') {
       const me = await requireAdmin();
       const users = await readTab(sheets, TABS.users);
