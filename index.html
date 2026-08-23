@@ -724,7 +724,7 @@ input,textarea,select{-webkit-appearance:none;appearance:none;}
 
 /* ═══ CONFIG ═══ */
 var API="https://territory-manager-silk.vercel.app/api/territory";
-var APP_VERSION="2.2.1";
+var APP_VERSION="2.3.0";
 
 /* ═══════════════════════════════════════════════════════════════════════
    OFFLINE DATA LAYER
@@ -1900,9 +1900,12 @@ function doSync(manual){
 }
 function updateSyncUI(forceState){
   var pill=$("#syncPill"),txt=$("#syncTxt"),n=pendingCount();
-  var state=forceState||(offlineMode?"offline":(n?"pending":(lastSyncError?"offline":"ok")));
+  // "Locked" is not "offline" — telling someone their signal is bad when they
+  // actually need to sign in sends them looking for the wrong problem.
+  var state=forceState||(needsAuth?"locked":offlineMode?"offline":(n?"pending":(lastSyncError?"offline":"ok")));
   pill.className="";
   if(state==="syncing"){pill.className="syncing";txt.textContent="Syncing…";}
+  else if(state==="locked"){pill.className="pending";txt.textContent="Sign in";}
   else if(state==="offline"){pill.className="offline";txt.textContent=n?(n+" saved"):"Offline";}
   else if(state==="pending"){pill.className="pending";txt.textContent=n+" to sync";}
   else{txt.textContent="Synced";}
@@ -1912,7 +1915,10 @@ function updateSyncUI(forceState){
     $("#syncSub").textContent=v?("Last synced "+new Date(v).toLocaleString()):"Never synced";
   });
 }
-$("#syncPill").addEventListener("click",function(){doSync(true);});
+$("#syncPill").addEventListener("click",function(){
+  if(needsAuth&&!me){openAuth();return;}
+  doSync(true);
+});
 $("#rowSync").addEventListener("click",function(){doSync(true);});
 $("#swOffline").addEventListener("click",function(){
   offlineMode=!offlineMode;
@@ -2366,7 +2372,12 @@ function drawAuth(mode){
       setSession(r.token,r.user);
       closeSheet("#sh-auth");
       toast("Hello, "+String(r.user.name).split(" ")[0]+" ✓");
+      // Signing in is the moment the territory becomes reachable, so fetch it
+      // now. Without this the app sits on an empty locked screen until the
+      // next sync tick, which looks exactly like the sign-in having failed.
+      needsAuth=false;
       loadTeam();
+      doSync(false);
     }).catch(function(e){
       err.textContent=e.message;
       btn.disabled=false;btn.textContent=label;
