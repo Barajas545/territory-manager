@@ -24,6 +24,10 @@
   --border:#E2E6EC; --border-strong:#CDD4DF;
   --brand:#0D6B4F; --brand-soft:#E6F4EE; --brand-ink:#FFFFFF;
   --rv:#6941C6; --rv-soft:#F0EAFB;
+  /* Apartment units. Indigo: distinct from the visit-status colours (green,
+     amber, red, grey) and from return-visit violet, so a unit number never
+     reads as a status. */
+  --unit:#2E35C4; --unit-soft:#EAECFF;
   --ok:#12805C; --ok-soft:#E4F5EE;
   --warn:#B54708; --warn-soft:#FDF0E6;
   --bad:#B42318; --bad-soft:#FDECEA;
@@ -44,6 +48,7 @@
     --border:#293039; --border-strong:#3A424E;
     --brand:#3FB68B; --brand-soft:#12301F; --brand-ink:#05150E;
     --rv:#A98BFF; --rv-soft:#241B3A;
+    --unit:#93A4FF; --unit-soft:#1B1F45;
     --ok:#3FB68B; --ok-soft:#12301F;
     --warn:#E8944A; --warn-soft:#33210F;
     --bad:#F27267; --bad-soft:#331815;
@@ -149,18 +154,36 @@ input,textarea,select{-webkit-appearance:none;appearance:none;}
 
 /* ═══ HOUSE LIST ══════════════════════════════════════════════════════ */
 .street-hd{
-  position:sticky;top:0;z-index:2;padding:9px 16px 7px;
-  background:var(--bg);color:var(--text-2);
-  font-size:12px;font-weight:750;letter-spacing:.06em;text-transform:uppercase;
+  position:sticky;top:0;z-index:2;padding:11px 16px 9px;
+  background:var(--bg);color:var(--text);
+  font-size:17px;font-weight:800;letter-spacing:.01em;line-height:1.2;
   border-bottom:1px solid var(--border);
 }
-.apt-hd{padding:7px 16px 4px;font-size:12px;font-weight:700;color:var(--text-3);}
+.street-hd .st-count{font-size:13px;font-weight:700;color:var(--text-3);letter-spacing:0;}
+
+/* Apartment building header — the symbol makes a multi-unit address readable
+   at a glance instead of looking like a stray house number. */
+.apt-hd{
+  display:flex;align-items:center;gap:7px;padding:11px 16px 5px;
+  font-size:16px;font-weight:800;color:var(--unit);letter-spacing:-.01em;
+}
+.apt-hd .apt-ico{font-size:17px;line-height:1;}
+.apt-hd .apt-n{font-size:12px;font-weight:700;color:var(--text-3);letter-spacing:.04em;text-transform:uppercase;}
 .house{
   display:flex;align-items:center;gap:10px;padding:9px 12px 9px 14px;min-height:62px;
   background:var(--surface);border-bottom:1px solid var(--border);
 }
 .house:active{background:var(--surface-2);}
-.house.unit{padding-left:30px;}
+/* Unit rows sit under their building header, marked by a coloured rail so the
+   group reads as one address rather than a run of separate houses. */
+.house.unit{padding-left:14px;border-left:3px solid var(--unit-soft);}
+.house.unit .house-num{
+  font-size:26px;font-weight:850;color:var(--unit);letter-spacing:-.02em;
+  display:flex;align-items:center;gap:6px;
+}
+.house.unit .house-num .u-ico{font-size:18px;line-height:1;flex:0 0 auto;}
+.house.unit .house-num .u-num{white-space:nowrap;}
+.house.unit .house-num .u-hash{font-size:18px;font-weight:700;opacity:.5;}
 .house-main{flex:1;min-width:0;display:flex;align-items:center;gap:10px;text-align:left;}
 .house-dot{width:10px;height:10px;border-radius:50%;flex:0 0 auto;}
 .dot-recent{background:var(--ok);} .dot-due{background:var(--warn);}
@@ -624,7 +647,7 @@ input,textarea,select{-webkit-appearance:none;appearance:none;}
 
 /* ═══ CONFIG ═══ */
 var API="https://territory-manager-silk.vercel.app/api/territory";
-var APP_VERSION="2.0.2";
+var APP_VERSION="2.0.3";
 
 /* ═══════════════════════════════════════════════════════════════════════
    OFFLINE DATA LAYER
@@ -1301,7 +1324,7 @@ function renderHouses(){
       if(!isNaN(na)&&!isNaN(nb)&&na!==nb)return na-nb;
       return extractApt(a.HouseAddress).localeCompare(extractApt(b.HouseAddress));
     });
-    html+='<div class="street-hd">'+esc(st)+' <span style="opacity:.6">· '+list.length+'</span></div>';
+    html+='<div class="street-hd">'+esc(st)+' <span class="st-count">· '+list.length+'</span></div>';
     var groups=[],cur=null,g=null;
     list.forEach(function(h){
       var bn=extractBaseNum(h.HouseAddress);
@@ -1309,7 +1332,8 @@ function renderHouses(){
     });
     groups.forEach(function(gr){
       var multi=gr.items.length>1&&gr.items.some(function(h){return hasApt(h.HouseAddress);});
-      if(multi)html+='<div class="apt-hd">'+esc(gr.num)+' · units</div>';
+      if(multi)html+='<div class="apt-hd"><span class="apt-ico">🏢</span>'+esc(gr.num)+
+        '<span class="apt-n">'+gr.items.length+' units</span></div>';
       gr.items.forEach(function(h){
         var apt=extractApt(h.HouseAddress);
         var label=multi?(apt||gr.num):(extractNumber(h.HouseAddress)+(apt?" #"+apt:""));
@@ -1325,7 +1349,9 @@ function houseRow(h,label,isUnit){
     '<button class="house-main" data-act="detail" data-id="'+esc(h.id)+'">'+
       '<span class="house-dot dot-'+visitStatus(h.HouseLastVisitDate)+'"></span>'+
       '<span class="house-txt">'+
-        '<span class="house-num">'+esc(label)+
+        '<span class="house-num">'+
+          (isUnit?'<span class="u-ico">🏢</span><span class="u-num"><span class="u-hash">#</span>'+esc(label)+'</span>'
+                 :esc(label))+
           (h.HouseVerifiedOnMaps==="No"?'<span class="warn-mark" title="Not found on maps">⚠</span>':'')+
         '</span>'+
         '<span class="house-sub">'+houseSubtitle(h)+'</span>'+
