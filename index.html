@@ -32,6 +32,9 @@
   --unit:#1565C0; --unit-soft:#E3F0FC;
   /* Street headings. */
   --street:#C0392B;
+  /* Someone else is holding these numbers. The same violet already used for a
+     teammate's pin on the map — same person, same colour. */
+  --held:#7C3AED; --held-ink:#FFFFFF;
   --ok:#12805C; --ok-soft:#E4F5EE;
   --warn:#B54708; --warn-soft:#FDF0E6;
   --bad:#B42318; --bad-soft:#FDECEA;
@@ -54,6 +57,7 @@
     --rv:#A98BFF; --rv-soft:#241B3A;
     --unit:#6BB6FF; --unit-soft:#12283C;
     --street:#FF8577;
+    --held:#A78BFA; --held-ink:#140C24;
     --ok:#3FB68B; --ok-soft:#12301F;
     --warn:#E8944A; --warn-soft:#33210F;
     --bad:#F27267; --bad-soft:#331815;
@@ -195,6 +199,10 @@ input,textarea,select{-webkit-appearance:none;appearance:none;}
 .house-sub{display:block;font-size:12.5px;color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px;}
 .house-sub .rv-tag{color:var(--rv);font-weight:700;}
 .house-sub .pend{color:var(--warn);font-weight:700;}
+/* Who is holding this one. Darker and heavier than the rest of the subtitle so
+   it survives sunlight, and no brand colour, so it stays legible on a row that
+   is tinted while picking. */
+.house-sub .held-tag{color:var(--text);font-weight:750;}
 /* the list row is one full-width target now; logging lives on the detail sheet */
 .empty{padding:56px 24px;text-align:center;color:var(--text-3);font-size:15px;}
 .empty .big{font-size:34px;display:block;margin-bottom:10px;}
@@ -241,7 +249,8 @@ input,textarea,select{-webkit-appearance:none;appearance:none;}
 .map-fabs{position:absolute;right:12px;bottom:14px;display:flex;flex-direction:column;gap:8px;z-index:400;}
 
 /* ── selecting houses to hand out ── */
-.tool-row{display:flex;align-items:center;gap:8px;margin-top:8px;}
+.tool-row{display:flex;align-items:center;gap:8px;margin-top:8px;overflow-x:auto;scrollbar-width:none;}
+.tool-row::-webkit-scrollbar{display:none;}
 .tool-btn{height:34px;padding:0 12px;border-radius:var(--r-full);background:var(--surface-2);
   font-size:13px;font-weight:700;color:var(--text-2);flex:0 0 auto;}
 .tool-btn[aria-pressed="true"]{background:var(--brand);color:var(--brand-ink);}
@@ -262,6 +271,15 @@ body.picking #fab{display:none;}
 #pickBar button{height:40px;padding:0 16px;border-radius:var(--r-md);font-size:14px;font-weight:750;}
 #pbAssign{background:var(--brand);color:var(--brand-ink);}
 #pbCancel{background:rgba(255,255,255,.16);color:inherit;}
+
+/* ── numbers handed out ── */
+.held-card{margin-bottom:10px;}
+.held-nums{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:11px 14px;}
+.held-nums .nc-st{flex:0 0 100%;font-size:12px;font-weight:750;color:var(--text-3);}
+.held-nums .nc{font-size:13px;font-weight:750;padding:4px 9px;border-radius:var(--r-sm);
+  background:var(--surface-2);color:var(--text);}
+.held-nums .nc.q{color:var(--text-3);}
+.held-acts{display:flex;gap:8px;padding:0 14px 14px;}
 
 .qr-wrap{display:flex;justify-content:center;padding:14px;background:#fff;border-radius:var(--r-md);margin:10px 0;}
 .qr-wrap img,.qr-wrap svg{width:210px;height:210px;display:block;}
@@ -292,8 +310,9 @@ body.picking #fab{display:none;}
   display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex:0 0 auto;}
 .who.sm{width:26px;height:26px;font-size:11px;}
 .who.gray{background:var(--surface-3);color:var(--text-2);}
+.who.held{background:var(--held);color:var(--held-ink);}
 .mate-pin{display:flex;flex-direction:column;align-items:center;}
-.mate-pin .mp-dot{width:26px;height:26px;border-radius:50%;background:#7C3AED;color:#fff;border:3px solid #fff;
+.mate-pin .mp-dot{width:26px;height:26px;border-radius:50%;background:var(--held);color:var(--held-ink);border:3px solid #fff;
   display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;
   box-shadow:0 2px 8px rgba(0,0,0,.45);}
 .mate-pin .mp-name{margin-top:3px;background:rgba(20,20,28,.86);color:#fff;font-size:10.5px;font-weight:700;
@@ -557,6 +576,7 @@ body.picking #fab{display:none;}
         <div class="tool-row" id="toolRow">
           <button class="tool-btn" id="btnPick" aria-pressed="false">☑ Select</button>
           <button class="tool-btn" id="btnWorking" aria-pressed="false" style="display:none">▶ Start working</button>
+          <button class="tool-btn" id="btnHeld" style="display:none"></button>
         </div>
         <div class="chips" id="filterChips">
           <button class="chip" data-f="all" aria-pressed="true"><span class="cdot"></span>All <span class="cnum" id="n-all"></span></button>
@@ -774,6 +794,15 @@ body.picking #fab{display:none;}
   <div class="sheet-bd" id="asBody" style="padding:10px 12px 20px"></div>
 </div>
 
+<!-- numbers handed out -->
+<div class="sheet" id="sh-held" style="height:82dvh">
+  <div class="grab" data-drag></div>
+  <div class="sheet-hd"><div class="st"><div class="sheet-t">Numbers handed out</div>
+    <div class="sheet-s" id="hdSub"></div></div>
+    <button class="x-btn" data-close>✕</button></div>
+  <div class="sheet-bd" id="hdBody" style="padding:10px 12px 20px"></div>
+</div>
+
 <!-- generic picker (territories / export / pending) -->
 <div class="sheet" id="sh-pick" style="max-height:80dvh">
   <div class="grab" data-drag></div>
@@ -788,7 +817,7 @@ body.picking #fab{display:none;}
 
 /* ═══ CONFIG ═══ */
 var API="https://territory-manager-silk.vercel.app/api/territory";
-var APP_VERSION="2.5.1";
+var APP_VERSION="2.6.0";
 
 /* ═══════════════════════════════════════════════════════════════════════
    OFFLINE DATA LAYER
@@ -1051,7 +1080,7 @@ function sync(opts) {
     // disk either way. Nothing is ever lost here.
     lastSyncError = e.message;
     if (e.needsAuth) return { ok: false, needsAuth: true, error: 'Sign in to sync' };
-    return { ok: false, offline: !navigator.onLine || /Failed to fetch|NetworkError|Load failed/i.test(e.message), error: e.message };
+    return { ok: false, offline: netOffline(e), error: e.message };
   }).then(function (r) { syncing = false; inFlightIds = {}; return r; });
 }
 
@@ -1091,6 +1120,11 @@ function fullAddr(r){return[r.HouseAddress,r.HouseCity,r.HouseState,r.HouseZIP].
 function parseGPS(v){if(!v)return null;var p=String(v).split(",").map(function(s){return parseFloat(s.trim());});
   if(p.length===2&&!isNaN(p[0])&&!isNaN(p[1])&&Math.abs(p[0])<=90&&Math.abs(p[1])<=180)return{lat:p[0],lng:p[1]};return null;}
 function byId(id){for(var i=0;i<records.length;i++)if(records[i].id===id)return records[i];return null;}
+/* One test for "there is no signal", so a raw fetch rejection never reaches
+   the screen as "Failed to fetch". */
+function netOffline(e){
+  return !navigator.onLine||/Failed to fetch|NetworkError|Load failed/i.test((e&&e.message)||"");
+}
 
 function toast(msg,bad){
   var t=$("#toast");t.textContent=msg;t.className=bad?"show bad":"show";
@@ -1454,6 +1488,7 @@ function updateCounts(){
 
 function houseSubtitle(h){
   var bits=[];
+  var ht=heldTagFor(h.id);if(ht)bits.push(ht);
   if(isRV(h))bits.push('<span class="rv-tag">Return visit</span>');
   bits.push(esc(visitLabel(h.HouseLastVisitDate)));
   if(h.HouseNotes)bits.push(esc(h.HouseNotes));
@@ -2049,7 +2084,7 @@ $("#pBody").addEventListener("click",function(e){
   var b=e.target.closest("[data-terr],[data-exp]");if(!b)return;
   if(b.dataset.terr!==undefined){
     terrFilter=b.dataset.terr;closeSheet("#sh-pick");renderHouses();fitPins();
-    stopPresence();updatePttVisibility();loadWorkingState();
+    stopPresence();updatePttVisibility();loadHeld();
     if(routeOn)drawRoute();
     if($("#view-map").classList.contains("active"))startPresence();
   }else{
@@ -2322,8 +2357,11 @@ function signOut(silent){
   // Wipe the local copy. Leaving it behind means the territory stays readable
   // to whoever next picks up the phone, which is the thing signing out is for.
   mirror={};pending={};needsAuth=true;records=[];
+  // A roster of volunteers' names and house counts is exactly the residue
+  // signing out exists to remove.
+  heldClear();working=false;
   Promise.all([idb.clear(S_MIRROR),idb.clear(S_PENDING)]).catch(function(){});
-  renderHouses();renderRV();updateSyncUI();
+  renderHouses();renderRV();updateSyncUI();refreshWorkingBtn();refreshHeldBtn();
   if(mapReady)refreshMapPins();
   if(!silent)toast("Signed out");
 }
@@ -2378,6 +2416,10 @@ function renderTeamCard(){
       '<span class="row-txt"><span class="row-t">Who works this territory</span>'+
       '<span class="row-s">Share a territory with others</span></span>'+
       '<span class="row-act">›</span></button>'+
+    '<button class="row" id="tmHeld"><span class="row-ico">\u{1F4E4}</span>'+
+      '<span class="row-txt"><span class="row-t">Numbers handed out</span>'+
+      '<span class="row-s" id="tmHeldSub">'+esc(heldSub())+'</span></span>'+
+      '<span class="row-act">›</span></button>'+
     (me.role==="admin"?
       '<button class="row" id="tmPeople"><span class="row-ico">\u{1F5C2}\u{FE0F}</span>'+
         '<span class="row-txt"><span class="row-t">People</span>'+
@@ -2390,6 +2432,7 @@ function renderTeamCard(){
       '<span class="row-txt"><span class="row-t">Sign out</span></span>'+
       '<span class="row-act">›</span></button>';
   $("#tmAssign").addEventListener("click",openAssign);
+  $("#tmHeld").addEventListener("click",openHeld);
   var pe=$("#tmPeople");if(pe)pe.addEventListener("click",openAdmin);
   $("#tmPw").addEventListener("click",openChangePassword);
   $("#tmOut").addEventListener("click",function(){
@@ -2474,6 +2517,7 @@ function drawAuth(mode){
       needsAuth=false;
       pendingSetupCode=null;
       loadTeam();
+      loadHeld();
       doSync(false);
     }).catch(function(e){
       err.textContent=e.message;
@@ -2924,22 +2968,357 @@ function refreshWorkingBtn(){
   b.setAttribute("aria-pressed",working?"true":"false");
   b.textContent=working?"■ Stop working":"▶ Start working";
 }
+/* Shared by the toolbar switch and the ledger's "Start working" button, so
+   both run the same confirm, the same request and the same repaint. */
+function setWorking(next,btn,terr){
+  terr=terr||terrFilter;
+  if(!next&&!confirm("Stop working "+terr+"?\n\nAnyone helping today loses access to their numbers straight away."))return;
+  if(btn)btn.disabled=true;
+  team("setTerritoryWorking",{territory:terr,working:next}).then(function(r){
+    if(terr===terrFilter)working=r.working;
+    // The switch changes the STATE of every packet there, not the set of them,
+    // so flip them in place rather than re-reading the list.
+    held.list.forEach(function(p){if(p.territory===terr)p.live=r.working;});
+    refreshWorkingBtn();refreshHeldBtn();renderHouses();
+    if(heldOpen())drawHeld();
+    toast(r.working?("Working "+terr):"Stopped — helpers are signed out");
+  }).catch(function(e){toast(e.message,true);}).then(function(){if(btn)btn.disabled=false;});
+}
 $("#btnWorking").addEventListener("click",function(){
   if(terrFilter==="all"){toast("Pick one territory first",true);return;}
-  var next=!working;
-  if(!next&&!confirm("Stop working "+terrFilter+"?\n\nAnyone helping today loses access to their numbers straight away."))return;
-  var b=this;b.disabled=true;
-  team("setTerritoryWorking",{territory:terrFilter,working:next}).then(function(r){
-    working=r.working;refreshWorkingBtn();
-    toast(working?("Working "+terrFilter):"Stopped — helpers are signed out");
-  }).catch(function(e){toast(e.message,true);}).then(function(){b.disabled=false;});
+  setWorking(!working,this);
 });
+$("#btnHeld").addEventListener("click",openHeld);
 
-function loadWorkingState(){
-  if(!me||guestMode||terrFilter==="all"){working=false;refreshWorkingBtn();return;}
-  team("listAssignments",{territory:terrFilter}).then(function(r){
-    working=!!r.working;refreshWorkingBtn();
-  }).catch(function(){refreshWorkingBtn();});
+/* ── who is holding numbers right now ──────────────────────────────────
+   Server-only truth, kept in memory for the session and never written to
+   IndexedDB — the same treatment presence markers and voice clips get, and for
+   the same reason: a roster of names is exactly what signing out must erase.
+
+   The rule that governs everything below: never claim something the server did
+   not tell us. "We have not been told" and "nobody has it" are different
+   answers and are never rendered the same way. */
+var held={scope:null,list:[],by:{},sig:"",at:0,err:"",offline:false};
+/* Every request carries a sequence number. Anything that invalidates the
+   roster — a territory switch, signing out, entering guest mode — bumps it, so
+   a reply that is already on its way lands in the bin instead of on screen. */
+var heldSeq=0, heldFetching=false, heldFetchScope=null;
+
+function heldClear(){
+  heldSeq++;heldFetching=false;heldFetchScope=null;
+  held={scope:null,list:[],by:{},sig:"",at:0,err:"",offline:false};
+}
+function offlineNow(){return !navigator.onLine||held.offline;}
+
+/* The two server shapes disagree: createAssignment hands back the stored row,
+   where houseIds is a comma string and expiresAt a string; listAssignments
+   sends an array and a number. Splicing a create response in raw would render
+   a character count as the house count. */
+function normPacket(a,whoFallback){
+  var ids=Array.isArray(a.houseIds)?a.houseIds.slice()
+    :String(a.houseIds||"").split(",").filter(Boolean);
+  return {
+    id:a.id,territory:a.territory||"",
+    who:a.who||whoFallback||"Someone",
+    hasAccount:(a.hasAccount!==undefined)?!!a.hasAccount:!!a.assigneeId,
+    guestCode:a.guestCode||"",houseIds:ids,
+    expiresAt:Number(a.expiresAt||0),
+    // Only ever a boolean when the server actually sent one.
+    live:(typeof a.live==="boolean")?a.live:null,
+    from:a.from||""
+  };
+}
+
+/* Expiry is decided at read time, so a phone left open past midnight stops
+   claiming a dead packet on the next paint without asking anyone. An unknown
+   expiry is not the same as an expired one. */
+function liveHeld(){
+  var now=Date.now();
+  return held.list.filter(function(p){return !(p.expiresAt&&p.expiresAt<=now);});
+}
+
+/* Tri-state on purpose. The server reports the territory's working flag only
+   when the request named one territory, so in All Territories we know nothing
+   about it — and "no idea" must never collapse into "live". */
+function packetPaused(p){
+  if(p.live===true)return false;
+  if(p.live===false)return true;
+  if(held.scope&&held.scope===p.territory)return !working;
+  return null;
+}
+
+/* renderHouses is one innerHTML blow-away with no per-row lookups, so every
+   row's answer has to be resident before the loop starts. */
+function rebuildHeldBy(){
+  var by={},sig=[];
+  liveHeld().forEach(function(p){
+    if(packetPaused(p)===true)return;   // paused means nobody is on that door
+    var first=String(p.who||"").split(" ")[0];
+    p.houseIds.forEach(function(id){
+      var names=by[id]||(by[id]=[]);
+      // Two packets can hold the same door, and often both go to one person —
+      // "With Ilmy and Ilmy" is not an answer.
+      if(names.indexOf(first)===-1)names.push(first);
+    });
+  });
+  Object.keys(by).sort().forEach(function(id){sig.push(id+":"+by[id].join(","));});
+  held.by=by;held.sig=sig.join("|");
+}
+
+/* Distinct doors, not a sum over packets: handing the same number to two
+   people is still one number out, and packets overlap in practice. */
+function heldTotal(){
+  var s={};
+  liveHeld().forEach(function(p){p.houseIds.forEach(function(id){s[id]=1;});});
+  return Object.keys(s).length;
+}
+function heldPeople(){var s={};liveHeld().forEach(function(p){s[p.who]=1;});return Object.keys(s).length;}
+
+function heldSub(){
+  if(held.at===0)return held.err?"Can't check right now":"Checking…";
+  var t=heldTotal();
+  if(!t)return "You have not handed any out";
+  var m=heldPeople();
+  return t+" number"+(t===1?"":"s")+" with "+m+" "+(m===1?"person":"people");
+}
+
+/* The one choke point: every mutation of `held` ends here. Writes display on
+   every call, like refreshWorkingBtn, so guest mode needs no hide/restore. */
+function refreshHeldBtn(){
+  rebuildHeldBy();
+  var b=$("#btnHeld");
+  var unknown=held.at===0&&!!held.err;
+  var show=!!me&&!guestMode&&(unknown||heldTotal()>0);
+  b.style.display=show?"block":"none";
+  if(show){
+    b.textContent=unknown?"\u{1F465} ?":"\u{1F465} "+heldTotal()+" out";
+    b.setAttribute("aria-label",unknown?"Can't check who has numbers"
+      :heldTotal()+" numbers handed out");
+  }
+  var s=$("#tmHeldSub");if(s)s.textContent=heldSub();
+}
+
+/* Silence here never means "nobody has it" — it means we have not been told,
+   and the pill and the More row say so in words. */
+function heldTagFor(id){
+  if(guestMode||!me||held.at===0)return "";
+  var names=held.by[id];
+  if(!names||!names.length)return "";
+  var t=names.length===1?"With "+names[0]
+    :names.length===2?"With "+names[0]+" and "+names[1]
+    :"With "+names.length+" people";
+  return '<span class="held-tag">'+esc(t)+'</span>';
+}
+
+function loadHeld(){
+  if(!me||guestMode){
+    // A guest token 401s against this endpoint, and team() treats a 401 as a
+    // sign-out — which would wipe their packet and any unsynced visits.
+    heldClear();working=false;refreshWorkingBtn();refreshHeldBtn();return;
+  }
+  var scope=terrFilter==="all"?"":terrFilter;
+  // Only a duplicate of the SAME question is worth skipping. Skipping a
+  // different one would leave the new territory waiting on an answer about the
+  // old one, which nothing would ever correct.
+  if(heldFetching&&heldFetchScope===scope)return;
+  if(held.scope!==null&&held.scope!==scope){
+    // Repaint before the request, so one territory's names cannot sit under
+    // another territory's houses even for a single frame.
+    var had=held.list.length;
+    held.list=[];held.at=0;held.by={};held.sig="";
+    if(had){refreshHeldBtn();renderHouses();}
+  }
+  var seq=++heldSeq;
+  heldFetching=true;heldFetchScope=scope;
+  team("listAssignments",{territory:scope}).then(function(r){
+    if(seq!==heldSeq||!me||guestMode)return;
+    held.scope=scope;
+    held.list=(r.assignments||[]).map(function(a){return normPacket(a);});
+    held.at=Date.now();held.err="";held.offline=false;
+    // The list and the flag that governs it are only ever written together.
+    working=scope?!!r.working:false;
+  }).catch(function(e){
+    if(seq!==heldSeq||!me||guestMode)return;
+    held.scope=scope;
+    held.err=e.message||"Could not check";held.offline=netOffline(e);
+  }).then(function(){
+    if(seq!==heldSeq)return;   // a newer answer is already on its way
+    heldFetching=false;heldFetchScope=null;
+    refreshWorkingBtn();refreshHeldBtn();renderHouses();
+    if(heldOpen())drawHeld();
+  });
+}
+
+/* Waking up is where a cached roster rots unnoticed. Re-derive expiry every
+   time (free), but go to the network at most once a minute. */
+function refreshHeldIfDue(){
+  if(!me||guestMode)return;
+  var sig=held.sig;
+  refreshHeldBtn();
+  if(held.sig!==sig)renderHouses();
+  if(Date.now()-held.at>60000)loadHeld();
+}
+
+function heldOpen(){return openSheets.indexOf("#sh-held")!==-1;}
+function openHeld(){
+  drawHeld();openSheet("#sh-held");
+  if(held.at===0||Date.now()-held.at>30000)loadHeld();
+}
+
+/* Never store a formatted expiry — a packet handed out at 11pm genuinely can
+   outlive tonight, and a phone left open crosses midnight on its own. */
+function endsWord(ms){
+  if(!ms)return "";
+  if(ms<=Date.now())return "ended";
+  var end=new Date();end.setHours(23,59,59,999);
+  return ms<=end.getTime()?"ends tonight":"ends tomorrow";
+}
+function clockTime(ms){
+  var d=new Date(ms),h=d.getHours(),m=d.getMinutes();
+  var ap=h<12?"AM":"PM";h=h%12;if(!h)h=12;
+  return h+":"+(m<10?"0":"")+m+" "+ap;
+}
+
+/* Numbers read exactly as they do in the list the owner picked them from. */
+function numbersByStreet(ids){
+  var map={};records.forEach(function(r){map[r.id]=r;});
+  var groups={},missing=0;
+  ids.forEach(function(id){
+    var h=map[id];
+    if(!h){missing++;return;}
+    var st=extractStreet(h.HouseAddress);
+    (groups[st]||(groups[st]=[])).push(h);
+  });
+  var out=Object.keys(groups).sort().map(function(st){
+    var list=groups[st].slice().sort(function(a,b){
+      var na=parseInt(extractBaseNum(a.HouseAddress),10),nb=parseInt(extractBaseNum(b.HouseAddress),10);
+      if(!isNaN(na)&&!isNaN(nb)&&na!==nb)return na-nb;
+      return extractApt(a.HouseAddress).localeCompare(extractApt(b.HouseAddress));
+    });
+    return {street:st,labels:list.map(function(h){
+      var apt=extractApt(h.HouseAddress);
+      return extractNumber(h.HouseAddress)+(apt?" #"+apt:"");
+    })};
+  });
+  return {groups:out,missing:missing};
+}
+
+function heldNumbers(ids){
+  if(!records.length)
+    return '<p style="font-size:13.5px;color:var(--text-2);padding:11px 14px;margin:0">'+
+      'The numbers appear once this phone has synced.</p>';
+  var g=numbersByStreet(ids),html="";
+  g.groups.forEach(function(gr){
+    html+='<span class="nc-st">'+esc(gr.street)+'</span>'+
+      gr.labels.map(function(l){return '<span class="nc">'+esc(l)+'</span>';}).join("");
+  });
+  // A house this phone cannot resolve still counts: never understate what
+  // somebody is holding.
+  for(var i=0;i<g.missing;i++)html+='<span class="nc q">?</span>';
+  return '<div class="held-nums">'+html+'</div>';
+}
+
+function drawHeld(){
+  var t=heldTotal(),scope=held.scope||"All territories";
+  // Until the roster has been confirmed once, the header states the scope and
+  // nothing else: "0 numbers out" would be a count we have not been given.
+  $("#hdSub").textContent=held.at===0?scope
+    :scope+" · "+t+" number"+(t===1?"":"s")+" out";
+  var body=$("#hdBody");
+  if(held.at===0&&!held.err){body.innerHTML='<div class="empty">Loading…</div>';return;}
+  if(held.at===0&&held.err){
+    body.innerHTML=held.offline
+      ?'<div class="empty"><span class="big">\u{1F4F5}</span>'+
+        'Can\'t check who has numbers right now.<br>'+
+        '<span style="font-size:13.5px">You are offline. Try again when you have signal.</span></div>'
+      :'<div class="empty">'+esc(held.err)+'</div>';
+    return;
+  }
+
+  var list=liveHeld().slice().sort(function(a,b){
+    return String(a.who).localeCompare(String(b.who))||String(a.id).localeCompare(String(b.id));
+  });
+  // Keep a just-expired packet on screen with its own label: a row that
+  // silently vanishes is ambiguous between "it ended" and "I took it back".
+  held.list.forEach(function(p){if(list.indexOf(p)===-1)list.push(p);});
+
+  var html="";
+  if(held.err)
+    html+='<p style="font-size:13.5px;color:var(--text-2);margin-bottom:12px">'+
+      'Last checked '+esc(clockTime(held.at))+'. '+
+      (held.offline?'You are offline, so this may have changed.':'Could not check just now.')+'</p>';
+  if(held.scope&&!working&&list.length)
+    html+='<p style="font-size:13.5px;color:var(--text-2);margin-bottom:12px">'+
+      esc(held.scope)+' is stopped, so nobody can open these numbers. '+
+      'Start working '+esc(held.scope)+' and they come back.</p>'+
+      '<button class="btn btn-p" id="hdStart" style="width:100%;margin-bottom:12px">'+
+      'Start working '+esc(held.scope)+'</button>';
+
+  if(!list.length){
+    html+='<div class="empty"><span class="big">\u{1F465}</span>'+
+      'You have not handed out any numbers.<br>'+
+      '<span style="font-size:13.5px">Tap Select on the Houses tab, pick some, then Assign.</span></div>';
+  }else{
+    list.forEach(function(p){
+      var ended=!!(p.expiresAt&&p.expiresAt<=Date.now());
+      var paused=!ended&&packetPaused(p)===true;
+      var bits=[];
+      if(!held.scope&&p.territory)bits.push(esc(p.territory));
+      bits.push(p.houseIds.length+" number"+(p.houseIds.length===1?"":"s"));
+      bits.push(ended?"ended":paused?"paused":esc(endsWord(p.expiresAt)));
+      if(p.from&&me&&p.from!==me.name)bits.push("from "+esc(p.from));
+      html+='<div class="card held-card">'+
+        '<div class="row"><span class="who '+(ended||paused?"gray":"held")+'">'+
+          esc(initials(p.who))+'</span>'+
+          '<span class="row-txt"><span class="row-t">'+esc(p.who)+'</span>'+
+          '<span class="row-s">'+bits.filter(Boolean).join(" · ")+'</span></span>'+
+          (ended?'<span class="pill-tag off">ended</span>'
+            :paused?'<span class="pill-tag pend">paused</span>':'')+
+        '</div>'+
+        heldNumbers(p.houseIds)+
+        (ended?"":'<div class="held-acts">'+
+          (p.guestCode?'<button class="btn btn-s" data-hact="code" data-pkt="'+esc(p.id)+'">Show their code</button>':"")+
+          '<button class="btn btn-d" data-hact="back" data-pkt="'+esc(p.id)+'"'+
+            (offlineNow()?" disabled":"")+'>Take back</button>'+
+        '</div>')+
+      '</div>';
+    });
+  }
+  html+='<div id="hdErr" style="color:var(--bad);font-size:13.5px;margin-top:10px"></div>';
+  body.innerHTML=html;
+
+  var sb=$("#hdStart");
+  if(sb)sb.addEventListener("click",function(){setWorking(true,sb,held.scope);});
+  body.querySelectorAll("[data-hact]").forEach(function(b){
+    b.addEventListener("click",function(){
+      var p=held.list.filter(function(x){return x.id===b.dataset.pkt;})[0];
+      if(!p)return;
+      if(b.dataset.hact==="code")showHandoff(p);
+      else takeBack(p,b);
+    });
+  });
+}
+
+function takeBack(p,btn){
+  var c=p.houseIds.length;
+  if(!confirm("Take back "+String(p.who).split(" ")[0]+"'s "+c+" number"+(c===1?"":"s")+"?"+
+    "\n\nThey lose them straight away."))return;
+  btn.disabled=true;
+  team("revokeAssignment",{id:p.id}).then(function(){
+    // By id, not by identity: a refresh in between replaces every packet
+    // object, and the receipt still holds the one it was opened with.
+    held.list=held.list.filter(function(x){return x.id!==p.id;});
+    refreshHeldBtn();renderHouses();
+    if(openSheets.indexOf("#sh-pick")!==-1)closeSheet("#sh-pick");
+    toast("Numbers taken back ✓");
+    if(heldOpen())drawHeld();
+  }).catch(function(e){
+    // Nothing goes until the server confirms: somebody who still has access
+    // must not disappear from the owner's screen.
+    var el=openSheets.indexOf("#sh-pick")!==-1?$("#hoErr"):$("#hdErr");
+    if(el)el.textContent=e.message;else toast(e.message,true);
+    btn.disabled=false;
+  });
 }
 
 /* ── handing the numbers out ── */
@@ -2995,15 +3374,22 @@ function endOfDay(){
 function makeAssignment(payload,who){
   payload.expiresAt=endOfDay();
   team("createAssignment",payload).then(function(r){
-    setPicking(false);
-    working=true;refreshWorkingBtn();
-    if(r.guestCode)showGuestCode(who,r.guestCode,payload.houseIds.length);
-    else{
-      closeSheet("#sh-pick");
-      toast(payload.houseIds.length+" numbers sent to "+String(who).split(" ")[0]+" ✓");
-    }
+    var p=normPacket(r.assignment||{},who);
+    p.houseIds=payload.houseIds.slice();   // the response sends them as a string
+    p.who=who||p.who;p.live=true;
+    if(r.guestCode)p.guestCode=r.guestCode;
+    held.list.push(p);
+    working=true;refreshWorkingBtn();refreshHeldBtn();
+    setPicking(false);                     // repaints, now carrying the tags
+    showHandoff(p);
+    loadHeld();                            // reconcile behind the receipt
   }).catch(function(e){
-    var el=$("#gvErr");if(el)el.textContent=e.message;else toast(e.message,true);
+    // Nothing was queued — handing numbers out has no offline path — so say
+    // that plainly instead of echoing sync's "saved on this phone".
+    var msg=netOffline(e)?"No signal — nothing was sent. Try again when you have a bar.":e.message;
+    var el=$("#gvErr");if(el)el.textContent=msg;else toast(msg,true);
+    var g=$("#gvGo");if(g)g.disabled=false;
+    $("#pBody").querySelectorAll("[data-give]").forEach(function(b){b.disabled=false;});
   });
 }
 
@@ -3011,41 +3397,84 @@ function guestUrl(code){
   return location.origin+location.pathname+"#g="+code;
 }
 
-function showGuestCode(name,code,count){
-  var url=guestUrl(code);
-  $("#pTitle").textContent="Give this to "+String(name).split(" ")[0];
-  $("#pSub").textContent=count+" number"+(count===1?"":"s")+" · expires tonight";
-  $("#pBody").innerHTML=
-    '<div class="qr-wrap" id="qrHere"></div>'+
-    '<p style="font-size:14px;text-align:center;margin-bottom:6px">'+
-      'They point their camera at this. No app or account needed.</p>'+
-    '<div class="lbl">Or they can type this code</div>'+
-    '<div class="code-box">'+esc(code)+'</div>'+
-    '<button class="btn btn-s" id="qrShare" style="width:100%;margin-bottom:8px">Send the link instead</button>'+
-    '<p style="font-size:12.5px;color:var(--text-2)">'+
-      'Their access ends tonight, or the moment you stop working this territory.</p>';
+/* The receipt. Shown the moment numbers are handed over, and re-openable from
+   the ledger afterwards — one renderer, so what the owner saw at the handoff
+   is exactly what they see two hours later. Somebody with the app and somebody
+   with a code differ only in how they receive it, not in what is said. */
+function showHandoff(p){
+  var first=String(p.who||"").split(" ")[0];
+  var c=p.houseIds.length;
+  var guest=!!p.guestCode;
+  var url=guest?guestUrl(p.guestCode):"";
+  var ends=endsWord(p.expiresAt);
 
-  var box=$("#qrHere");
-  try{
-    // Fixed error correction and an auto-chosen version: the URL length varies
-    // with the host, and a fixed version would fail on longer ones.
-    var qr=qrcode(0,"M");
-    qr.addData(url);
-    qr.make();
-    box.innerHTML=qr.createSvgTag({cellSize:6,margin:2,scalable:true});
-  }catch(e){
-    box.innerHTML='<p style="color:#333;font-size:13px;text-align:center">'+
-      'Could not draw the code here — send the link instead.</p>';
+  $("#pTitle").textContent=guest?("Give this to "+first):("Sent to "+first);
+  $("#pSub").textContent=c+" number"+(c===1?"":"s")+" · "+p.territory+(ends?" · "+ends:"");
+
+  var nums='<div class="lbl">The numbers they have</div>'+
+    '<div class="card">'+heldNumbers(p.houseIds)+'</div>';
+  var back='<button class="btn btn-d" id="hoBack" style="width:100%"'+
+      (offlineNow()?" disabled":"")+'>Take these numbers back</button>'+
+    '<div id="hoErr" style="color:var(--bad);font-size:13.5px;margin-top:10px"></div>';
+
+  $("#pBody").innerHTML=guest
+    ?'<div class="qr-wrap" id="qrHere"></div>'+
+     '<p style="font-size:14px;text-align:center;margin-bottom:6px">'+
+       'They point their camera at this. No app or account needed.</p>'+
+     '<div class="lbl">Or they can type this code</div>'+
+     '<div class="code-box">'+esc(p.guestCode)+'</div>'+
+     '<button class="btn btn-s" id="qrShare" style="width:100%;margin-bottom:8px">Send the link instead</button>'+
+     nums+
+     '<p style="font-size:12.5px;color:var(--text-2);margin-bottom:12px">'+
+       'Their access ends tonight, or the moment you stop working this territory.</p>'+
+     back
+    :'<div class="card"><div class="row">'+
+       '<span class="who held">'+esc(initials(p.who))+'</span>'+
+       '<span class="row-txt"><span class="row-t">'+esc(p.who)+'</span>'+
+       '<span class="row-s">'+esc(p.territory)+(ends?' · '+esc(ends):'')+'</span></span></div></div>'+
+     nums+
+     '<p style="font-size:13px;color:var(--text-2);margin-bottom:12px">'+
+       esc(first)+' already has this territory in the app. Send them the list '+
+       'so they know which numbers are theirs.</p>'+
+     '<button class="btn btn-s" id="hoShare" style="width:100%;margin-bottom:8px">Send them the list</button>'+
+     back;
+
+  if(guest){
+    var box=$("#qrHere");
+    try{
+      // Fixed error correction and an auto-chosen version: the URL length varies
+      // with the host, and a fixed version would fail on longer ones.
+      var qr=qrcode(0,"M");
+      qr.addData(url);
+      qr.make();
+      box.innerHTML=qr.createSvgTag({cellSize:6,margin:2,scalable:true});
+    }catch(e){
+      box.innerHTML='<p style="color:#333;font-size:13px;text-align:center">'+
+        'Could not draw the code here — send the link instead.</p>';
+    }
+    $("#qrShare").addEventListener("click",function(){
+      var text=first+", here are your numbers for today: "+url;
+      if(navigator.share)navigator.share({title:"Territory numbers",text:text,url:url}).catch(function(){});
+      else if(navigator.clipboard){
+        navigator.clipboard.writeText(url).then(function(){toast("Link copied ✓");})
+          .catch(function(){prompt("Copy this link:",url);});
+      }else prompt("Copy this link:",url);
+    });
+  }else{
+    $("#hoShare").addEventListener("click",function(){
+      // The list itself, never a credential: this one goes to somebody who
+      // already has the app.
+      var g=numbersByStreet(p.houseIds);
+      var text=first+", you have these numbers today: "+
+        g.groups.map(function(x){return x.labels.join(", ")+" on "+x.street;}).join("; ")+".";
+      if(navigator.share)navigator.share({title:"Territory numbers",text:text}).catch(function(){});
+      else if(navigator.clipboard){
+        navigator.clipboard.writeText(text).then(function(){toast("List copied ✓");})
+          .catch(function(){prompt("Copy this:",text);});
+      }else prompt("Copy this:",text);
+    });
   }
-
-  $("#qrShare").addEventListener("click",function(){
-    var text=String(name).split(" ")[0]+", here are your numbers for today: "+url;
-    if(navigator.share)navigator.share({title:"Territory numbers",text:text,url:url}).catch(function(){});
-    else if(navigator.clipboard){
-      navigator.clipboard.writeText(url).then(function(){toast("Link copied ✓");})
-        .catch(function(){prompt("Copy this link:",url);});
-    }else prompt("Copy this link:",url);
-  });
+  $("#hoBack").addEventListener("click",function(){takeBack(p,this);});
   openSheet("#sh-pick");
 }
 
@@ -3086,10 +3515,12 @@ function applyGuestChrome(){
   if(!guestMode)return;
   terrFilter=guestInfo.territory||"all";
   document.body.classList.add("guest");
-  // A guest owns nothing here: no adding houses, no handing numbers out.
+  // A guest owns nothing here: no adding houses, no handing numbers out, and
+  // no sight of who else is holding what.
   $("#fab").style.display="none";
   $("#btnPick").style.display="none";
   $("#btnWorking").style.display="none";
+  heldClear();refreshHeldBtn();
   var b=document.getElementById("guestBanner");
   if(!b){
     b=document.createElement("div");
@@ -3126,6 +3557,7 @@ function leaveGuest(){
   var b=document.getElementById("guestBanner");if(b)b.remove();
   document.body.classList.remove("guest");
   $("#fab").style.display="";$("#btnPick").style.display="";
+  heldClear();working=false;refreshWorkingBtn();refreshHeldBtn();
   renderHouses();renderTeamCard();
 }
 
@@ -3294,13 +3726,14 @@ function boot(){
       var n=$("#auName");if(n)n.focus();
     },400);
   }
-  refreshMe().then(function(){loadTeam();loadWorkingState();});
+  refreshMe().then(function(){loadTeam();loadHeld();});
 }
 
-window.addEventListener("online",function(){if(!offlineMode)doSync(false);updateSyncUI();});
+window.addEventListener("online",function(){if(!offlineMode)doSync(false);updateSyncUI();refreshHeldIfDue();});
 window.addEventListener("offline",updateSyncUI);
 document.addEventListener("visibilitychange",function(){
   if(document.visibilityState==="visible"&&!offlineMode)doSync(false);
+  if(document.visibilityState==="visible")refreshHeldIfDue();
 });
 
 /* iOS kills backgrounded tabs without waiting for IndexedDB to flush, and a
