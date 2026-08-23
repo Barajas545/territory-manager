@@ -338,9 +338,18 @@ module.exports = async (req, res) => {
        move to SharePoint is done. */
     if (action === 'spCheck') {
       const out = { configured: SP.configured(), steps: [] };
+      // Which names the runtime can actually see. Presence and length only —
+      // enough to tell "not set" from "set to something odd", and nothing more.
+      const seen = {};
+      ['SP_TENANT_ID','SP_CLIENT_ID','SP_CLIENT_SECRET','SP_SITE_URL','SP_SITE_ID'].forEach(k => {
+        const v = process.env[k];
+        seen[k] = v ? (String(v).length + ' chars') : 'MISSING';
+      });
+      out.visible = seen;
+      out.spKeysInEnv = Object.keys(process.env).filter(k => k.indexOf('SP_') === 0);
       if (!out.configured) {
         out.steps.push({ step: 'environment variables', ok: false,
-          detail: 'One of SP_TENANT_ID, SP_CLIENT_ID, SP_CLIENT_SECRET, SP_SITE_URL is missing on this deployment' });
+          detail: 'Missing: ' + Object.keys(seen).filter(k => seen[k] === 'MISSING' && k !== 'SP_SITE_ID').join(', ') });
         return res.json(out);
       }
       out.steps.push({ step: 'environment variables', ok: true, detail: 'all four present' });
