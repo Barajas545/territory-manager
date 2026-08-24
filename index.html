@@ -228,18 +228,30 @@ input,textarea,select{-webkit-appearance:none;appearance:none;}
 .vc.k-RV{background:var(--rv-soft);color:var(--rv);border-color:var(--rv);}
 .vc.k-NI,.vc.k-X{background:var(--surface-3);color:var(--text-2);border-color:var(--border-strong);}
 
-/* Do Not Visit. Red already means "overdue" in this same list, so colour alone
-   cannot carry a new meaning here: the dot changes SHAPE, the words lead the
-   subtitle, and the four boxes are replaced by a band. The number itself is
-   never struck through — it is the one string you have to read to know which
-   door you are walking past. */
-.house.dnv{border-left:4px solid var(--bad);}
-.house.dnv .house-num{color:var(--bad);}
-.dot-dnv{background:var(--bad);border-radius:3px;}
-.house-sub .dnv-tag{color:var(--bad);font-weight:800;font-size:11px;letter-spacing:.04em;}
+/* ── what a row's colour means ──
+   Three states worth seeing from arm's length, in the order they change what
+   you do at the door: a household that asked us not to call, numbers somebody
+   else is holding, and a door where somebody was actually spoken to.
+
+   A full-strength bar down the left and a wash behind the row — never a solid
+   fill, which would take the text with it in dark mode. The colours themselves
+   come from the group's settings, so an admin can change them. */
+.house.tinted{border-left:4px solid var(--tint-c);background:var(--tint-bg);}
+.house.t-dnv{--tint-c:var(--c-dnv);--tint-bg:var(--c-dnv-soft);}
+.house.t-assigned{--tint-c:var(--c-assigned);--tint-bg:var(--c-assigned-soft);}
+.house.t-talked{--tint-c:var(--c-talked);--tint-bg:var(--c-talked-soft);}
+
+/* Do Not Visit says it three ways, not just in colour: red is already
+   "overdue" in this same list. The dot changes SHAPE, the words lead the
+   subtitle, and the four boxes become a band. The number itself is never
+   struck through — it is the one string you have to read to know which door
+   you are walking past. */
+.house.dnv .house-num{color:var(--c-dnv);}
+.dot-dnv{background:var(--c-dnv);border-radius:3px;}
+.house-sub .dnv-tag{color:var(--c-dnv);font-weight:800;font-size:11px;letter-spacing:.04em;}
 .dnv-band{display:flex;align-items:center;justify-content:center;gap:8px;height:44px;margin-top:7px;
-  border-radius:var(--r-sm);border:1.5px solid var(--bad);background:var(--bad-soft);
-  color:var(--bad);font-size:12px;font-weight:800;letter-spacing:.05em;}
+  border-radius:var(--r-sm);border:1.5px solid var(--c-dnv);background:var(--c-dnv-soft);
+  color:var(--c-dnv);font-size:12px;font-weight:800;letter-spacing:.05em;}
 .dnv-due{font-size:11px;font-weight:800;padding:2px 7px;border-radius:var(--r-full);
   background:var(--warn-soft);color:var(--warn);letter-spacing:0;}
 #dnvBanner{margin:10px 12px;padding:11px 14px;border-radius:var(--r-md);
@@ -321,7 +333,7 @@ body:not(.admin) .house.dnv .vrow{pointer-events:none;opacity:.4;}
   color:transparent;background:var(--surface);}
 body.picking .house .pick{display:flex;}
 .house.on .pick{background:var(--brand);border-color:var(--brand);color:var(--brand-ink);}
-.house.on{background:var(--brand-soft);}
+.house.on,.house.tinted.on{background:var(--brand-soft);}
 #pickBar{
   position:absolute;left:10px;right:10px;bottom:14px;z-index:70;display:none;
   align-items:center;gap:10px;padding:11px 12px 11px 16px;border-radius:var(--r-lg);
@@ -873,7 +885,7 @@ body.picking #fab{display:none;}
 
 /* ═══ CONFIG ═══ */
 var API="https://territory-manager-silk.vercel.app/api/territory";
-var APP_VERSION="2.8.1";
+var APP_VERSION="2.9.0";
 
 /* ═══════════════════════════════════════════════════════════════════════
    OFFLINE DATA LAYER
@@ -1768,9 +1780,19 @@ function renderHouses(){
   el.innerHTML=html;
 }
 
+/* One row, one colour. Do Not Visit outranks everything because it is the one
+   that must never be missed; being handed to somebody outranks having been
+   worked, because it says whether to knock at all today. */
+function rowTint(h,d){
+  if(d.on)return " dnv tinted t-dnv";
+  if(held.at>0&&held.by[h.id]&&held.by[h.id].length)return " tinted t-assigned";
+  var spoke=visitEntries(h).some(function(e){var k=kindOf(e);return k==="M"||k==="W";});
+  return spoke?" tinted t-talked":"";
+}
+
 function houseRow(h,label,isUnit){
   var d=dnvState(h);
-  return '<div class="house'+(isUnit?' unit':'')+(picked[h.id]?' on':'')+(d.on?' dnv':'')+
+  return '<div class="house'+(isUnit?' unit':'')+(picked[h.id]?' on':'')+rowTint(h,d)+
       '" data-hid="'+esc(h.id)+'">'+
     '<button class="house-main" data-act="detail" data-id="'+esc(h.id)+'">'+
       '<span class="pick">✓</span>'+
@@ -2507,6 +2529,33 @@ var teamUsers=[], teamTerritories=[], teamHasUsers=true;
 var scope={kind:"unknown",territories:[],owned:[],canCreate:true,canDelete:true,
   canHandOut:true,empty:false,reason:"",at:0};
 
+/* The group's row colours. Defaults match the tokens the app already uses for
+   the same ideas, so nothing looks bolted on until somebody changes them. */
+var DEFAULT_ROW_COLORS={colorAssigned:"#1565C0",colorDnv:"#B42318",colorTalked:"#12805C"};
+var rowColors=Object.assign({},DEFAULT_ROW_COLORS);
+
+/* The chosen colour at low alpha. A solid fill would take the row's text with
+   it in dark mode, and the point is to read the street faster, not less. */
+function softOf(hex,a){
+  var m=/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(String(hex||""));
+  if(!m)return "transparent";
+  return "rgba("+parseInt(m[1],16)+","+parseInt(m[2],16)+","+parseInt(m[3],16)+","+a+")";
+}
+function applyRowColors(c){
+  rowColors=Object.assign({},DEFAULT_ROW_COLORS,c||{});
+  var dark=matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches;
+  var a=dark?.20:.13;
+  var s=document.documentElement.style;
+  s.setProperty("--c-assigned",rowColors.colorAssigned);
+  s.setProperty("--c-assigned-soft",softOf(rowColors.colorAssigned,a));
+  s.setProperty("--c-dnv",rowColors.colorDnv);
+  s.setProperty("--c-dnv-soft",softOf(rowColors.colorDnv,a));
+  s.setProperty("--c-talked",rowColors.colorTalked);
+  s.setProperty("--c-talked-soft",softOf(rowColors.colorTalked,a));
+}
+if(window.matchMedia)matchMedia("(prefers-color-scheme: dark)")
+  .addEventListener("change",function(){applyRowColors(rowColors);});
+
 function scopeLabel(){
   if(guestMode)return guestInfo&&guestInfo.territory||"My numbers";
   if(scope.kind==="admin"||scope.kind==="unknown")return "All Territories";
@@ -3066,7 +3115,63 @@ function policyCard(){
       '<span class="row-ico">⏱️</span>'+
       '<span class="row-txt"><span class="row-t">Numbers come back</span>'+
       '<span class="row-s">'+esc(nightsWords(orgPolicy.nights))+'</span></span>'+
+      '<span class="row-act">›</span></button>'+
+    '<button class="row" id="adColors">'+
+      '<span class="row-ico">🎨</span>'+
+      '<span class="row-txt"><span class="row-t">Row colours</span>'+
+      '<span class="row-s">What the colours on the list mean</span></span>'+
       '<span class="row-act">›</span></button></div>';
+}
+
+var COLOR_ROWS=[
+  {k:"colorDnv",     l:"Do not visit",  s:"Nobody calls here"},
+  {k:"colorAssigned",l:"Assigned",      s:"Somebody else is working these"},
+  {k:"colorTalked",  l:"Spoke to someone",s:"A man or a woman was recorded"}
+];
+
+function drawRowColors(){
+  $("#pTitle").textContent="Row colours";
+  $("#pSub").textContent="Everybody in the group sees these";
+  $("#pBody").innerHTML=
+    '<div class="card">'+COLOR_ROWS.map(function(c){
+      return '<div class="row"><span class="row-txt">'+
+        '<span class="row-t">'+esc(c.l)+'</span>'+
+        '<span class="row-s">'+esc(c.s)+'</span></span>'+
+        '<input type="color" id="col-'+c.k+'" value="'+esc(rowColors[c.k])+'"'+
+        ' aria-label="'+esc(c.l)+'" style="width:52px;height:34px;border:0;background:none;flex:0 0 auto">'+
+        '</div>';
+    }).join("")+'</div>'+
+    '<p style="font-size:13px;color:var(--text-2);margin-bottom:12px">'+
+      'The colour is a bar down the side of the row and a wash behind it — never a '+
+      'solid fill, so the writing stays readable in the sun and at night. A number '+
+      'marked Do not visit always wins, then one somebody else is holding.</p>'+
+    '<button class="btn btn-p" id="colSave" style="width:100%;margin-bottom:8px">Save colours</button>'+
+    '<button class="btn btn-s" id="colReset" style="width:100%">Back to the usual colours</button>'+
+    '<div id="colErr" style="color:var(--bad);font-size:13.5px;margin-top:10px"></div>';
+
+  // Live preview: the list behind the sheet repaints as the picker moves.
+  COLOR_ROWS.forEach(function(c){
+    $("#col-"+c.k).addEventListener("input",function(){
+      var next={};COLOR_ROWS.forEach(function(x){next[x.k]=$("#col-"+x.k).value;});
+      applyRowColors(next);
+    });
+  });
+  $("#colReset").addEventListener("click",function(){
+    applyRowColors(DEFAULT_ROW_COLORS);
+    COLOR_ROWS.forEach(function(c){$("#col-"+c.k).value=DEFAULT_ROW_COLORS[c.k];});
+  });
+  $("#colSave").addEventListener("click",function(){
+    var b=this,next={};
+    COLOR_ROWS.forEach(function(c){next[c.k]=$("#col-"+c.k).value;});
+    b.disabled=true;
+    team("setRowColors",{colors:next}).then(function(r){
+      applyRowColors(r.colors||next);
+      renderHouses();
+      closeSheet("#sh-pick");
+      toast("Colours saved ✓");
+    }).catch(function(e){$("#colErr").textContent=e.message;b.disabled=false;});
+  });
+  openSheet("#sh-pick");
 }
 
 function drawReturnPolicy(){
@@ -3105,7 +3210,7 @@ function drawAdmin(){
   $("#adBody").innerHTML='<div class="empty">Loading…</div>';
   team("listUsers",{}).then(function(r){
     teamUsers=r.users||[];
-    if(r.policy)orgPolicy=r.policy;
+    if(r.policy){orgPolicy=r.policy;if(r.policy.colors)applyRowColors(r.policy.colors);}
     $("#adSub").textContent=teamUsers.length+" "+(teamUsers.length===1?"person":"people");
     $("#adBody").innerHTML=policyCard()+'<div class="lbl">People</div><div class="card">'+teamUsers.map(function(u){
       var tags=(u.role==="admin"?'<span class="pill-tag admin">admin</span> ':"")+
@@ -3122,6 +3227,8 @@ function drawAdmin(){
     });
     var rp=$("#adPolicy");
     if(rp)rp.addEventListener("click",drawReturnPolicy);
+    var rc=$("#adColors");
+    if(rc)rc.addEventListener("click",drawRowColors);
   }).catch(function(e){
     $("#adBody").innerHTML='<div class="empty">'+esc(e.message)+'</div>';
   });
@@ -3474,6 +3581,7 @@ function loadTeam(){
   if(!me)return;
   team("listTerritories",{}).then(function(r){
     teamUsers=r.users||[];teamTerritories=r.territories||[];
+    if(r.colors){applyRowColors(r.colors);renderHouses();}
     /* Read defensively: against a server that predates this, the absence of a
        scope means "carry on as before" rather than "you may do nothing". */
     var s=r.scope;
@@ -3678,9 +3786,9 @@ function heldTagFor(id){
   if(guestMode||!me||held.at===0)return "";
   var names=held.by[id];
   if(!names||!names.length)return "";
-  var t=names.length===1?"With "+names[0]
-    :names.length===2?"With "+names[0]+" and "+names[1]
-    :"With "+names.length+" people";
+  var t="Assigned to: "+(names.length===1?names[0]
+    :names.length===2?names[0]+" and "+names[1]
+    :names.length+" people");
   return '<span class="held-tag">'+esc(t)+'</span>';
 }
 
