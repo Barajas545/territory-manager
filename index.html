@@ -817,7 +817,7 @@ body.picking #fab{display:none;}
 
 /* ═══ CONFIG ═══ */
 var API="https://territory-manager-silk.vercel.app/api/territory";
-var APP_VERSION="2.6.0";
+var APP_VERSION="2.7.0";
 
 /* ═══════════════════════════════════════════════════════════════════════
    OFFLINE DATA LAYER
@@ -1017,7 +1017,11 @@ function sync(opts) {
   });
 
   var nothingToPush = !sent.creates.length && !sent.updates.length && !sent.deletes.length;
-  var authHeaders = authToken ? { Authorization: 'Bearer ' + authToken } : {};
+  /* Says this phone understands a partial answer. Without it the server has
+     to refuse a mixed batch outright, because an older build would clear its
+     queue believing everything landed. */
+  var authHeaders = Object.assign({ 'X-TM-Client': '3' },
+    authToken ? { Authorization: 'Bearer ' + authToken } : {});
   var on401 = function (r) {
     // Signed out or expired. Flag it, but never touch what is already on the
     // device: the queue must survive to be uploaded after signing back in.
@@ -1044,15 +1048,34 @@ function sync(opts) {
       });
 
   return request.then(function (res) {
-    // Replace the mirror wholesale — the server just told us the truth.
+    /* Anything the server would not take, by id. Keeping these in the queue is
+       the whole point: the note stays on the phone, and the person who wrote it
+       is told, rather than watching it disappear. */
+    var refused = {};
+    (res.rejected || []).forEach(function (x) { if (x && x.id) refused[x.id] = x; });
+
+    var prevMirror = mirror;
     mirror = {};
     (res.records || []).forEach(function (rec) { mirror[rec.id] = rec; });
+    /* A row that still has unsent work stays in the mirror even when it has
+       dropped out of view — otherwise its edit loses the base it was made
+       against, and the pending list can only show a bare record id. */
+    Object.keys(pending).forEach(function (id) {
+      if (!mirror[id] && prevMirror[id]) mirror[id] = prevMirror[id];
+    });
 
     // Clear only what we actually sent AND that has not been re-edited since.
     var stillPending = {};
     Object.keys(pending).forEach(function (id) {
       var now = pending[id], was = sent.snapshot[id];
       if (!was) { stillPending[id] = now; return; } // edited during the request
+      if (refused[id] && !refused[id].fields) {
+        // Refused whole: keep every field, and remember why.
+        now.blocked = { code: refused[id].code, reason: refused[id].reason, at: Date.now() };
+        now.tries = (now.tries || 0) + 1;
+        stillPending[id] = now;
+        return;
+      }
       var keep = { id: id, fields: {}, created: false, deleted: false, at: now.at };
       var any = false;
       Object.keys(now.fields).forEach(function (k) {
@@ -1063,6 +1086,14 @@ function sync(opts) {
       });
       if (now.deleted && !was.deleted) { keep.deleted = true; any = true; }
       if (now.created && !was.created) { keep.created = true; any = true; }
+      if (refused[id]) {
+        // Partly refused: keep exactly the fields named.
+        (refused[id].fields || []).forEach(function (f) {
+          if (f in now.fields) { keep.fields[f] = now.fields[f]; any = true; }
+        });
+        keep.blocked = { code: refused[id].code, reason: refused[id].reason, at: Date.now() };
+        keep.tries = (now.tries || 0) + 1;
+      }
       if (any) stillPending[id] = keep;
     });
     pending = stillPending;
@@ -1073,7 +1104,8 @@ function sync(opts) {
       idb.setMeta('lastSync', new Date().toISOString()),
     ]).then(function () {
       lastSyncError = null;
-      return { ok: true, conflicts: res.conflicts || [], pushed: sent.creates.length + sent.updates.length + sent.deletes.length };
+      return { ok: true, conflicts: res.conflicts || [], rejected: res.rejected || [],
+        pushed: sent.creates.length + sent.updates.length + sent.deletes.length };
     });
   }).catch(function (e) {
     // Offline, signed out, or a server error: pending is untouched and still on
@@ -1480,7 +1512,9 @@ function updateCounts(){
     var el=document.getElementById("n-"+k);if(el)el.textContent=c[k];
   });
   $("#scopeCount").textContent=scoped.length;
-  $("#scopeName").textContent=terrFilter==="all"?"All Territories":terrFilter;
+  // "All Territories" is only true for an admin; everyone else is looking at
+  // their own, and saying otherwise over a seven-house list is a small lie.
+  if(!guestMode)$("#scopeName").textContent=terrFilter==="all"?scopeLabel():terrFilter;
   var rvN=records.filter(isRV).length;
   var b=$("#rvBadge");
   if(rvN){b.textContent=rvN;b.style.display="flex";}else{b.style.display="none";}
@@ -1514,8 +1548,27 @@ function renderHouses(){
       var g=$("#gateIn");if(g)g.addEventListener("click",openAuth);
       return;
     }
+    if(records.length){
+      el.innerHTML='<div class="empty"><span class="big">🔍</span>No houses match this filter.</div>';
+      return;
+    }
+    /* Nothing to show has three different causes and they must not read the
+       same. Telling somebody to add a house when the server would refuse it is
+       the worst of the three. */
+    if(!guestMode&&me&&scope.empty&&scope.kind!=="unknown"){
+      el.innerHTML='<div class="empty"><span class="big">📋</span>'+
+        esc(scope.reason||"Nothing is assigned to you yet.")+'<br>'+
+        '<span style="font-size:13.5px">Numbers appear here as soon as somebody hands them to you.</span></div>';
+      return;
+    }
+    if(lastSyncError&&!scope.canCreate){
+      el.innerHTML='<div class="empty"><span class="big">📡</span>'+
+        'Could not check your numbers just now.<br>'+
+        '<span style="font-size:13.5px">They will appear when this phone has signal.</span></div>';
+      return;
+    }
     el.innerHTML='<div class="empty"><span class="big">🔍</span>'+
-      (records.length?"No houses match this filter.":"No houses yet. Tap Add to create one.")+'</div>';
+      (scope.canCreate?"No houses yet. Tap Add to create one.":"No houses here yet.")+'</div>';
     return;
   }
   var streets={};
@@ -1827,7 +1880,7 @@ function setVerified(val){
 }
 function openForm(h){
   $("#fTitle").textContent=h?"Edit house":"Add house";
-  $("#fDelete").style.display=h?"flex":"none";
+  $("#fDelete").style.display=(h&&scope.canDelete)?"flex":"none";
   $("#fId").value=h?h.id:"";
   FORM.forEach(function(p){$("#"+p[0]).value=h?(h[p[1]]||""):"";});
   // The slots are not in FORM (the server derives them), so fill them from the
@@ -2320,6 +2373,34 @@ var TEAM_API=API.replace(/\/territory$/,"/team");
 var me=null, authToken="";
 try{authToken=localStorage.getItem("tm_token")||"";}catch(e){}
 var teamUsers=[], teamTerritories=[], teamHasUsers=true;
+
+/* What this account may see and do, as the server describes it.
+
+   "unknown" means we have not been told yet, and everything stays as it is —
+   hiding controls on ignorance would take Add away from an admin on a cold
+   start. Guessing is never necessary here, because a refused write is now kept
+   and named rather than silently dropped. */
+var scope={kind:"unknown",territories:[],owned:[],canCreate:true,canDelete:true,
+  canHandOut:true,empty:false,reason:"",at:0};
+
+function scopeLabel(){
+  if(guestMode)return guestInfo&&guestInfo.territory||"My numbers";
+  if(scope.kind==="admin"||scope.kind==="unknown")return "All Territories";
+  if(scope.kind==="numbers")return "My numbers";
+  if(scope.territories.length===1)return scope.territories[0];
+  if(scope.territories.length)return "My territories";
+  return "My numbers";
+}
+
+/* Applied wherever refreshWorkingBtn is, so the two never disagree. */
+function refreshChrome(){
+  var show=function(sel,on){var el=$(sel);if(el)el.style.display=on?"":"none";};
+  show("#fab",!guestMode&&scope.canCreate);
+  show("#btnPick",!guestMode&&scope.canHandOut);
+  show("#scopeBtn",guestMode||scope.kind!=="numbers");
+  var ex=$("#rowExport");
+  if(ex)ex.style.display=(!guestMode&&(scope.kind==="admin"||scope.territories.length))?"":"none";
+}
 var pendingSetupCode=null;   // carried in from a scanned QR or a shared link
 
 function initials(name){
@@ -2361,7 +2442,7 @@ function signOut(silent){
   // signing out exists to remove.
   heldClear();working=false;
   Promise.all([idb.clear(S_MIRROR),idb.clear(S_PENDING)]).catch(function(){});
-  renderHouses();renderRV();updateSyncUI();refreshWorkingBtn();refreshHeldBtn();
+  renderHouses();renderRV();updateSyncUI();refreshWorkingBtn();refreshHeldBtn();refreshChrome();
   if(mapReady)refreshMapPins();
   if(!silent)toast("Signed out");
 }
@@ -2412,6 +2493,7 @@ function renderTeamCard(){
       '<span class="row-txt"><span class="row-t">'+esc(me.name)+'</span>'+
       '<span class="row-s">'+esc(me.phone||me.email||"Signed in")+
       (me.role==="admin"?" · Admin":"")+'</span></span></div>'+
+    myNumbersRow()+
     '<button class="row" id="tmAssign"><span class="row-ico">\u{1F465}</span>'+
       '<span class="row-txt"><span class="row-t">Who works this territory</span>'+
       '<span class="row-s">Share a territory with others</span></span>'+
@@ -2433,6 +2515,8 @@ function renderTeamCard(){
       '<span class="row-act">›</span></button>';
   $("#tmAssign").addEventListener("click",openAssign);
   $("#tmHeld").addEventListener("click",openHeld);
+  $("#tmAssign").style.display=scope.canHandOut?"":"none";
+  $("#tmHeld").style.display=(scope.canHandOut||heldTotal()>0)?"":"none";
   var pe=$("#tmPeople");if(pe)pe.addEventListener("click",openAdmin);
   $("#tmPw").addEventListener("click",openChangePassword);
   $("#tmOut").addEventListener("click",function(){
@@ -2517,6 +2601,7 @@ function drawAuth(mode){
       needsAuth=false;
       pendingSetupCode=null;
       loadTeam();
+      loadMine();
       loadHeld();
       doSync(false);
     }).catch(function(e){
@@ -2544,14 +2629,67 @@ function openChangePassword(){
   openSheet("#sh-pick");
 }
 
+/* ── admin: when numbers come back ──────────────────────────────────────
+   Handed-out numbers return at midnight. That is the rule everyone in the
+   group can hold in their head, so it is the default and it is stated in
+   words. An admin can lengthen it for a group that works a territory across
+   several days. */
+var orgPolicy={nights:0,tz:"America/Los_Angeles",options:[0,1,2,6]};
+
+function nightsWords(nights){
+  if(nights===0)return "Tonight at midnight";
+  if(nights===1)return "Tomorrow at midnight";
+  return "In "+(nights+1)+" days, at midnight";
+}
+
+function policyCard(){
+  return '<div class="lbl" style="margin-top:0">Numbers</div>'+
+    '<div class="card"><button class="row" id="adPolicy">'+
+      '<span class="row-ico">⏱️</span>'+
+      '<span class="row-txt"><span class="row-t">Numbers come back</span>'+
+      '<span class="row-s">'+esc(nightsWords(orgPolicy.nights))+'</span></span>'+
+      '<span class="row-act">›</span></button></div>';
+}
+
+function drawReturnPolicy(){
+  $("#pTitle").textContent="Numbers come back";
+  $("#pSub").textContent="Applies to numbers handed out from now on";
+  $("#pBody").innerHTML=
+    '<div class="card">'+(orgPolicy.options||[0,1,2,6]).map(function(nt){
+      return '<button class="row" data-nights="'+nt+'">'+
+        '<span class="row-txt"><span class="row-t">'+esc(nightsWords(nt))+'</span>'+
+        '<span class="row-s">'+(nt===0?"The usual — everyone starts fresh each day"
+          :"They keep the same numbers for "+(nt+1)+" days")+'</span></span>'+
+        (orgPolicy.nights===nt?'<span class="row-act">✓</span>':'<span class="row-act">›</span>')+
+        '</button>';
+    }).join("")+'</div>'+
+    '<p style="font-size:13px;color:var(--text-2)">Numbers already handed out keep '+
+      'the time they were given. Whoever has them can always be sent home early '+
+      'with Stop working, or by taking their numbers back.</p>'+
+    '<div id="rpErr" style="color:var(--bad);font-size:13.5px;margin-top:10px"></div>';
+  $("#pBody").querySelectorAll("[data-nights]").forEach(function(b){
+    b.addEventListener("click",function(){
+      var nt=parseInt(b.dataset.nights,10);
+      b.disabled=true;
+      team("setReturnPolicy",{nights:nt}).then(function(){
+        orgPolicy.nights=nt;
+        closeSheet("#sh-pick");drawAdmin();
+        toast("Numbers come back "+nightsWords(nt).toLowerCase()+" ✓");
+      }).catch(function(e){$("#rpErr").textContent=e.message;b.disabled=false;});
+    });
+  });
+  openSheet("#sh-pick");
+}
+
 /* ── admin: people ── */
 function openAdmin(){openSheet("#sh-admin");drawAdmin();}
 function drawAdmin(){
   $("#adBody").innerHTML='<div class="empty">Loading…</div>';
   team("listUsers",{}).then(function(r){
     teamUsers=r.users||[];
+    if(r.policy)orgPolicy=r.policy;
     $("#adSub").textContent=teamUsers.length+" "+(teamUsers.length===1?"person":"people");
-    $("#adBody").innerHTML='<div class="card">'+teamUsers.map(function(u){
+    $("#adBody").innerHTML=policyCard()+'<div class="lbl">People</div><div class="card">'+teamUsers.map(function(u){
       var tags=(u.role==="admin"?'<span class="pill-tag admin">admin</span> ':"")+
         (u.mustSetup?'<span class="pill-tag pend">code '+esc(u.setupCode||"")+'</span> ':"")+
         (!u.active?'<span class="pill-tag off">off</span>':"");
@@ -2564,6 +2702,8 @@ function drawAdmin(){
     $("#adBody").querySelectorAll("[data-u]").forEach(function(b){
       b.addEventListener("click",function(){userActions(b.dataset.u);});
     });
+    var rp=$("#adPolicy");
+    if(rp)rp.addEventListener("click",drawReturnPolicy);
   }).catch(function(e){
     $("#adBody").innerHTML='<div class="empty">'+esc(e.message)+'</div>';
   });
@@ -2697,7 +2837,7 @@ function drawAssign(pick){
     var cur=pick||(terrFilter!=="all"&&names[terrFilter]?terrFilter:keys[0]);
     $("#asSub").textContent=cur;
     var t=teamTerritories.find(function(x){return x.name===cur;})||{name:cur,ownerId:"",assigneeIds:[]};
-    var canEdit=me&&(me.role==="admin"||!t.ownerId||t.ownerId===me.id);
+    var canEdit=me&&me.role==="admin";
     var ownerName=(t.owner&&t.owner.name)||"";
 
     $("#asBody").innerHTML=
@@ -2709,10 +2849,9 @@ function drawAssign(pick){
         esc(ownerName?initials(ownerName):"?")+'</span>'+
         '<span class="row-txt"><span class="row-t">'+esc(ownerName||"Not claimed yet")+'</span>'+
         '<span class="row-s">'+(t.ownerId?"Runs this territory":"Nobody is running this one")+'</span></span></div></div>'+
-      (!t.ownerId?'<button class="btn btn-p" id="asClaim" style="width:100%;margin-top:10px">Take this territory</button>':"")+
       '<div class="lbl">Helpers</div>'+
-      (canEdit?"":'<p style="font-size:13px;color:var(--text-2);margin-bottom:8px">Only '+
-        esc(ownerName||"the owner")+' can change this.</p>')+
+      (canEdit?"":'<p style="font-size:13px;color:var(--text-2);margin-bottom:8px">'+
+        'An admin decides who a territory belongs to.</p>')+
       '<div class="card">'+teamUsers.filter(function(u){return u.id!==t.ownerId;}).map(function(u){
         var on=(t.assigneeIds||[]).indexOf(u.id)!==-1;
         return '<div class="row"><span class="who '+(on?"":"gray")+'">'+esc(initials(u.name))+'</span>'+
@@ -2726,13 +2865,6 @@ function drawAssign(pick){
       'while the Map tab is open.</p>';
 
     $("#asTerr").addEventListener("change",function(){drawAssign(this.value);});
-    var cl=$("#asClaim");
-    if(cl)cl.addEventListener("click",function(){
-      cl.disabled=true;
-      team("assignTerritory",{territory:cur,ownerId:me.id}).then(function(){
-        toast("Territory is yours ✓");drawAssign(cur);
-      }).catch(function(e){toast(e.message,true);cl.disabled=false;});
-    });
     $("#asBody").querySelectorAll("[data-as]").forEach(function(b){
       b.addEventListener("click",function(){
         if(b.disabled)return;
@@ -2924,6 +3056,21 @@ function loadTeam(){
   if(!me)return;
   team("listTerritories",{}).then(function(r){
     teamUsers=r.users||[];teamTerritories=r.territories||[];
+    /* Read defensively: against a server that predates this, the absence of a
+       scope means "carry on as before" rather than "you may do nothing". */
+    var s=r.scope;
+    scope=s?{
+      kind:s.kind||"admin",
+      territories:s.territories||[],owned:s.owned||[],
+      canCreate:s.canCreate!==false,canDelete:s.canDelete!==false,
+      canHandOut:s.canHandOut!==false,
+      empty:!!s.empty,reason:s.reason||"",at:Date.now()
+    }:{kind:"admin",territories:[],owned:[],canCreate:true,canDelete:true,
+       canHandOut:true,empty:false,reason:"",at:Date.now()};
+    // Somebody holding numbers works only those, the way a guest does.
+    if(scope.kind==="numbers"&&terrFilter==="all"&&teamTerritories.length===1)
+      terrFilter=teamTerritories[0].name;
+    refreshChrome();refreshWorkingBtn();renderTeamCard();updateCounts();
   }).catch(function(){});
 }
 
@@ -2963,7 +3110,9 @@ $("#pbCancel").addEventListener("click",function(){setPicking(false);});
    ends every guest's access at once, without revoking packets one by one. */
 function refreshWorkingBtn(){
   var b=$("#btnWorking");
-  var can=me&&!guestMode&&terrFilter!=="all";
+  var mine=scope.kind==="admin"||scope.kind==="unknown"||
+    scope.owned.indexOf(terrFilter)!==-1;
+  var can=me&&!guestMode&&terrFilter!=="all"&&mine;
   b.style.display=can?"block":"none";
   b.setAttribute("aria-pressed",working?"true":"false");
   b.textContent=working?"■ Stop working":"▶ Start working";
@@ -3108,6 +3257,38 @@ function heldTagFor(id){
     :names.length===2?"With "+names[0]+" and "+names[1]
     :"With "+names.length+" people";
   return '<span class="held-tag">'+esc(t)+'</span>';
+}
+
+var myPackets=[];
+/* What THIS person was handed. The endpoint has existed since packets did and
+   had never once been called, so somebody given numbers was told nothing at
+   all about them. */
+function loadMine(){
+  if(!me||guestMode){myPackets=[];return;}
+  team("myAssignments",{}).then(function(r){
+    myPackets=r.assignments||[];
+    renderTeamCard();
+  }).catch(function(){});
+}
+
+function myNumbersRow(){
+  if(!myPackets.length)return "";
+  var live=myPackets.filter(function(p){return p.usable;});
+  var ids={};
+  live.forEach(function(p){(p.houseIds||[]).forEach(function(i){ids[i]=1;});});
+  var n=Object.keys(ids).length;
+  var sub;
+  if(live.length){
+    var ends=endsWord(live[0].expiresAt);
+    sub=n+" number"+(n===1?"":"s")+" from "+esc(String(live[0].from||"").split(" ")[0])+
+      (ends?" · "+esc(ends):"");
+  }else{
+    // An ended packet says why, rather than vanishing and leaving a blank app.
+    sub=esc(myPackets[0].reason||"Those numbers have been returned.");
+  }
+  return '<div class="row"><span class="row-ico">\u{1F4CD}</span>'+
+    '<span class="row-txt"><span class="row-t">Your numbers</span>'+
+    '<span class="row-s">'+sub+'</span></span></div>';
 }
 
 function loadHeld(){
@@ -3520,7 +3701,7 @@ function applyGuestChrome(){
   $("#fab").style.display="none";
   $("#btnPick").style.display="none";
   $("#btnWorking").style.display="none";
-  heldClear();refreshHeldBtn();
+  heldClear();refreshHeldBtn();refreshChrome();
   var b=document.getElementById("guestBanner");
   if(!b){
     b=document.createElement("div");
@@ -3557,7 +3738,10 @@ function leaveGuest(){
   var b=document.getElementById("guestBanner");if(b)b.remove();
   document.body.classList.remove("guest");
   $("#fab").style.display="";$("#btnPick").style.display="";
-  heldClear();working=false;refreshWorkingBtn();refreshHeldBtn();
+  heldClear();working=false;myPackets=[];
+  scope={kind:"unknown",territories:[],owned:[],canCreate:true,canDelete:true,
+    canHandOut:true,empty:false,reason:"",at:0};
+  refreshWorkingBtn();refreshHeldBtn();refreshChrome();
   renderHouses();renderTeamCard();
 }
 
@@ -3726,7 +3910,7 @@ function boot(){
       var n=$("#auName");if(n)n.focus();
     },400);
   }
-  refreshMe().then(function(){loadTeam();loadHeld();});
+  refreshMe().then(function(){loadTeam();loadMine();loadHeld();});
 }
 
 window.addEventListener("online",function(){if(!offlineMode)doSync(false);updateSyncUI();refreshHeldIfDue();});
