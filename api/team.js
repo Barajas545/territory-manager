@@ -85,7 +85,10 @@ const norm = v => String(v || '').trim().toLowerCase();
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+  /* X-TM-Client must be listed too: a header the browser does not recognise
+     turns every request into a preflight, and an unlisted one fails there —
+     before it is ever sent. */
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-TM-Client');
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST' });
 

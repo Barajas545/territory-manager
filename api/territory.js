@@ -175,7 +175,10 @@ module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
   // Authorization must be listed, or the browser's preflight rejects every
   // authenticated request before it is ever sent.
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+  /* X-TM-Client must be listed too: a header the browser does not recognise
+     turns every request into a preflight, and an unlisted one fails there —
+     before it is ever sent. */
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-TM-Client');
   res.setHeader('Access-Control-Max-Age', '86400');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
