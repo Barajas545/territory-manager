@@ -179,30 +179,92 @@ input,textarea,select{-webkit-appearance:none;appearance:none;}
 .apt-hd .apt-ico{width:22px;height:22px;flex:0 0 auto;display:block;color:var(--unit);}
 .apt-hd .apt-n{font-size:12px;font-weight:700;color:var(--text-3);letter-spacing:.04em;text-transform:uppercase;}
 .house{
-  display:flex;align-items:center;gap:10px;padding:9px 12px 9px 14px;min-height:62px;
+  display:flex;flex-direction:column;align-items:stretch;padding:8px 12px 8px 14px;min-height:62px;
   background:var(--surface);border-bottom:1px solid var(--border);
 }
-.house:active{background:var(--surface-2);}
+/* Pressed feedback moved onto the row's own button: tapping a visit box must
+   not flash the whole row as though the house had been opened. */
+.house-main:active{background:var(--surface-2);}
 /* Unit rows sit under their building header, marked by a coloured rail so the
    group reads as one address rather than a run of separate houses. */
 /* Units sit under their building header: a small indent and italics mark them
    as part of that building, without competing with the house numbers. */
 .house.unit{padding-left:30px;border-left:3px solid var(--unit-soft);}
 .house.unit .house-num{font-style:italic;}
-.house-main{flex:1;min-width:0;display:flex;align-items:center;gap:10px;text-align:left;}
+.house-main{flex:0 0 auto;width:100%;min-width:0;display:flex;align-items:center;gap:10px;text-align:left;}
 .house-dot{width:10px;height:10px;border-radius:50%;flex:0 0 auto;}
 .dot-recent{background:var(--ok);} .dot-due{background:var(--warn);}
 .dot-overdue{background:var(--bad);} .dot-never{background:var(--none);}
-.house-txt{min-width:0;flex:1;}
-.house-num{display:block;font-size:19px;font-weight:750;letter-spacing:-.02em;line-height:1.15;}
+.house-txt{min-width:0;flex:1;display:flex;align-items:baseline;gap:8px;}
+.house-num{display:block;flex:0 0 auto;font-size:19px;font-weight:750;letter-spacing:-.02em;line-height:1.15;}
 .house-num .warn-mark{color:var(--bad);font-size:12px;vertical-align:super;margin-left:2px;}
-.house-sub{display:block;font-size:12.5px;color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px;}
+.house-sub{display:block;flex:1;min-width:0;font-size:12.5px;color:var(--text-2);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:0;}
 .house-sub .rv-tag{color:var(--rv);font-weight:700;}
 .house-sub .pend{color:var(--warn);font-weight:700;}
 /* Who is holding this one. Darker and heavier than the rest of the subtitle so
    it survives sunlight, and no brand colour, so it stays legible on a row that
    is tinted while picking. */
 .house-sub .held-tag{color:var(--text);font-weight:750;}
+.house-sub .vcount{color:var(--text);font-weight:750;}
+.house-sub .blocked{color:var(--bad);font-weight:700;}
+
+/* ── recording a visit from the list ──
+   Four boxes on their own line. Every EMPTY one records the next visit: the
+   box number is bookkeeping, not a choice anybody makes at a door, so a thumb
+   that lands one box off still does the right thing. */
+.vrow{display:flex;gap:6px;margin-top:7px;}
+.vc{flex:1;min-width:0;height:44px;border-radius:var(--r-sm);
+  border:1.5px dashed var(--border-strong);background:var(--surface-2);
+  display:flex;align-items:center;justify-content:center;
+  font-size:15px;font-weight:800;letter-spacing:.02em;color:var(--text-3);
+  -webkit-user-select:none;user-select:none;}
+.vc:active{transform:scale(.95);}
+.vc.next{color:var(--brand);border-color:var(--brand);background:var(--brand-soft);font-size:19px;font-weight:600;}
+.vc.on{border-style:solid;}
+.vc.k-NH{background:var(--none-soft);color:var(--text-2);border-color:var(--border-strong);}
+.vc.k-M,.vc.k-W,.vc.k-T{background:var(--ok-soft);color:var(--ok);border-color:var(--ok);}
+.vc.k-BZ,.vc.k-CB{background:var(--warn-soft);color:var(--warn);border-color:var(--warn);}
+.vc.k-RV{background:var(--rv-soft);color:var(--rv);border-color:var(--rv);}
+.vc.k-NI,.vc.k-X{background:var(--surface-3);color:var(--text-2);border-color:var(--border-strong);}
+
+/* Do Not Visit. Red already means "overdue" in this same list, so colour alone
+   cannot carry a new meaning here: the dot changes SHAPE, the words lead the
+   subtitle, and the four boxes are replaced by a band. The number itself is
+   never struck through — it is the one string you have to read to know which
+   door you are walking past. */
+.house.dnv{border-left:4px solid var(--bad);}
+.house.dnv .house-num{color:var(--bad);}
+.dot-dnv{background:var(--bad);border-radius:3px;}
+.house-sub .dnv-tag{color:var(--bad);font-weight:800;font-size:11px;letter-spacing:.04em;}
+.dnv-band{display:flex;align-items:center;justify-content:center;gap:8px;height:44px;margin-top:7px;
+  border-radius:var(--r-sm);border:1.5px solid var(--bad);background:var(--bad-soft);
+  color:var(--bad);font-size:12px;font-weight:800;letter-spacing:.05em;}
+.dnv-due{font-size:11px;font-weight:800;padding:2px 7px;border-radius:var(--r-full);
+  background:var(--warn-soft);color:var(--warn);letter-spacing:0;}
+#dnvBanner{margin:10px 12px;padding:11px 14px;border-radius:var(--r-md);
+  background:var(--warn-soft);color:var(--warn);font-size:13.5px;font-weight:650;line-height:1.45;}
+#dnvBanner b{display:block;font-weight:800;margin-bottom:2px;}
+
+/* Lassoing thirty doors for a packet must not be able to log a visit: the tap
+   falls through to the row and toggles it, exactly as before. */
+body.picking .vrow,body.picking .dnv-band{pointer-events:none;opacity:.4;}
+body:not(.admin) .house.dnv .vrow{pointer-events:none;opacity:.4;}
+
+/* the visit picker */
+.cell-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.cell-grid .pk{min-height:60px;border-radius:var(--r-md);border:1.5px solid var(--border);
+  background:var(--surface-2);display:flex;align-items:center;gap:11px;padding:0 14px;text-align:left;}
+.cell-grid .pk.wide{grid-column:1/-1;}
+.cell-grid .pk:active{transform:scale(.98);}
+.pk-b{width:46px;height:32px;border-radius:var(--r-sm);border:1.5px solid;flex:0 0 auto;
+  display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;}
+.pk-l{font-size:16px;font-weight:700;}
+.pk-hr{grid-column:1/-1;height:1px;background:var(--border);margin:6px 0 2px;}
+.pk.danger{min-height:52px;border-color:var(--bad);background:transparent;}
+.pk.danger .pk-l{color:var(--bad);}
+#toast .undo{margin-left:14px;font-weight:800;color:var(--brand);text-decoration:underline;}
+#toast.act{pointer-events:auto;}
 /* the list row is one full-width target now; logging lives on the detail sheet */
 .empty{padding:56px 24px;text-align:center;color:var(--text-3);font-size:15px;}
 .empty .big{font-size:34px;display:block;margin-bottom:10px;}
@@ -710,16 +772,6 @@ body.picking #fab{display:none;}
 </div>
 
 <!-- log visit -->
-<div class="sheet" id="sh-log">
-  <div class="grab" data-drag></div>
-  <div class="sheet-hd"><div class="st"><div class="sheet-t" id="lTitle">Log visit</div><div class="sheet-s" id="lSub"></div></div>
-    <button class="x-btn" data-close>✕</button></div>
-  <div class="sheet-bd">
-    <div class="out-grid" id="outGrid"></div>
-    <div class="f" style="margin-top:16px"><label for="lNote">Note (optional)</label>
-      <textarea id="lNote" placeholder="What was said, who you spoke with…"></textarea></div>
-  </div>
-  <div class="sheet-ft"><button class="btn btn-p" id="lSave">Save visit</button></div>
 </div>
 
 <!-- return-visit thread -->
@@ -755,11 +807,6 @@ body.picking #fab{display:none;}
     <div class="f"><label for="fPersonal">Personal notes</label><textarea id="fPersonal" placeholder="Who lives here, interests…"></textarea></div>
     <div class="lbl">Visit results</div>
     <div class="grid2">
-      <div class="f"><label for="fV1">Visit 1</label><input id="fV1"></div>
-      <div class="f"><label for="fV2">Visit 2</label><input id="fV2"></div>
-      <div class="f"><label for="fV3">Visit 3</label><input id="fV3"></div>
-      <div class="f"><label for="fV4">Visit 4</label><input id="fV4"></div>
-      <div class="f"><label for="fV5">Visit 5</label><input id="fV5"></div>
     </div>
     <button class="btn btn-d" id="fDelete" style="width:100%;margin-top:6px">Delete house</button>
   </div>
@@ -794,6 +841,15 @@ body.picking #fab{display:none;}
   <div class="sheet-bd" id="asBody" style="padding:10px 12px 20px"></div>
 </div>
 
+<!-- record a visit -->
+<div class="sheet" id="sh-cell" style="max-height:92dvh">
+  <div class="grab" data-drag></div>
+  <div class="sheet-hd"><div class="st"><div class="sheet-t" id="cTitle"></div>
+    <div class="sheet-s" id="cSub"></div></div>
+    <button class="x-btn" data-close>✕</button></div>
+  <div class="sheet-bd" id="cBody" style="padding:10px 12px 20px"></div>
+</div>
+
 <!-- numbers handed out -->
 <div class="sheet" id="sh-held" style="height:82dvh">
   <div class="grab" data-drag></div>
@@ -817,7 +873,7 @@ body.picking #fab{display:none;}
 
 /* ═══ CONFIG ═══ */
 var API="https://territory-manager-silk.vercel.app/api/territory";
-var APP_VERSION="2.7.0";
+var APP_VERSION="2.8.0";
 
 /* ═══════════════════════════════════════════════════════════════════════
    OFFLINE DATA LAYER
@@ -1177,17 +1233,109 @@ function parseLog(s){
   try{var a=JSON.parse(s);return Array.isArray(a)?a:[];}catch(e){return[];}
 }
 function liveEntries(s){return parseLog(s).filter(function(e){return e&&!e.x;});}
+
+/* ── the seven outcomes ────────────────────────────────────────────────────
+   `t` stays a human sentence, so the printed sheet and anything reading the
+   old columns still make sense. `k` is the structured outcome, and it is the
+   only thing the boxes render from — an outcome is never guessed from prose.
+
+   The marks are letters, not emoji: emoji do not take the theme's colour,
+   look different on every phone, and are unreadable in sunlight at this size.
+   The colour only repeats what the letter already says. */
+var KINDS=[
+  {k:"NH",m:"NH",l:"Not home",i:"\u{1F6AA}"},
+  {k:"M", m:"M", l:"Man",     i:"\u{1F464}"},
+  {k:"W", m:"W", l:"Woman",   i:"\u{1F464}"},
+  {k:"BZ",m:"BZ",l:"Busy",    i:"\u{23F3}"},
+  {k:"CB",m:"CB",l:"Come back",i:"\u{21A9}\u{FE0F}"},
+  {k:"RV",m:"RV",l:"Return visit",i:"\u{1F4D6}"},
+  {k:"DNV",m:"DNV",l:"Do not visit",i:"\u{26D4}"},
+  {k:"DNVX",m:"—",l:"Do not visit cleared",i:"\u{21A9}\u{FE0F}"},
+  // Legacy shapes, shown but never offered.
+  {k:"T", m:"T", l:"Talked",  i:"\u{1F4AC}"},
+  {k:"NI",m:"NI",l:"Not interested",i:"\u{1F6AB}"}
+];
+var PICKABLE=["NH","M","W","BZ","CB","RV"];
+function kindDef(k){for(var i=0;i<KINDS.length;i++)if(KINDS[i].k===k)return KINDS[i];return null;}
+function markFor(k){var d=kindDef(k);return d?d.m:"•";}
+function labelFor(k){var d=kindDef(k);return d?d.l:"Visit";}
+function textFor(k,note){var l=labelFor(k);return note?l+" — "+note:l;}
+
+/* Entries written before outcomes were structured carry theirs only in the
+   first words of the sentence. Read them for display; never write the guess
+   back, or a guess becomes indistinguishable from something somebody chose.
+   Do Not Visit is never inferred from prose at all. */
+function kindOf(e){
+  if(!e)return"";
+  if(e.k&&kindDef(e.k))return e.k;
+  var t=String(e.t||"");
+  if(/^(NH|Not home)\b/.test(t))return"NH";
+  if(/^(Man|Hombre)\b/.test(t))return"M";
+  if(/^(Woman|Mujer)\b/.test(t))return"W";
+  if(/^Talked\b/.test(t))return"T";
+  if(/^Busy\b/.test(t))return"BZ";
+  if(/^Come back\b/.test(t))return"CB";
+  if(/^Not interested\b/.test(t))return"NI";
+  if(/^(RV|Return visit)\b/.test(t))return"RV";
+  return"";
+}
+
+/* Must match api/_scope.js exactly. Two sides that order entries differently
+   would put the same visit in different boxes. */
+function entryKeyC(e){return e&&e.i?String(e.i):JSON.stringify(e);}
+function cmpEntry(a,b){
+  var d=String(a.d||"").localeCompare(String(b.d||""));
+  return d!==0?d:entryKeyC(a).localeCompare(entryKeyC(b));
+}
+// A decision not to call again is not a visit.
+function isVisitEntry(e){return !!e&&!e.x&&e.k!=="DNV"&&e.k!=="DNVX";}
+function visitEntries(h){return parseLog(h&&h.HouseVisitLog).filter(isVisitEntry).sort(cmpEntry);}
+function findEntry(log,eid){
+  for(var i=0;i<log.length;i++)if(String(log[i].i)===String(eid))return log[i];
+  return null;
+}
+function fmtDateOr(v,alt){return v?fmtDate(v):alt;}
+
+/* Do Not Visit, derived from the log by the same rule the server uses — so a
+   phone with no signal knows what it just did without waiting to be told. */
+function dnvState(h){
+  var live=parseLog(h&&h.HouseVisitLog).filter(function(e){
+    return e&&!e.x&&(e.k==="DNV"||e.k==="DNVX");}).sort(cmpEntry);
+  var last=live[live.length-1];
+  if(!last||last.k!=="DNV")return {on:false,since:"",reason:"",by:"",all:live};
+  return {on:true,since:last.d||"",reason:String(last.r||last.t||""),by:String(last.u||""),all:live};
+}
+function dnvMarks(h){
+  return parseLog(h&&h.HouseVisitLog).filter(function(e){return e&&!e.x&&e.k==="DNV";}).sort(cmpEntry);
+}
+/* Two years since it was marked, or since anybody last called — whichever is
+   later. That is the review the admin is reminded about. */
+function dnvDueYears(h){
+  var d=dnvState(h);if(!d.on)return 0;
+  var newest=d.since;
+  visitEntries(h).forEach(function(e){if(String(e.d||"")>newest)newest=String(e.d||"");});
+  var t=parseDay(newest);if(!t)return 0;
+  return (Date.now()-t.getTime())/(365.25*24*3600e3);
+}
+function dnvDue(h){return dnvDueYears(h)>=2;}
+function whoName(uid){
+  if(!uid)return"";
+  if(me&&me.id===uid)return String(me.name||"").split(" ")[0]||"you";
+  for(var i=0;i<teamUsers.length;i++)if(teamUsers[i].id===uid)return String(teamUsers[i].name||"").split(" ")[0];
+  return"";
+}
 function getRVs(h){return h?liveEntries(h.HouseReturnVisits):[];}
 function getLog(h){return h?parseLog(h.HouseVisitLog):[];}
 function isRV(h){return getRVs(h).length>0;}
 
-/* Mirrors the server's projection so the five visit slots look right
-   immediately, before any sync. */
+/* Mirrors the server's projection so the boxes look right immediately, before
+   any sync. Four now — the cap is on what the row shows, never on what the
+   record keeps. The loop still clears the fifth column, which must not be left
+   holding a visit that has scrolled out of the window. */
 function deriveSlotsLocal(changes,logArr){
-  var live=logArr.filter(function(e){return e&&!e.x;})
-    .sort(function(a,b){return String(a.d||"").localeCompare(String(b.d||""));});
-  var last5=live.slice(-5);
-  for(var n=1;n<=5;n++)changes["HouseResutsOnVisit"+n]=last5[n-1]?String(last5[n-1].t||""):"";
+  var live=logArr.filter(isVisitEntry).sort(cmpEntry);
+  var last4=live.slice(-4);
+  for(var n=1;n<=5;n++)changes["HouseResutsOnVisit"+n]=last4[n-1]?String(last4[n-1].t||""):"";
   if(live.length)changes.HouseLastVisitDate=live[live.length-1].d||changes.HouseLastVisitDate;
 }
 
@@ -1496,8 +1644,8 @@ function applyFilters(){
       return [h.HouseAddress,h.HouseCity,h.HouseState,h.HouseZIP,h.HouseTerritoryNumber,
         h.HouseTerritoryAssingnedTo,h.HouseLanguage,h.HouseNotes,h.HousePersonalNotes,
         h.HouseGPSCoordinates,h.HouseVerifiedOnMaps,h.HouseReturnVisits,
-        h.HouseResutsOnVisit1,h.HouseResutsOnVisit2,h.HouseResutsOnVisit3,
-        h.HouseResutsOnVisit4,h.HouseResutsOnVisit5]
+        // The whole history, not just the four the row has room for.
+        h.HouseVisitLog]
         .filter(Boolean).join(" ").toLowerCase().indexOf(q)!==-1;
     });
   }
@@ -1515,6 +1663,8 @@ function updateCounts(){
   // "All Territories" is only true for an admin; everyone else is looking at
   // their own, and saying otherwise over a seven-house list is a small lie.
   if(!guestMode)$("#scopeName").textContent=terrFilter==="all"?scopeLabel():terrFilter;
+  var ds=$("#tmDNVSub");
+  if(ds)ds.textContent=dnvSub();
   var rvN=records.filter(isRV).length;
   var b=$("#rvBadge");
   if(rvN){b.textContent=rvN;b.style.display="flex";}else{b.style.display="none";}
@@ -1522,6 +1672,11 @@ function updateCounts(){
 
 function houseSubtitle(h){
   var bits=[];
+  var vn=visitEntries(h).length;
+  // The boxes show the last four; the count says the rest are still there.
+  if(vn>4)bits.push('<span class="vcount" data-act="hist" data-id="'+esc(h.id)+'">'+vn+' visits</span>');
+  var p=pending[h.id];
+  if(p&&p.blocked)bits.push('<span class="blocked">• held</span>');
   var ht=heldTagFor(h.id);if(ht)bits.push(ht);
   if(isRV(h))bits.push('<span class="rv-tag">Return visit</span>');
   bits.push(esc(visitLabel(h.HouseLastVisitDate)));
@@ -1601,19 +1756,60 @@ function renderHouses(){
 }
 
 function houseRow(h,label,isUnit){
-  return '<div class="house'+(isUnit?' unit':'')+(picked[h.id]?' on':'')+'" data-hid="'+esc(h.id)+'">'+
+  var d=dnvState(h);
+  return '<div class="house'+(isUnit?' unit':'')+(picked[h.id]?' on':'')+(d.on?' dnv':'')+
+      '" data-hid="'+esc(h.id)+'">'+
     '<button class="house-main" data-act="detail" data-id="'+esc(h.id)+'">'+
       '<span class="pick">✓</span>'+
-      '<span class="house-dot dot-'+visitStatus(h.HouseLastVisitDate)+'"></span>'+
+      '<span class="house-dot '+(d.on?'dot-dnv':'dot-'+visitStatus(h.HouseLastVisitDate))+'"></span>'+
       '<span class="house-txt">'+
         '<span class="house-num">'+
           esc(label)+
           (h.HouseVerifiedOnMaps==="No"?'<span class="warn-mark" title="Not found on maps">⚠</span>':'')+
         '</span>'+
-        '<span class="house-sub">'+houseSubtitle(h)+'</span>'+
+        '<span class="house-sub">'+(d.on?dnvSubtitle(h,d):houseSubtitle(h))+'</span>'+
       '</span>'+
     '</button>'+
+    (d.on?dnvBand(h,d):visitCells(h))+
   '</div>';
+}
+
+/* Four boxes. Every empty one records the next visit — nobody at a door thinks
+   "I want to record visit 3" — and every filled one opens the visit it shows,
+   addressed by entry id, because position stops being identity the moment
+   another phone's visit can sync in between. */
+function visitCells(h){
+  var live=visitEntries(h),shown=live.slice(-4),out='<div class="vrow">',i,e,k;
+  for(i=0;i<4;i++){
+    e=shown[i];
+    if(e){
+      k=kindOf(e);
+      out+='<button class="vc on k-'+(k||"X")+'" data-act="cell" data-id="'+esc(h.id)+'"'+
+        ' data-eid="'+esc(e.i||"")+'" title="'+esc(e.t||"")+'"'+
+        ' aria-label="Visit '+(i+1)+', '+esc(labelFor(k))+', '+esc(fmtDateOr(e.d,"date not recorded"))+'">'+
+        esc(markFor(k))+'</button>';
+    }else{
+      out+='<button class="vc'+(i===shown.length?' next':'')+'" data-act="cell" data-id="'+esc(h.id)+'"'+
+        ' aria-label="Record a visit">'+(i===shown.length?"＋":"")+'</button>';
+    }
+  }
+  return out+'</div>';
+}
+
+function dnvBand(h,d){
+  return '<button class="dnv-band" data-act="dnv" data-id="'+esc(h.id)+'">'+
+    'DO NOT VISIT · '+esc(fmtDate(d.since))+
+    (dnvDue(h)?'<span class="dnv-due">'+Math.floor(dnvDueYears(h))+' years — check</span>':'')+
+    '</button>';
+}
+
+/* A retired address is not work any more, so the subtitle stops reporting how
+   long since anybody called and says what was decided instead. */
+function dnvSubtitle(h,d){
+  var bits=['<span class="dnv-tag">DO NOT VISIT</span>'];
+  if(d.reason)bits.push(esc(d.reason));
+  if(d.since)bits.push(esc(fmtDate(d.since)));
+  return bits.join(" · ");
 }
 
 /* ═══ RENDER: RETURN VISITS ═══ */
@@ -1657,7 +1853,7 @@ function closeSheet(sel){
   // A closed composer is no longer owned, so its leftover text is never
   // re-offered as a recovered draft.
   if(sel==="#sh-rv")delete draftOwner.rvNew;
-  if(sel==="#sh-log")delete draftOwner.lNote;
+  if(sel==="#sh-cell")delete draftOwner.cNote;
   openSheets=openSheets.filter(function(x){return x!==sel;});
   if(!openSheets.length)$("#scrim").classList.remove("open");
 }
@@ -1698,7 +1894,9 @@ function openDetail(id){
   $("#dTitle").textContent=h.HouseAddress||"No address";
   $("#dSub").textContent=[h.HouseCity,h.HouseState,h.HouseZIP].filter(Boolean).join(", ");
   var rv=getRVs(h);
-  var visits=[1,2,3,4,5].map(function(n){return{n:n,v:h["HouseResutsOnVisit"+n]||""};});
+  // The whole history, oldest first — the four boxes on the row are only ever
+  // a window onto the end of it.
+  var visits=visitEntries(h);
 
   $("#dBody").innerHTML=
     '<div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:6px">'+
@@ -1719,11 +1917,18 @@ function openDetail(id){
     '</div>'+
     (h.HouseNotes?'<div class="lbl">House notes</div><div class="note-box">'+esc(h.HouseNotes)+'</div>':'')+
     (h.HousePersonalNotes?'<div class="lbl">Personal notes</div><div class="note-box">'+esc(h.HousePersonalNotes)+'</div>':'')+
-    '<div class="lbl">Visit results — tap to edit</div>'+
-    '<div class="vgrid">'+visits.map(function(x){
-      return '<button class="vbox'+(x.v?' filled':'')+'" data-act="slot" data-id="'+esc(h.id)+'" data-slot="'+x.n+'">'+
-        '<span class="vn">VISIT '+x.n+'</span><span class="vv">'+(x.v?esc(x.v):"—")+'</span></button>';
-    }).join("")+'</div>'+
+    '<div class="lbl">Every visit</div>'+
+    (visits.length
+      ?'<div class="card">'+visits.map(function(e){
+        var k=kindOf(e),who=whoName(e.u);
+        return '<button class="row" data-act="cell" data-id="'+esc(h.id)+'" data-eid="'+esc(e.i||"")+'">'+
+          '<span class="pk-b vc k-'+(k||"X")+'" style="width:40px;height:28px;font-size:12px">'+esc(markFor(k))+'</span>'+
+          '<span class="row-txt"><span class="row-t">'+esc(fmtDateOr(e.d,"date not recorded"))+
+            (who?' · '+esc(who):"")+'</span>'+
+          '<span class="row-s" style="white-space:normal">'+esc(e.t||labelFor(k))+'</span></span>'+
+          '<span class="row-act">›</span></button>';
+      }).reverse().join("")+'</div>'
+      :'<div class="empty" style="padding:22px">Nothing recorded here yet.</div>')+
     '<div style="height:8px"></div>';
 
   $("#dDir").addEventListener("click",function(){
@@ -1734,69 +1939,9 @@ function openDetail(id){
   openSheet("#sh-detail");
 }
 $("#dEdit").addEventListener("click",function(){var id=curId;closeSheet("#sh-detail");openForm(byId(id));});
-$("#dLog").addEventListener("click",function(){openLog(curId,null);});
+$("#dLog").addEventListener("click",function(){var id=curId;closeSheet("#sh-detail");openCell(id,"");});
 
 /* ═══ LOG VISIT ═══ */
-var OUTCOMES=[
-  {k:"NH",  i:"🚪", l:"Not home"},
-  {k:"Talked", i:"💬", l:"Talked"},
-  {k:"Busy", i:"⏳", l:"Busy"},
-  {k:"Come back", i:"↩️", l:"Come back"},
-  {k:"Not interested", i:"🚫", l:"Not interested"},
-  {k:"RV", i:"📖", l:"Return visit", rv:true}
-];
-function openLog(id,slot){
-  var h=byId(id);if(!h)return;
-  curId=id;curSlot=slot;curOutcome=null;
-  $("#lTitle").textContent=h.HouseAddress||"Log visit";
-  $("#lSub").textContent=slot?("Visit "+slot):"Pick what happened";
-  $("#lNote").value=slot?(h["HouseResutsOnVisit"+slot]||""):"";
-  ownDraft("lNote",id);
-  $("#outGrid").innerHTML=OUTCOMES.map(function(o){
-    return '<button class="out" data-k="'+esc(o.k)+'"'+(o.rv?' data-rv="1"':'')+' aria-pressed="false">'+
-      '<span class="oi">'+o.i+'</span><span class="ol">'+esc(o.l)+'</span></button>';
-  }).join("");
-  openSheet("#sh-log");
-}
-$("#outGrid").addEventListener("click",function(e){
-  var b=e.target.closest(".out");if(!b)return;
-  var already=b.getAttribute("aria-pressed")==="true";
-  this.querySelectorAll(".out").forEach(function(x){x.setAttribute("aria-pressed","false");});
-  if(already){curOutcome=null;return;}
-  b.setAttribute("aria-pressed","true");curOutcome=b.dataset.k;haptic();
-});
-
-$("#lSave").addEventListener("click",function(){
-  var h=byId(curId);if(!h)return;
-  var note=$("#lNote").value.trim();
-  if(!curOutcome&&!note){toast("Pick an outcome or write a note",true);return;}
-  var text=curOutcome==="RV"?(note||"Return visit"):[curOutcome,note].filter(Boolean).join(" — ");
-
-  var log=seedLogLocal(h);
-  if(curSlot){
-    // Editing one specific slot: replace the entry it projects from, so the
-    // grid stays in step instead of growing a duplicate.
-    var live=log.filter(function(e){return e&&!e.x;})
-      .sort(function(a,b){return String(a.d||"").localeCompare(String(b.d||""));});
-    var target=live.slice(-5)[curSlot-1];
-    if(target)target.t=text;
-    else log.push({i:entryId(),d:todayStr(),t:text});
-  }else{
-    log.push({i:entryId(),d:todayStr(),t:text});
-  }
-
-  var changes={HouseVisitLog:JSON.stringify(log),HouseLastVisitDate:todayStr()};
-  deriveSlotsLocal(changes,log);
-
-  if(curOutcome==="RV"){
-    var rv=parseLog(h.HouseReturnVisits);
-    rv.push({i:entryId(),d:todayStr(),n:note||"Started return visit"});
-    changes.HouseReturnVisits=JSON.stringify(rv);
-  }
-  saveChanges(curId,changes,"Visit logged ✓");
-  closeSheet("#sh-log");
-});
-
 /* ═══ RETURN-VISIT THREAD ═══ */
 function openRV(id){
   var h=byId(id);if(!h)return;
@@ -1867,8 +2012,11 @@ function drawRV(){
 var FORM=[["fAddr","HouseAddress"],["fCity","HouseCity"],["fState","HouseState"],["fZip","HouseZIP"],
   ["fTerr","HouseTerritoryNumber"],["fAssigned","HouseTerritoryAssingnedTo"],["fLang","HouseLanguage"],
   ["fGPS","HouseGPSCoordinates"],["fNotes","HouseNotes"],["fPersonal","HousePersonalNotes"]];
-var FORM_SLOTS=["fV1","fV2","fV3","fV4","fV5"];
-var formSlotsAtOpen=["","","","",""];   // what the form showed when it opened
+/* Visits are no longer edited here. They are entries in an append-only log
+   with an author and a date, corrected by recording a new one rather than by
+   overwriting text in a box — which is also what the server now enforces, so
+   a form that rewrote them would simply be refused. Tap a visit on the row or
+   in the history instead. */
 
 function setVerified(val){
   var sel=$("#fVerified"),i;
@@ -1883,14 +2031,6 @@ function openForm(h){
   $("#fDelete").style.display=(h&&scope.canDelete)?"flex":"none";
   $("#fId").value=h?h.id:"";
   FORM.forEach(function(p){$("#"+p[0]).value=h?(h[p[1]]||""):"";});
-  // The slots are not in FORM (the server derives them), so fill them from the
-  // record explicitly. Leaving them blank would make slotEditsToLog read every
-  // visit as "cleared" on save and tombstone real history.
-  FORM_SLOTS.forEach(function(fid,i){
-    var v=h?(h["HouseResutsOnVisit"+(i+1)]||""):"";
-    $("#"+fid).value=v;
-    formSlotsAtOpen[i]=v;
-  });
   $("#fLastVisit").value=h?cleanDate(h.HouseLastVisitDate):"";
   setVerified(h?(h.HouseVerifiedOnMaps||""):"");
   if(!h){
@@ -1919,32 +2059,6 @@ $("#fGPSBtn").addEventListener("click",function(){
 /* Translate the five visit inputs into edits on the append-only log, which is
    the actual source of truth. Editing an existing slot rewrites that entry's
    text; typing into an empty slot appends a new entry. */
-function slotEditsToLog(h){
-  var log=seedLogLocal(h);
-  var live=log.filter(function(e){return e&&!e.x;})
-    .sort(function(a,b){return String(a.d||"").localeCompare(String(b.d||""));});
-  var shown=live.slice(-5);
-  var touched=false;
-  FORM_SLOTS.forEach(function(fid,i){
-    var val=$("#"+fid).value.trim();
-    // Compare against what the form actually DISPLAYED, not against the log.
-    // If population ever fails, the opened value is blank too, so the field
-    // reads as unchanged and no visit is destroyed. Comparing to the log would
-    // read an unpopulated form as "the user cleared everything".
-    var opened=String(formSlotsAtOpen[i]||"").trim();
-    if(val===opened)return;
-    var cur=shown[i];
-    touched=true;
-    if(cur){
-      if(val)cur.t=val;
-      else cur.x=1;                       // deliberately cleared -> tombstone
-    }else if(val){
-      log.push({i:entryId(),d:$("#fLastVisit").value||todayStr(),t:val});
-    }
-  });
-  return touched?log:null;
-}
-
 $("#fSave").addEventListener("click",function(){
   var id=$("#fId").value;
   var data={};
@@ -1955,23 +2069,17 @@ $("#fSave").addEventListener("click",function(){
   var btn=this;btn.disabled=true;
   if(id){
     var h=byId(id)||{};
-    var log=slotEditsToLog(h);
-    if(log){
-      data.HouseVisitLog=JSON.stringify(log);
-      deriveSlotsLocal(data,log);         // keeps the optimistic view honest
-    }
-    // The server recomputes the date from the log, so only send a hand-typed
-    // date when there is no log for it to override.
+    /* The server recomputes the date from the log, so only send a hand-typed
+       date when there is no log for it to override. Visits themselves are not
+       edited here any more — they are entries, corrected by recording one. */
     var typed=$("#fLastVisit").value||"";
-    if(typed!==cleanDate(h.HouseLastVisitDate)&&!(log||[]).some(function(e){return !e.x;}))
+    if(typed!==cleanDate(h.HouseLastVisitDate)&&!visitEntries(h).length)
       data.HouseLastVisitDate=typed;
     saveChanges(id,data,"House saved ✓").then(function(){
       btn.disabled=false;closeSheet("#sh-form");
     });
   }else{
     data.HouseLastVisitDate=$("#fLastVisit").value||"";
-    var newLog=slotEditsToLog({});
-    if(newLog){data.HouseVisitLog=JSON.stringify(newLog);deriveSlotsLocal(data,newLog);}
     localCreate(data).then(function(){
       afterLocalChange();toast("House added ✓");closeSheet("#sh-form");scheduleSync();
     }).catch(function(e){
@@ -2190,7 +2298,7 @@ function refreshMapPins(){
         '<div class="pp-s">'+esc(visitLabel(rec.HouseLastVisitDate))+'</div>'+
         '<div class="pp-row"><button class="pp-det">Details</button><button class="pp-log">Log</button></div>';
       el.querySelector(".pp-det").addEventListener("click",function(){map.closePopup();openDetail(h.id);});
-      el.querySelector(".pp-log").addEventListener("click",function(){map.closePopup();openLog(h.id,null);});
+      el.querySelector(".pp-log").addEventListener("click",function(){map.closePopup();openCell(h.id,"");});
       m.setPopupContent(el);
     });
     markerMap[h.id]=m;
@@ -2269,8 +2377,11 @@ document.addEventListener("click",function(e){
   var b=e.target.closest("[data-act]");if(!b)return;
   var a=b.dataset.act,id=b.dataset.id;
   if(a==="detail")openDetail(id);
-  else if(a==="log")openLog(id,null);
-  else if(a==="slot")openLog(id,parseInt(b.dataset.slot,10));
+  else if(a==="cell")openCell(id,b.dataset.eid||"");
+  else if(a==="dnv")openDNVPanel(id);
+  else if(a==="hist")openDetail(id);
+  else if(a==="log")openCell(id,"");
+  else if(a==="slot")openCell(id,"");
   else if(a==="rv")openRV(id);
 });
 
@@ -2394,6 +2505,7 @@ function scopeLabel(){
 
 /* Applied wherever refreshWorkingBtn is, so the two never disagree. */
 function refreshChrome(){
+  document.body.classList.toggle("admin",!!(me&&!guestMode&&scope.kind==="admin"));
   var show=function(sel,on){var el=$(sel);if(el)el.style.display=on?"":"none";};
   show("#fab",!guestMode&&scope.canCreate);
   show("#btnPick",!guestMode&&scope.canHandOut);
@@ -2498,6 +2610,11 @@ function renderTeamCard(){
       '<span class="row-txt"><span class="row-t">Who works this territory</span>'+
       '<span class="row-s">Share a territory with others</span></span>'+
       '<span class="row-act">›</span></button>'+
+    (scope.kind==="admin"?
+      '<button class="row" id="tmDNV"><span class="row-ico">\u{1F6AB}</span>'+
+        '<span class="row-txt"><span class="row-t">Do not visit</span>'+
+        '<span class="row-s" id="tmDNVSub">'+esc(dnvSub())+'</span></span>'+
+        '<span class="row-act">›</span></button>':"")+
     '<button class="row" id="tmHeld"><span class="row-ico">\u{1F4E4}</span>'+
       '<span class="row-txt"><span class="row-t">Numbers handed out</span>'+
       '<span class="row-s" id="tmHeldSub">'+esc(heldSub())+'</span></span>'+
@@ -2515,6 +2632,7 @@ function renderTeamCard(){
       '<span class="row-act">›</span></button>';
   $("#tmAssign").addEventListener("click",openAssign);
   $("#tmHeld").addEventListener("click",openHeld);
+  var dv=$("#tmDNV");if(dv)dv.addEventListener("click",openDNVList);
   $("#tmAssign").style.display=scope.canHandOut?"":"none";
   $("#tmHeld").style.display=(scope.canHandOut||heldTotal()>0)?"":"none";
   var pe=$("#tmPeople");if(pe)pe.addEventListener("click",openAdmin);
@@ -2626,6 +2744,293 @@ function openChangePassword(){
       .then(function(){closeSheet("#sh-pick");toast("Password changed ✓");})
       .catch(function(e){$("#cpErr").textContent=e.message;b.disabled=false;});
   });
+  openSheet("#sh-pick");
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   RECORDING A VISIT
+
+   Two taps at the door: a box, then what happened. The outcome is on disk
+   before a character of any note is typed, so a phone killed in a pocket can
+   cost at most the note, never the visit.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+var curCell={id:"",eid:""}, lastWrite=null;
+
+function openCell(id,eid){
+  var h=byId(id);if(!h)return;
+  if(dnvState(h).on){openDNVPanel(id);return;}
+  curCell={id:id,eid:eid||""};
+  drawPicker();
+  openSheet("#sh-cell");
+}
+
+function drawPicker(){
+  var h=byId(curCell.id);if(!h)return;
+  var log=seedLogLocal(h);
+  var old=curCell.eid?findEntry(log,curCell.eid):null;
+  var idx=old?visitEntries(h).map(function(e){return String(e.i);}).indexOf(String(old.i)):-1;
+
+  $("#cTitle").textContent=shortLabel(h);
+  $("#cSub").textContent=old
+    ?("Visit "+(idx>=0?idx+1:"")+" · "+fmtDateOr(old.d,"date not recorded"))
+    :"New visit · today";
+
+  var tile=function(k,wide){
+    var d=kindDef(k);
+    return '<button class="pk'+(wide?" wide":"")+'" data-k="'+k+'">'+
+      '<span class="pk-b vc k-'+k+'">'+esc(d.m)+'</span>'+
+      '<span class="pk-l">'+esc(d.l)+'</span></button>';
+  };
+  $("#cBody").innerHTML=
+    '<div class="cell-grid">'+
+      tile("NH",true)+tile("M")+tile("W")+tile("BZ")+tile("CB")+tile("RV",true)+
+      '<div class="pk-hr"></div>'+
+    '</div>'+
+    '<div class="f" style="margin-top:10px"><label for="cNote">Note (optional)</label>'+
+      '<textarea id="cNote" rows="2" placeholder="Anything worth remembering">'+
+      esc(old?noteOf(old):"")+'</textarea></div>'+
+    (old?'<button class="btn btn-s" id="cDel" style="width:100%;margin-bottom:8px">Remove this visit</button>':"")+
+    (guestMode?"":'<div class="cell-grid"><button class="pk danger wide" data-dnv="1">'+
+      '<span class="pk-b vc k-DNV">DNV</span><span class="pk-l">Do not visit</span></button></div>')+
+    '<div id="cErr" style="color:var(--bad);font-size:13.5px;margin-top:10px"></div>';
+
+  $("#cBody").querySelectorAll("[data-k]").forEach(function(b){
+    b.addEventListener("click",function(){commitVisit(curCell.id,b.dataset.k);});
+  });
+  var dn=$("#cBody").querySelector("[data-dnv]");
+  if(dn)dn.addEventListener("click",drawDNVSet);
+  var del=$("#cDel");
+  if(del)del.addEventListener("click",function(){removeVisit(curCell.id,curCell.eid);});
+}
+
+function shortLabel(h){
+  var apt=extractApt(h.HouseAddress);
+  return extractNumber(h.HouseAddress)+(apt?" #"+apt:"")+" "+extractStreet(h.HouseAddress);
+}
+// The sentence is "Not home — dog in yard"; the note is the part after the dash.
+function noteOf(e){
+  var t=String((e&&e.t)||""),i=t.indexOf(" — ");
+  return i===-1?"":t.slice(i+3);
+}
+
+function commitVisit(id,k){
+  var h=byId(id);if(!h)return;
+  /* Rebuilt from the record at the moment of the write, never from a snapshot
+     taken when the sheet opened: a second tap built from a stale array is how
+     the first note gets destroyed for real. */
+  var log=seedLogLocal(h);
+  var note=$("#cNote")?$("#cNote").value.trim():"";
+  var old=curCell.eid?findEntry(log,curCell.eid):null;
+  var ent={i:entryId(),d:(old&&old.d)||todayStr(),t:textFor(k,note),k:k};
+  if(me&&me.id&&!guestMode)ent.u=me.id;
+  /* A correction is a tombstone plus a fresh entry, never a rewrite in place.
+     Every phone replays its whole log, so an entry edited in place comes back
+     the next time a device that has been offline a week syncs. */
+  if(old){old.x=1;ent.sup=old.i;}
+  log.push(ent);
+
+  var changes={HouseVisitLog:JSON.stringify(log)};
+  if(h.HouseAccess!=="rv"){
+    changes.HouseLastVisitDate=todayStr();
+    deriveSlotsLocal(changes,log);
+  }
+  var rvId=null;
+  if(k==="RV"){
+    var rv=parseLog(h.HouseReturnVisits);
+    rvId=entryId();
+    var e={i:rvId,d:todayStr(),n:note||"Started a return visit"};
+    if(me&&me.id&&!guestMode)e.u=me.id;
+    rv.push(e);
+    changes.HouseReturnVisits=JSON.stringify(rv);
+  }
+  lastWrite={id:id,eid:ent.i,rv:rvId};
+  closeSheet("#sh-cell");
+  saveChanges(id,changes,null).then(function(ok){if(ok)toastUndo(labelFor(k)+" ✓");});
+}
+
+/* Undo writes a tombstone rather than removing the entry: it may already be on
+   somebody else's phone, and the union never un-deletes — so an undo cannot be
+   resurrected by a stale sync, and if the entry never reached the server it
+   simply arrives already dead. */
+function undoLast(){
+  if(!lastWrite)return;
+  var w=lastWrite;lastWrite=null;
+  var h=byId(w.id);if(!h)return;
+  var log=seedLogLocal(h),e=findEntry(log,w.eid);
+  if(e){e.x=1;if(e.sup){var s=findEntry(log,e.sup);if(s)delete s.x;}}
+  var changes={HouseVisitLog:JSON.stringify(log)};
+  var live=log.filter(isVisitEntry).sort(cmpEntry);
+  deriveSlotsLocal(changes,log);
+  // deriveSlots only ever SETS this date, so the last visit going away has to
+  // clear it here or the house stays "Visited today" with nothing on it.
+  changes.HouseLastVisitDate=live.length?(live[live.length-1].d||""):"";
+  if(w.rv){
+    var rv=parseLog(h.HouseReturnVisits),r=findEntry(rv,w.rv);
+    if(r)r.x=1;
+    changes.HouseReturnVisits=JSON.stringify(rv);
+  }
+  saveChanges(w.id,changes,"Undone");
+}
+
+function toastUndo(msg){
+  var t=$("#toast");
+  t.innerHTML=esc(msg)+'<button class="undo" id="tUndo">Undo</button>';
+  t.className="show act";
+  var b=$("#tUndo");
+  if(b)b.addEventListener("click",function(){t.className="";undoLast();});
+  clearTimeout(toast._t);
+  toast._t=setTimeout(function(){t.className="";t.textContent="";lastWrite=null;},5000);
+}
+
+function removeVisit(id,eid){
+  var h=byId(id);if(!h||!eid)return;
+  var log=seedLogLocal(h),e=findEntry(log,eid);
+  if(!e)return;
+  if(!confirm("Remove this visit?\n\nIt stays in the history as removed."))return;
+  e.x=1;
+  var changes={HouseVisitLog:JSON.stringify(log)};
+  var live=log.filter(isVisitEntry).sort(cmpEntry);
+  deriveSlotsLocal(changes,log);
+  changes.HouseLastVisitDate=live.length?(live[live.length-1].d||""):"";
+  closeSheet("#sh-cell");
+  saveChanges(id,changes,"Visit removed");
+}
+
+/* ── Do Not Visit ───────────────────────────────────────────────────────
+   Somebody stood at their own door and asked not to be called on again. The
+   app's job is to make that stick — on every phone, past a territory changing
+   hands, past a resync — and to make it hard to do by accident. */
+function drawDNVSet(){
+  var h=byId(curCell.id);if(!h)return;
+  $("#cTitle").textContent="Do not visit";
+  $("#cSub").textContent=shortLabel(h);
+  $("#cBody").innerHTML=
+    '<p style="font-size:14.5px;margin-bottom:4px">Mark this number as Do Not Visit?</p>'+
+    '<p style="font-size:13px;color:var(--text-2);margin-bottom:12px">'+
+      'Nobody in the group will be able to visit or change '+esc(shortLabel(h))+
+      ' — only an admin can undo it.</p>'+
+    '<div class="f"><label for="dnvWhy">Why? (required)</label>'+
+      '<textarea id="dnvWhy" rows="3" placeholder="What did they say?"></textarea></div>'+
+    '<p style="font-size:12.5px;color:var(--text-2);margin-bottom:12px">Recorded '+
+      esc(fmtDate(todayStr()))+(me?' by '+esc(String(me.name||"").split(" ")[0]):"")+'</p>'+
+    '<button class="btn btn-d" id="dnvGo" style="width:100%" disabled>Mark Do Not Visit</button>'+
+    '<div id="cErr" style="color:var(--bad);font-size:13.5px;margin-top:10px"></div>';
+  var why=$("#dnvWhy"),go=$("#dnvGo");
+  why.addEventListener("input",function(){go.disabled=why.value.trim().length<3;});
+  why.focus();
+  go.addEventListener("click",function(){
+    var w=why.value.trim();
+    if(w.length<3)return;
+    var log=seedLogLocal(h);
+    var ent={i:entryId(),d:todayStr(),t:"Do not visit — "+w,k:"DNV",r:w};
+    if(me&&me.id&&!guestMode)ent.u=me.id;
+    log.push(ent);
+    // Deliberately no visit date and no box: a decision not to call is not a call.
+    closeSheet("#sh-cell");
+    // No Undo here — clearing it needs an admin, so offering one would be the
+    // app promising something it cannot do.
+    saveChanges(curCell.id,{HouseVisitLog:JSON.stringify(log)},"Marked Do Not Visit");
+  });
+}
+
+function openDNVPanel(id){
+  var h=byId(id);if(!h)return;
+  curCell={id:id,eid:""};
+  drawDNVView();
+  openSheet("#sh-cell");
+}
+
+function drawDNVView(){
+  var h=byId(curCell.id);if(!h)return;
+  var marks=dnvMarks(h),isAdmin=scope.kind==="admin";
+  $("#cTitle").textContent="Do not visit";
+  $("#cSub").textContent=shortLabel(h);
+  $("#cBody").innerHTML=
+    '<div class="card">'+marks.map(function(e){
+      var who=whoName(e.u);
+      return '<div class="row"><span class="row-txt">'+
+        '<span class="row-t">'+esc(fmtDate(e.d))+(who?' · '+esc(who):"")+'</span>'+
+        '<span class="row-s" style="white-space:normal">'+esc(e.r||e.t||"")+'</span></span></div>';
+    }).join("")+'</div>'+
+    (dnvDue(h)?'<p style="font-size:13.5px;color:var(--warn);font-weight:650;margin-bottom:10px">'+
+      'Marked '+Math.floor(dnvDueYears(h))+' years ago — worth checking whether anything has changed.</p>':"")+
+    (isAdmin
+      ?'<button class="btn btn-s" id="dnvClear" style="width:100%">Unlock this number</button>'
+      :'<p style="font-size:13px;color:var(--text-2)">Only an admin can unlock this number.</p>')+
+    '<div id="cErr" style="color:var(--bad);font-size:13.5px;margin-top:10px"></div>';
+  var cb=$("#dnvClear");
+  if(cb)cb.addEventListener("click",drawDNVClear);
+}
+
+function drawDNVClear(){
+  var h=byId(curCell.id);if(!h)return;
+  $("#cBody").innerHTML=
+    '<p style="font-size:14.5px;margin-bottom:12px">Unlock '+esc(shortLabel(h))+'?</p>'+
+    '<div class="f"><label for="dnvWhy2">What changed? (required)</label>'+
+      '<textarea id="dnvWhy2" rows="3" placeholder="New people moved in"></textarea></div>'+
+    '<p style="font-size:12.5px;color:var(--text-2);margin-bottom:12px">'+
+      'What was written down stays in the history, with its date.</p>'+
+    '<button class="btn btn-p" id="dnvGo2" style="width:100%" disabled>Unlock this number</button>'+
+    '<div id="cErr" style="color:var(--bad);font-size:13.5px;margin-top:10px"></div>';
+  var why=$("#dnvWhy2"),go=$("#dnvGo2");
+  why.addEventListener("input",function(){go.disabled=why.value.trim().length<3;});
+  why.focus();
+  go.addEventListener("click",function(){
+    var w=why.value.trim();
+    if(w.length<3)return;
+    var log=seedLogLocal(h);
+    var ent={i:entryId(),d:todayStr(),t:"Do not visit cleared — "+w,k:"DNVX",r:w};
+    if(me&&me.id)ent.u=me.id;
+    log.push(ent);
+    closeSheet("#sh-cell");
+    saveChanges(curCell.id,{HouseVisitLog:JSON.stringify(log)},"Unlocked");
+  });
+}
+
+/* ── the Do Not Visit list ──────────────────────────────────────────────
+   Not a real territory holding copies of the records — moving a house into one
+   would break every packet naming it and take the red row off the street where
+   people actually look. It is the same houses, gathered into one view. */
+function dnvHouses(){
+  return records.filter(function(h){return dnvState(h).on;}).sort(function(a,b){
+    var da=dnvState(a).since,db=dnvState(b).since;
+    return String(da).localeCompare(String(db));   // oldest first: those are the ones due
+  });
+}
+function dnvDueHouses(){return dnvHouses().filter(dnvDue);}
+
+function openDNVList(){
+  $("#pTitle").textContent="Do not visit";
+  var list=dnvHouses(),due=dnvDueHouses();
+  $("#pSub").textContent=list.length
+    ? list.length+" number"+(list.length===1?"":"s")+(due.length?" · "+due.length+" to check":"")
+    : "None";
+  $("#pBody").innerHTML=
+    (due.length?'<div id="dnvBanner"><b>'+due.length+' worth checking</b>'+
+      'Two years or more since these were marked or last called on. '+
+      'Things change — new people move in.</div>':"")+
+    (list.length
+      ?'<div class="card">'+list.map(function(h){
+        var d=dnvState(h),who=whoName(d.by);
+        return '<button class="row" data-dnvh="'+esc(h.id)+'">'+
+          '<span class="row-txt"><span class="row-t">'+esc(h.HouseAddress||"No address")+'</span>'+
+          '<span class="row-s" style="white-space:normal">'+esc(d.reason||"")+
+            ' · '+esc(fmtDate(d.since))+(who?' · '+esc(who):"")+'</span></span>'+
+          (dnvDue(h)?'<span class="dnv-due">'+Math.floor(dnvDueYears(h))+'y</span>':'')+
+          '<span class="row-act">›</span></button>';
+      }).join("")+'</div>'
+      :'<div class="empty"><span class="big">\u{1F6AB}</span>No numbers are marked Do Not Visit.</div>')+
+    (list.length?'<button class="btn btn-s" id="dnvPdf" style="width:100%;margin-top:12px">'+
+      'Print this list</button>':"");
+  $("#pBody").querySelectorAll("[data-dnvh]").forEach(function(b){
+    b.addEventListener("click",function(){
+      closeSheet("#sh-pick");
+      setTimeout(function(){openDNVPanel(b.dataset.dnvh);},260);
+    });
+  });
+  var pdf=$("#dnvPdf");
+  if(pdf)pdf.addEventListener("click",function(){generateTerritoryPDF("Do not visit",dnvHouses());});
   openSheet("#sh-pick");
 }
 
@@ -3222,6 +3627,13 @@ function heldTotal(){
   return Object.keys(s).length;
 }
 function heldPeople(){var s={};liveHeld().forEach(function(p){s[p.who]=1;});return Object.keys(s).length;}
+
+function dnvSub(){
+  var list=dnvHouses(),due=dnvDueHouses();
+  if(!list.length)return "No numbers are marked";
+  return list.length+" number"+(list.length===1?"":"s")+
+    (due.length?" · "+due.length+" worth checking again":"");
+}
 
 function heldSub(){
   if(held.at===0)return held.err?"Can't check right now":"Checking…";
@@ -3846,7 +4258,7 @@ $("#ncDir").addEventListener("click",function(){
 });
 $("#ncDone").addEventListener("click",function(){
   var h=byId($("#nextCard").dataset.hid);if(!h)return;
-  openLog(h.id,null);
+  openCell(h.id,"");
 });
 
 /* ═══ BOOT ═══ */
@@ -3947,13 +4359,13 @@ function writeDrafts(list){
 }
 function stashDrafts(){
   var out=[];
-  [["rvNew","return visit"],["lNote","visit note"]].forEach(function(p){
+  [["rvNew","return visit"],["cNote","visit note"]].forEach(function(p){
     var el=document.getElementById(p[0]);
     var owner=draftOwner[p[0]];
     // Only stash a composer that is actually open and owned. A stale value left
     // in a hidden sheet has already been saved or abandoned.
     if(!el||!owner||!el.value.trim())return;
-    if(!isSheetOpen(p[0]==="rvNew"?"#sh-rv":"#sh-log"))return;
+    if(!isSheetOpen(p[0]==="rvNew"?"#sh-rv":"#sh-cell"))return;
     out.push({el:p[0],id:owner,t:el.value,kind:p[1]});
   });
   writeDrafts(out);

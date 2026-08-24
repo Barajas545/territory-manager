@@ -522,6 +522,13 @@ module.exports = async (req, res) => {
       if (wrong.length) return res.status(400).json({
         error: wrong.length + ' of those numbers are not in ' + territory,
       });
+      /* An address somebody asked us not to call on again is not work to hand
+         out. Existing packets are left alone — the state is read from the house
+         at the door, not baked into the packet. */
+      const retired = houseIds.filter(id => SC.dnvState(byId.get(id)).on);
+      if (retired.length) return res.status(400).json({
+        error: retired.length + ' of those numbers are marked Do Not Visit',
+      });
 
       /* When they come back is the org's policy, not the phone's opinion.
          The old code took the client's number when it looked sane and fell

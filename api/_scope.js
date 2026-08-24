@@ -49,6 +49,44 @@ const norm = v => String(v || '').trim().toLowerCase();
 
 const splitIds = v => String(v || '').split(',').map(x => x.trim()).filter(Boolean);
 
+/* ── the shared vocabulary of a log entry ──────────────────────────────────
+   Both logs are append-only arrays of {i,d,...}. A visit entry now also carries
+   `k`, the structured outcome, and `u`, the id of whoever recorded it. Nothing
+   renders an outcome by reading the prose — `k` is the only input. */
+
+const parseArr = s => {
+  if (!s) return [];
+  try { const a = JSON.parse(s); return Array.isArray(a) ? a : []; }
+  catch (e) { return []; }
+};
+
+const entryKey = e => (e && e.i ? String(e.i) : JSON.stringify(e));
+
+/* One comparator for every projection, on the server and on the phone. The
+   union stores entries in exactly this order, so a phone that sorted them
+   differently would put a same-day visit in a different box than the server. */
+const cmpEntry = (a, b) => {
+  const d = String(a.d || '').localeCompare(String(b.d || ''));
+  return d !== 0 ? d : entryKey(a).localeCompare(entryKey(b));
+};
+
+// A decision not to call again is not a visit.
+const DNV_KINDS = new Set(['DNV', 'DNVX']);
+const isVisitEntry = e => !!e && !e.x && !DNV_KINDS.has(e.k);
+
+/* Do Not Visit is the newest live DNV/DNVX entry — a decision in the history,
+   never a flag. Clearing appends DNVX; the original stays, with the date, the
+   words the householder used and who wrote them down. Tombstoning it instead
+   would be permanent (the union never un-deletes) and would destroy exactly
+   what the two-year review needs to read. */
+function dnvState(rec) {
+  const live = parseArr(rec && rec.HouseVisitLog)
+    .filter(e => e && !e.x && DNV_KINDS.has(e.k)).sort(cmpEntry);
+  const last = live[live.length - 1];
+  if (!last || last.k !== 'DNV') return { on: false, since: '', reason: '', by: '' };
+  return { on: true, since: last.d || '', reason: String(last.r || last.t || ''), by: String(last.u || '') };
+}
+
 function fail(code, message) {
   const e = new Error(message);
   e.code = code;
@@ -64,6 +102,8 @@ async function resolveGrants(store, claims, now) {
     territories: new Set(),   // owned ∪ assigned — governs creating and deleting
     owned: new Set(),         // owned only      — governs the kill switch
     packets: [], gracePackets: [],
+    userIds: new Set(),       // live accounts, so an author id cannot be invented
+    rv: new Set(),            // houses held only by the caller's own return visit
     canCreate: false, canDelete: false, canHandOut: false,
     empty: true, reason: '',
     read: new Set(), write: new Set(), grace: new Set(),
@@ -92,6 +132,8 @@ async function resolveGrants(store, claims, now) {
   }
 
   const users = await store.read(USERS_TAB);
+  // Read before the admin short-circuit, so an admin gets it too.
+  grant.userIds = new Set(users.filter(u => u.active !== '0').map(u => u.id));
   /* An empty Users list is a storage fault, not an org with no people: a
      renamed or moved list makes _sp.js create a fresh empty one, and every
      account would silently resolve to no role and no territories. */
@@ -182,6 +224,27 @@ function attachHouses(grant, houseRows) {
     grace.add(id); write.add(id);
   }));
 
+  /* A return visit belongs to the person who wrote it, not to the territory it
+     happens to sit in — so it outlives the territory being reassigned and the
+     packet coming back at midnight. That is exactly what was asked for, and no
+     territory-derived grant can do it.
+
+     It is deliberately narrow: this grants the ONE house, and every write to it
+     is routed through the narrow filter in territory.js, never a full write.
+     A legacy entry with no author grants nothing to anybody. */
+  const rv = new Set();
+  if (grant.uid && grant.kind !== 'guest') {
+    houseRows.forEach(r => {
+      if (!r || !r.id || r.HouseDeleted === '1' || read.has(r.id)) return;
+      const mine = parseArr(r.HouseReturnVisits)
+        .some(e => e && !e.x && String(e.u || '') === grant.uid);
+      if (mine) { rv.add(r.id); read.add(r.id); write.add(r.id); }
+    });
+  }
+  grant.rv = rv;
+  // grant.territories is deliberately NOT widened: creating and deleting houses
+  // key off it, and a return visit is not a claim on the street.
+
   grant.read = read; grant.write = write; grant.grace = grace;
   if (read.size) grant.empty = false;
   return grant;
@@ -193,22 +256,45 @@ function attachHouses(grant, houseRows) {
    notes without being able to touch anything else. */
 const GRACE_FIELDS = ['HouseVisitLog', 'HouseReturnVisits'];
 
-function graceFilter(update, existing, parseArr, entryKey, seedLog) {
+function graceFilter(update, existing, parseArrFn, entryKeyFn, seedLog, grant) {
   const fields = {};
   const refusedFields = [];
+  const me = (grant && grant.uid) || '';
   Object.keys(update || {}).forEach(k => {
     if (k === 'id' || k === '_base') return;
     if (GRACE_FIELDS.indexOf(k) === -1) { refusedFields.push(k); return; }
     const base = k === 'HouseVisitLog' ? seedLog(existing) : existing[k];
-    const have = new Set(parseArr(base).map(entryKey));
-    const add = parseArr(update[k]).filter(e => e && !e.x && !have.has(entryKey(e)));
-    if (!add.length) { refusedFields.push(k); return; }
-    fields[k] = JSON.stringify(parseArr(base).concat(add));
+    const prev = parseArrFn(base);
+    const have = new Map(prev.map(e => [entryKeyFn(e), e]));
+    const incoming = parseArrFn(update[k]);
+
+    /* Adding is allowed; retiring an address is not. Grace deliberately ignores
+       whether the packet was revoked, so without this a withdrawn helper could
+       still mark houses Do Not Visit for a week — and only an admin could undo
+       it, one address at a time. */
+    const add = incoming.filter(e => {
+      if (!e || e.x || have.has(entryKeyFn(e))) return false;
+      if (DNV_KINDS.has(e.k)) { refusedFields.push(k); return false; }
+      return true;
+    });
+
+    /* Your own note is yours to withdraw. Without this the person whose return
+       visit IS their key to the house could never hand the key back: the delete
+       would be refused forever and sit in their queue. */
+    const kill = incoming.filter(e => {
+      if (!e || !e.x) return false;
+      const p = have.get(entryKeyFn(e));
+      return !!p && String(p.u || '') === me && !DNV_KINDS.has(p.k);
+    });
+
+    if (!add.length && !kill.length) { refusedFields.push(k); return; }
+    fields[k] = JSON.stringify(prev.concat(add).concat(kill));
   });
   return { fields: fields, refusedFields: refusedFields };
 }
 
 module.exports = {
-  HOUSES_TAB, USERS_TAB, GRACE_MS, GRACE_FIELDS,
+  HOUSES_TAB, USERS_TAB, GRACE_MS, GRACE_FIELDS, DNV_KINDS,
   norm, splitIds, resolveGrants, attachHouses, graceFilter,
+  parseArr, entryKey, cmpEntry, isVisitEntry, dnvState,
 };
