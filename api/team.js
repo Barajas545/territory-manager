@@ -270,6 +270,23 @@ module.exports = async (req, res) => {
       return res.json({ ok: true, nights: nights });
     }
 
+    /* Everybody's phone reads the colours; only an admin writes them. They ride
+       back on the call the app already makes when it starts, so this costs one
+       list read on boot and no extra round trip. */
+    if (action === 'setRowColors') {
+      const admin = await requireAdmin();
+      const given = body.colors || {};
+      const bad = ST.COLOR_KEYS.filter(k => given[k] !== undefined && !ST.isHexColor(given[k]));
+      if (bad.length) return res.status(400).json({ error: 'That is not a colour' });
+      for (const k of ST.COLOR_KEYS) {
+        // An explicit empty value means "back to the one we shipped".
+        if (given[k] === undefined) continue;
+        await ST.writeSetting(store, k, given[k], admin.id);
+      }
+      const after = await ST.readSettings(store);
+      return res.json({ ok: true, colors: after.colors });
+    }
+
     if (action === 'setOrgTimeZone') {
       const admin = await requireAdmin();
       const tz = String(body.tz || '').trim();
@@ -287,7 +304,10 @@ module.exports = async (req, res) => {
         ok: true,
         users: users.map(u => Object.assign(publicUser(u),
           { setupCode: u.mustSetup === '1' ? u.setupCode : '' })),
-        policy: { nights: policy.nights, tz: policy.tz, options: ST.ALLOWED_NIGHTS },
+        policy: {
+          nights: policy.nights, tz: policy.tz, options: ST.ALLOWED_NIGHTS,
+          colors: policy.colors, defaultColors: ST.DEFAULT_COLORS,
+        },
       });
     }
 
@@ -383,6 +403,7 @@ module.exports = async (req, res) => {
       users.forEach(u => { byId[u.id] = publicUser(u); });
       const grant = await SC.resolveGrants(store, claims, now);
       const isAdmin = grant.kind === 'admin';
+      const policy = await ST.readSettings(store);
       const mine = t => isAdmin || grant.territories.has(SC.norm(t.name)) ||
         grant.packets.some(a => SC.norm(a.territory) === SC.norm(t.name));
       const display = set => terrs.filter(t => set.has(SC.norm(t.name))).map(t => t.name);
@@ -393,6 +414,7 @@ module.exports = async (req, res) => {
       return res.json({
         ok: true,
         me: publicUser(me),
+        colors: policy.colors,
         scope: {
           kind: grant.kind,
           territories: isAdmin ? terrs.map(t => t.name) : display(grant.territories),

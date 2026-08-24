@@ -14,6 +14,16 @@ const SETTINGS_TAB = {
   cols: ['key', 'value', 'updatedAt', 'updatedBy'],
 };
 
+/* What the rows are tinted with. Stored for the whole group so everybody's
+   phone reads the same street the same way, and changeable by an admin. */
+const COLOR_KEYS = ['colorAssigned', 'colorDnv', 'colorTalked'];
+const DEFAULT_COLORS = {
+  colorAssigned: '#1565C0',   // somebody is holding these numbers
+  colorDnv: '#B42318',        // the household asked us not to call
+  colorTalked: '#12805C',     // somebody was spoken to here
+};
+const isHexColor = v => /^#[0-9a-fA-F]{6}$/.test(String(v || ''));
+
 // Nights a packet may live. 0 = tonight; 6 = a week of them.
 const ALLOWED_NIGHTS = [0, 1, 2, 6];
 const DEFAULT_NIGHTS = 0;
@@ -64,7 +74,9 @@ async function readSettings(store) {
   let nights = parseInt(map.returnNights, 10);
   if (ALLOWED_NIGHTS.indexOf(nights) === -1) nights = DEFAULT_NIGHTS;
   const tz = validTimeZone(map.timeZone) ? map.timeZone : DEFAULT_TZ;
-  return { nights: nights, tz: tz, raw: map };
+  const colors = {};
+  COLOR_KEYS.forEach(k => { colors[k] = isHexColor(map[k]) ? map[k] : DEFAULT_COLORS[k]; });
+  return { nights: nights, tz: tz, colors: colors, raw: map };
 }
 
 async function writeSetting(store, key, value, who) {
@@ -86,5 +98,6 @@ async function packetExpiry(store, now) {
 
 module.exports = {
   SETTINGS_TAB, ALLOWED_NIGHTS, DEFAULT_NIGHTS, DEFAULT_TZ, HARD_MAX_MS,
+  COLOR_KEYS, DEFAULT_COLORS, isHexColor,
   validTimeZone, tzOffsetMin, endOfNight, readSettings, writeSetting, packetExpiry,
 };
