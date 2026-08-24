@@ -873,7 +873,7 @@ body.picking #fab{display:none;}
 
 /* ═══ CONFIG ═══ */
 var API="https://territory-manager-silk.vercel.app/api/territory";
-var APP_VERSION="2.8.0";
+var APP_VERSION="2.8.1";
 
 /* ═══════════════════════════════════════════════════════════════════════
    OFFLINE DATA LAYER
@@ -1258,6 +1258,15 @@ var KINDS=[
 var PICKABLE=["NH","M","W","BZ","CB","RV"];
 function kindDef(k){for(var i=0;i<KINDS.length;i++)if(KINDS[i].k===k)return KINDS[i];return null;}
 function markFor(k){var d=kindDef(k);return d?d.m:"•";}
+/* An entry whose outcome we cannot read — somebody's own shorthand from before
+   the outcomes were structured — shows the shorthand itself rather than a dot.
+   Still not a guess about what it meant. */
+function markOf(e){
+  var k=kindOf(e);
+  if(k)return markFor(k);
+  var t=String((e&&e.t)||"").trim();
+  return t?t.slice(0,3):"•";
+}
 function labelFor(k){var d=kindDef(k);return d?d.l:"Visit";}
 function textFor(k,note){var l=labelFor(k);return note?l+" — "+note:l;}
 
@@ -1289,7 +1298,11 @@ function cmpEntry(a,b){
 }
 // A decision not to call again is not a visit.
 function isVisitEntry(e){return !!e&&!e.x&&e.k!=="DNV"&&e.k!=="DNVX";}
-function visitEntries(h){return parseLog(h&&h.HouseVisitLog).filter(isVisitEntry).sort(cmpEntry);}
+/* Reads through seedLogLocal, not the raw field: a record written before the
+   log existed keeps its history only in the old visit columns, and reading the
+   empty log directly would show four blank boxes on a house that has been
+   called on. Seeding is what the write path already does. */
+function visitEntries(h){return (h?seedLogLocal(h):[]).filter(isVisitEntry).sort(cmpEntry);}
 function findEntry(log,eid){
   for(var i=0;i<log.length;i++)if(String(log[i].i)===String(eid))return log[i];
   return null;
@@ -1787,7 +1800,7 @@ function visitCells(h){
       out+='<button class="vc on k-'+(k||"X")+'" data-act="cell" data-id="'+esc(h.id)+'"'+
         ' data-eid="'+esc(e.i||"")+'" title="'+esc(e.t||"")+'"'+
         ' aria-label="Visit '+(i+1)+', '+esc(labelFor(k))+', '+esc(fmtDateOr(e.d,"date not recorded"))+'">'+
-        esc(markFor(k))+'</button>';
+        esc(markOf(e))+'</button>';
     }else{
       out+='<button class="vc'+(i===shown.length?' next':'')+'" data-act="cell" data-id="'+esc(h.id)+'"'+
         ' aria-label="Record a visit">'+(i===shown.length?"＋":"")+'</button>';
@@ -1922,7 +1935,7 @@ function openDetail(id){
       ?'<div class="card">'+visits.map(function(e){
         var k=kindOf(e),who=whoName(e.u);
         return '<button class="row" data-act="cell" data-id="'+esc(h.id)+'" data-eid="'+esc(e.i||"")+'">'+
-          '<span class="pk-b vc k-'+(k||"X")+'" style="width:40px;height:28px;font-size:12px">'+esc(markFor(k))+'</span>'+
+          '<span class="pk-b vc k-'+(k||"X")+'" style="width:40px;height:28px;font-size:12px">'+esc(markOf(e))+'</span>'+
           '<span class="row-txt"><span class="row-t">'+esc(fmtDateOr(e.d,"date not recorded"))+
             (who?' · '+esc(who):"")+'</span>'+
           '<span class="row-s" style="white-space:normal">'+esc(e.t||labelFor(k))+'</span></span>'+
