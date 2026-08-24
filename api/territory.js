@@ -9,6 +9,7 @@
 const { claimsFrom } = require('./_auth');
 const { makeStore } = require('./_store');
 const AS = require('./_assign');
+const SC = require('./_scope');
 
 const HOUSES = {
   name: 'Houses',
@@ -25,6 +26,12 @@ const HOUSES = {
 // Server-owned. A client may not write these directly.
 const SERVER_FIELDS = new Set(['HouseUpdatedAt']);
 
+/* Which territory a house belongs to, and whether it exists, decide who can
+   see it — so they are not ordinary fields. Only an admin may move a house
+   between territories, and nobody deletes by writing a flag: that is what the
+   DELETE branch is for. */
+const CONTROLLED_FIELDS = new Set(['HouseTerritoryNumber', 'HouseDeleted']);
+
 /* Append-only JSON logs, merged by UNION of entry id rather than overwritten.
    Field-level last-write-wins cannot protect these: two devices write the same
    key, so one device's notes would simply vanish. */
@@ -38,10 +45,15 @@ function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
 
-function sanitize(updates) {
+/* `refused` collects what was dropped rather than dropping it silently: a
+   field refusal that vanishes is how a phone comes to believe a write landed. */
+function sanitize(updates, grant, refused) {
   const clean = {};
+  const isAdmin = !grant || grant.kind === 'admin';
   Object.keys(updates || {}).forEach(k => {
-    if (k !== 'id' && !SERVER_FIELDS.has(k) && HOUSES.cols.includes(k)) clean[k] = updates[k];
+    if (k === 'id' || SERVER_FIELDS.has(k) || !HOUSES.cols.includes(k)) return;
+    if (!isAdmin && CONTROLLED_FIELDS.has(k)) { if (refused) refused.push(k); return; }
+    clean[k] = updates[k];
   });
   return clean;
 }
@@ -178,35 +190,55 @@ module.exports = async (req, res) => {
     const store = makeStore();
     const now = new Date().toISOString();
 
-    /* A guest token carries a work packet rather than an account. It may only
-       ever see and touch the specific houses it was handed, and only while the
-       packet is live — so scope is resolved here, once, before any handler
-       runs, rather than trusted to each branch remembering to check. */
-    let scope = null;
-    if (claims.g) {
-      const packet = await AS.loadPacket(store, claims.g, Date.now());
-      if (!packet.state.ok) return res.status(403).json({ error: packet.state.reason });
-      scope = new Set(AS.houseIdList(packet.assignment));
-      if (req.method === 'DELETE' || req.method === 'POST') {
-        return res.status(403).json({ error: 'Guests can record visits, not add or remove houses' });
-      }
-    }
-    const inScope = id => !scope || scope.has(id);
+    /* What this session may see and touch, resolved once before any branch
+       runs. There is deliberately no `inScope` catch-all closure: one shared
+       helper is exactly how DELETE came to ship with no check at all, so every
+       branch below states its own rule. */
+    const grant = await SC.resolveGrants(store, claims, Date.now());
+    // Rows are cached per request by the store, so this is one read, not five.
+    const withHouses = async () => {
+      const rows = await store.read(HOUSES);
+      SC.attachHouses(grant, rows);
+      return rows;
+    };
+    const canRead = id => grant.read === null || grant.read.has(id);
+    const canWrite = id => grant.write === null || grant.write.has(id);
+    const ownsTerritory = t => grant.territories === null ||
+      grant.kind === 'admin' || grant.territories.has(SC.norm(t));
 
     /* ── GET ── */
     if (req.method === 'GET') {
-      const all = (await store.read(HOUSES)).filter(isLive);
-      const visible = scope ? all.filter(r => scope.has(r.id)) : all;
+      const all = (await withHouses()).filter(isLive);
+      /* An empty answer is 200 and [], never 403: the client turns a 403 into
+         "sign in to see your territory", which is a lie to somebody who is
+         signed in and simply holds nothing today. */
+      const visible = grant.read === null ? all : all.filter(r => grant.read.has(r.id));
       return res.json(visible.map(publicRec));
     }
 
     /* ── POST: create one ── */
     if (req.method === 'POST') {
       const body = await parseBody(req);
-      const rec = sanitize(body);
+      if (!grant.canCreate) {
+        return res.status(403).json({ error: grant.kind === 'guest'
+          ? 'Guests can record visits, not add or remove houses'
+          : 'Only someone with a territory can add a house' });
+      }
+      const rec = sanitize(body, grant);
+      const terr = grant.kind === 'admin' ? String(body.HouseTerritoryNumber || '')
+        : String(body.HouseTerritoryNumber || '');
+      if (!terr.trim()) return res.status(400).json({ error: 'Which territory is this house in?' });
+      if (!ownsTerritory(terr)) return res.status(403).json({ error: 'That territory is not yours' });
+      rec.HouseTerritoryNumber = terr;
       // Honour a client-supplied id so a house created offline keeps its
       // identity after sync, instead of needing an id remap.
       rec.id = (typeof body.id === 'string' && body.id.trim()) ? body.id.trim() : uid();
+      /* Two rows sharing an id makes every later lookup a coin toss, and would
+         let a made-up id pull somebody else's house into this scope. The bulk
+         path has always guarded this; the single-create path had not. */
+      const already = await store.read(HOUSES);
+      if (already.some(r => r.id === rec.id))
+        return res.status(409).json({ error: 'A house with that id already exists' });
       rec.HouseVisitLog = seedLog(rec) || rec.HouseVisitLog || '';
       deriveSlots(rec);
       rec.HouseUpdatedAt = now;
@@ -217,12 +249,23 @@ module.exports = async (req, res) => {
     /* ── PATCH: update one ── */
     if (req.method === 'PATCH') {
       const body = await parseBody(req);
-      if (!inScope(body.id)) return res.status(403).json({ error: 'That house is not on your list' });
-      const rows = await store.read(HOUSES);
+      const rows = await withHouses();
+      if (!canWrite(body.id)) return res.status(403).json({ error: 'That house is not on your list' });
       const existing = rows.find(r => r.id === body.id);
       if (!existing) return res.status(404).json({ error: 'Not found' });
 
-      const merged = mergeRow(existing, sanitize(body), now);
+      let fields;
+      if (grant.grace && grant.grace.has(body.id)) {
+        // Their numbers have come back. They may still finish uploading the
+        // notes they wrote, and nothing else.
+        const g = SC.graceFilter(body, existing, parseArr, entryKey, seedLog);
+        if (!Object.keys(g.fields).length)
+          return res.status(403).json({ error: 'Those numbers have been returned' });
+        fields = g.fields;
+      } else {
+        fields = sanitize(body, grant);
+      }
+      const merged = mergeRow(existing, fields, now);
       merged.id = body.id;
       await store.update(HOUSES, existing._key, merged);
       return res.json({ ok: true, HouseUpdatedAt: now });
@@ -234,9 +277,17 @@ module.exports = async (req, res) => {
        wrong house. A flag cannot do that. */
     if (req.method === 'DELETE') {
       const body = await parseBody(req);
-      const rows = await store.read(HOUSES);
+      if (!grant.canDelete) {
+        return res.status(403).json({ error: grant.kind === 'guest'
+          ? 'Guests can record visits, not add or remove houses'
+          : 'Only someone with a territory can remove a house' });
+      }
+      const rows = await withHouses();
       const existing = rows.find(r => r.id === body.id);
       if (!existing) return res.status(404).json({ error: 'Not found' });
+      // Being handed a house is not authority to delete it.
+      if (!canRead(body.id) || !ownsTerritory(existing.HouseTerritoryNumber))
+        return res.status(403).json({ error: 'That house is not yours to remove' });
       const rec = Object.assign({}, existing, { HouseDeleted: '1', HouseUpdatedAt: now });
       await store.update(HOUSES, existing._key, rec);
       return res.json({ ok: true });
@@ -251,17 +302,71 @@ module.exports = async (req, res) => {
       let creates = Array.isArray(body.creates) ? body.creates : [];
       let updates = Array.isArray(body.updates) ? body.updates : [];
       let deletes = Array.isArray(body.deletes) ? body.deletes.filter(x => typeof x === 'string') : [];
-      if (scope) {
-        // Silently drop what a guest may not touch instead of rejecting the
-        // whole batch: one stray id must not strand the visits they did record.
-        creates = [];
-        deletes = [];
-        updates = updates.filter(u => u && inScope(u.id));
-      }
 
-      const rows = await store.read(HOUSES);
+      const rows = await withHouses();
       const byId = new Map();
       rows.forEach(r => { if (r.id) byId.set(r.id, r); });
+
+      /* Anything refused is named and handed back, never folded into
+         `applied.missing` — the phone keeps that work in its queue and can show
+         it to the person who wrote it. Silence here is how notes disappear. */
+      const rejected = [];
+      const refuse = (id, op, code, reason, fields) => {
+        rejected.push({ id: id, op: op, code: code, reason: reason, fields: fields || undefined });
+      };
+
+      if (!grant.canCreate) {
+        creates.forEach(c => refuse(c && c.id, 'create', 'no_create', 'Only someone with a territory can add a house'));
+        creates = [];
+      } else {
+        creates = creates.filter(c => {
+          if (c && ownsTerritory(c.HouseTerritoryNumber)) return true;
+          refuse(c && c.id, 'create', 'wrong_territory', 'That territory is not yours');
+          return false;
+        });
+      }
+
+      if (!grant.canDelete) {
+        deletes.forEach(id => refuse(id, 'delete', 'no_delete', 'Only someone with a territory can remove a house'));
+        deletes = [];
+      } else {
+        deletes = deletes.filter(id => {
+          const row = byId.get(id);
+          if (row && canRead(id) && ownsTerritory(row.HouseTerritoryNumber)) return true;
+          if (row) refuse(id, 'delete', 'out_of_scope', 'That house is not yours to remove');
+          return !row;   // an unknown id falls through to `missing`, as before
+        });
+      }
+
+      const graced = new Map();   // id -> fields a graced writer may still add
+      updates = updates.filter(u => {
+        if (!u || typeof u.id !== 'string') return false;
+        if (canRead(u.id)) return true;
+        if (grant.grace && grant.grace.has(u.id)) {
+          const existing = byId.get(u.id);
+          if (!existing) return true;   // handled as `missing` below
+          const g = SC.graceFilter(u, existing, parseArr, entryKey, seedLog);
+          if (!Object.keys(g.fields).length) {
+            refuse(u.id, 'update', 'grace_field', 'Those numbers have been returned', g.refusedFields);
+            return false;
+          }
+          if (g.refusedFields.length)
+            refuse(u.id, 'update', 'grace_field', 'Those numbers have been returned', g.refusedFields);
+          graced.set(u.id, g.fields);
+          return true;
+        }
+        refuse(u.id, 'update', 'out_of_scope', 'Those numbers are not assigned to you');
+        return false;
+      });
+
+      /* A phone that predates this rule cannot be told what was refused, so it
+         would clear its queue believing everything landed. Refuse the whole
+         batch instead — its own catch leaves the queue on disk untouched. */
+      if (rejected.length && String(req.headers['x-tm-client'] || '') !== '3') {
+        return res.status(409).json({
+          error: 'Update the app — some of what this phone saved is no longer yours to change.',
+        });
+      }
 
       const deleteSet = new Set(deletes);
       const conflicts = [];
@@ -272,10 +377,12 @@ module.exports = async (req, res) => {
         if (!u || typeof u.id !== 'string' || deleteSet.has(u.id)) continue;
         const existing = pending.get(u.id) || byId.get(u.id);
         if (!existing) { applied.missing.push(u.id); continue; }
+        // Only ids that survived the checks above ever reach this point, which
+        // matters: a conflict hands the whole remote record back, notes and all.
         if (u._base && existing.HouseUpdatedAt && existing.HouseUpdatedAt > u._base) {
           conflicts.push({ id: u.id, remote: publicRec(existing) });
         }
-        const merged = mergeRow(existing, sanitize(u), now);
+        const merged = mergeRow(existing, graced.get(u.id) || sanitize(u, grant), now);
         merged.id = u.id;
         merged._key = existing._key;
         pending.set(u.id, merged);
@@ -301,7 +408,8 @@ module.exports = async (req, res) => {
       const newRows = [];
       for (const c of creates) {
         if (!c) continue;
-        const rec = sanitize(c);
+        const rec = sanitize(c, grant);
+        if (c.HouseTerritoryNumber) rec.HouseTerritoryNumber = String(c.HouseTerritoryNumber);
         rec.id = (typeof c.id === 'string' && c.id.trim()) ? c.id.trim() : uid();
         if (byId.has(rec.id) || deleteSet.has(rec.id)) continue;
         rec.HouseVisitLog = seedLog(rec) || rec.HouseVisitLog || '';
@@ -312,16 +420,23 @@ module.exports = async (req, res) => {
       }
       if (newRows.length) await store.createMany(HOUSES, newRows);
 
+      // A house just created here is legitimately theirs, but the scope was
+      // computed from the rows as they were before the write.
+      if (grant.read) applied.created.forEach(id => grant.read.add(id));
+
       // Read back so the client ends the sync in a known-good state.
       const after = (await store.readFresh(HOUSES)).filter(isLive);
-      const records = (scope ? after.filter(r => scope.has(r.id)) : after).map(publicRec);
-      return res.json({ ok: true, applied, conflicts, records, serverTime: now });
+      const records = (grant.read === null ? after : after.filter(r => grant.read.has(r.id))).map(publicRec);
+      return res.json({ ok: true, applied, rejected, conflicts, records, serverTime: now });
     }
 
     res.status(405).json({ error: 'Method not allowed' });
   } catch (err) {
-    console.error(err);
     const msg = (err && err.message) || 'Server error';
+    /* An authorization refusal is an answer, not a crash: it carries its own
+       status and its own sentence, and must not be flattened into a 500. */
+    if (err && err.code >= 400 && err.code < 600) return res.status(err.code).json({ error: msg });
+    console.error(err);
     res.status(/throttl|quota|429/i.test(msg) ? 429 : 500)
       .json({ error: /throttl|quota|429/i.test(msg) ? 'Too busy right now — try again in a moment' : msg });
   }

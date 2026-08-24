@@ -10,6 +10,8 @@
 
 const crypto = require('crypto');
 const AS = require('./_assign');
+const SC = require('./_scope');
+const ST = require('./_settings');
 const { makeStore } = require('./_store');
 // Session tokens are signed and verified in _auth.js, so the territory
 // endpoint validates them with exactly the code that issues them here.
@@ -23,6 +25,7 @@ const TABS = {
   },
   territories: AS.TERR_TAB,
   assignments: AS.ASSIGN_TAB,
+  settings: ST.SETTINGS_TAB,
   presence: {
     name: 'Presence',
     cols: ['userId','territory','lat','lng','acc','ts'],
@@ -134,14 +137,21 @@ module.exports = async (req, res) => {
       if (!a) { const e = new Error('Not signed in'); e.code = 401; throw e; }
       return a;
     };
+    /* 401 means "you are not signed in" and the app responds by signing out.
+       A token that verifies but names a deleted or deactivated account is a
+       different thing, and answering 401 there would wipe the phone's queue of
+       unsent notes on the way out. */
     const requireUser = async () => {
-      const u = await currentUser();
-      if (!u) { const e = new Error('Not signed in'); e.code = 401; throw e; }
+      if (!claims || !claims.uid) { const e = new Error('Not signed in'); e.code = 401; throw e; }
+      const users = await rd(TABS.users);
+      const u = users.find(x => x.id === claims.uid);
+      if (!u) { const e = new Error('This account no longer exists'); e.code = 403; throw e; }
+      if (u.active === '0') { const e = new Error('This account has been turned off'); e.code = 403; throw e; }
       return u;
     };
     const requireAdmin = async () => {
       const u = await requireUser();
-      if (u.role !== 'admin') { const e = new Error('Admins only'); e.code = 403; throw e; }
+      if (SC.norm(u.role) !== 'admin') { const e = new Error('Admins only'); e.code = 403; throw e; }
       return u;
     };
 
@@ -245,12 +255,37 @@ module.exports = async (req, res) => {
 
     /* ══ ADMIN ══ */
 
+    /* When handed-out numbers come back. Read on the admin screen, which is
+       already admin-only and already loading the people list, so this costs no
+       extra round trip and adds nothing to the boot path. */
+    if (action === 'setReturnPolicy') {
+      const admin = await requireAdmin();
+      const nights = parseInt(body.nights, 10);
+      if (ST.ALLOWED_NIGHTS.indexOf(nights) === -1)
+        return res.status(400).json({ error: 'Pick one of the offered options' });
+      await ST.writeSetting(store, 'returnNights', nights, admin.id);
+      return res.json({ ok: true, nights: nights });
+    }
+
+    if (action === 'setOrgTimeZone') {
+      const admin = await requireAdmin();
+      const tz = String(body.tz || '').trim();
+      if (!ST.validTimeZone(tz)) return res.status(400).json({ error: 'That is not a time zone name' });
+      await ST.writeSetting(store, 'timeZone', tz, admin.id);
+      return res.json({ ok: true, tz: tz });
+    }
+
     if (action === 'listUsers') {
       await requireAdmin();
       const users = await rd(TABS.users);
+      const policy = await ST.readSettings(store);
       // The pending setup code is shown to the admin only, so they can pass it on.
-      return res.json({ ok: true, users: users.map(u => Object.assign(publicUser(u),
-        { setupCode: u.mustSetup === '1' ? u.setupCode : '' })) });
+      return res.json({
+        ok: true,
+        users: users.map(u => Object.assign(publicUser(u),
+          { setupCode: u.mustSetup === '1' ? u.setupCode : '' })),
+        policy: { nights: policy.nights, tz: policy.tz, options: ST.ALLOWED_NIGHTS },
+      });
     }
 
     if (action === 'createUser') {
@@ -343,11 +378,29 @@ module.exports = async (req, res) => {
       ]);
       const byId = {};
       users.forEach(u => { byId[u.id] = publicUser(u); });
+      const grant = await SC.resolveGrants(store, claims, now);
+      const isAdmin = grant.kind === 'admin';
+      const mine = t => isAdmin || grant.territories.has(SC.norm(t.name)) ||
+        grant.packets.some(a => SC.norm(a.territory) === SC.norm(t.name));
+      const display = set => terrs.filter(t => set.has(SC.norm(t.name))).map(t => t.name);
+      /* The roster is needed to pick who to hand numbers to. Everyone's phone
+         number and email is not. */
+      const roster = users.filter(u => u.active !== '0')
+        .map(u => (isAdmin ? publicUser(u) : { id: u.id, name: u.name, role: 'user', active: true }));
       return res.json({
         ok: true,
         me: publicUser(me),
-        users: users.filter(u => u.active !== '0').map(publicUser),
-        territories: terrs.map(t => ({
+        scope: {
+          kind: grant.kind,
+          territories: isAdmin ? terrs.map(t => t.name) : display(grant.territories),
+          owned: isAdmin ? terrs.map(t => t.name) : display(grant.owned),
+          canCreate: grant.canCreate || isAdmin,
+          canDelete: grant.canDelete || isAdmin,
+          canHandOut: grant.canHandOut || isAdmin,
+          empty: grant.empty, reason: grant.reason,
+        },
+        users: roster,
+        territories: terrs.filter(mine).map(t => ({
           name: t.name,
           ownerId: t.ownerId,
           owner: byId[t.ownerId] || null,
@@ -359,20 +412,28 @@ module.exports = async (req, res) => {
 
     /* Only the territory's owner or an admin may change who works it. An
        unclaimed territory can be claimed by any signed-in user. */
+    /* Who a territory belongs to is an admin decision. The old guard passed
+       whenever the row was missing or had no owner, and then defaulted the
+       owner to the caller — so anyone signed in could take a territory, and
+       with it every house in it. */
     if (action === 'assignTerritory') {
-      const me = await requireUser();
+      const me = await requireAdmin();
       const name = String(body.territory || '').trim();
       if (!name) return res.status(400).json({ error: 'Territory is required' });
       const terrs = await rd(TABS.territories);
       const existing = terrs.find(t => t.name === name);
-      if (existing && existing.ownerId && existing.ownerId !== me.id && me.role !== 'admin')
-        return res.status(403).json({ error: 'Only the person this territory is assigned to can change it' });
 
       const ownerId = body.ownerId !== undefined ? String(body.ownerId || '') : (existing ? existing.ownerId : me.id);
       const assigneeIds = Array.isArray(body.assigneeIds)
         ? body.assigneeIds.filter(x => typeof x === 'string' && x).join(',')
         : (existing ? existing.assigneeIds : '');
-      const rec = { name, ownerId, assigneeIds, updatedAt: nowIso };
+      /* Carry `working` forward. A write names every column in the spec and
+         blanks the ones it omits, so saving this sheet used to clear the flag
+         — which quietly ended every helper's access mid-afternoon. */
+      const rec = {
+        name, ownerId, assigneeIds, updatedAt: nowIso,
+        working: existing ? (existing.working || '0') : '0',
+      };
       if (existing) await wr(TABS.territories, existing._key, rec);
       else await ap(TABS.territories, rec);
       return res.json({ ok: true });
@@ -383,8 +444,11 @@ module.exports = async (req, res) => {
       const [terrs, assigns] = await Promise.all([
         rd(TABS.territories), rd(TABS.assignments),
       ]);
-      const t = terrs.find(x => x.name === territory);
-      if (!t) return null;
+      const t = terrs.find(x => SC.norm(x.name) === SC.norm(territory));
+      /* An empty Set, not null. Every caller reads `!team || team.has(id)`, so
+         null there disabled the filter entirely for any territory without a
+         row — which is exactly the case where nobody has been vouched for. */
+      if (!t) return new Set();
       const ids = new Set(String(t.assigneeIds || '').split(',').filter(Boolean));
       if (t.ownerId) ids.add(t.ownerId);
       // Anyone holding a live packet for this territory counts as present,
@@ -409,18 +473,21 @@ module.exports = async (req, res) => {
       const name = String(body.territory || '').trim();
       if (!name) return res.status(400).json({ error: 'Territory is required' });
       const terrs = await rd(TABS.territories);
-      const t = terrs.find(x => x.name === name);
-      if (t && t.ownerId && t.ownerId !== me.id && me.role !== 'admin')
+      const t = terrs.find(x => SC.norm(x.name) === SC.norm(name));
+      // Never creates a row: a territory that does not exist cannot be started,
+      // and inventing one here was a way to become an owner.
+      if (!t) return res.status(404).json({ error: 'No such territory' });
+      /* Not assignees — this switch ends EVERYONE's access at once. Taking back
+         what you personally handed out is the narrower right, and revoke
+         already offers it. */
+      if (t.ownerId !== me.id && me.role !== 'admin')
         return res.status(403).json({ error: 'Only the person this territory is assigned to can start it' });
-      const rec = {
-        name,
-        ownerId: t ? (t.ownerId || me.id) : me.id,
-        assigneeIds: t ? t.assigneeIds : '',
+      const rec = Object.assign({}, t, {
         updatedAt: nowIso,
         working: body.working ? '1' : '0',
-      };
-      if (t) await wr(TABS.territories, t._key, rec);
-      else await ap(TABS.territories, rec);
+      });
+      delete rec._key;
+      await wr(TABS.territories, t._key, rec);
       return res.json({ ok: true, working: rec.working === '1' });
     }
 
@@ -433,14 +500,31 @@ module.exports = async (req, res) => {
       if (!houseIds.length) return res.status(400).json({ error: 'Pick at least one house' });
 
       const terrs = await rd(TABS.territories);
-      const t = terrs.find(x => x.name === territory);
-      if (t && t.ownerId && t.ownerId !== me.id && me.role !== 'admin')
+      const t = terrs.find(x => SC.norm(x.name) === SC.norm(territory));
+      if (!t) return res.status(404).json({ error: 'No such territory' });
+      const shared = SC.splitIds(t.assigneeIds).indexOf(me.id) !== -1;
+      if (t.ownerId !== me.id && !shared && me.role !== 'admin')
         return res.status(403).json({ error: 'Only the person this territory is assigned to can hand out numbers' });
 
-      // Cap the lifetime server-side. A client asking for a year gets a day.
-      const asked = Number(body.expiresAt || 0);
-      const cap = now + AS.MAX_TTL_MS;
-      const expiresAt = asked && asked > now && asked < cap ? asked : cap;
+      /* The houses must actually be the giver's to give. Without this an owner
+         of one territory could mint a packet full of another territory's ids
+         and the scope resolver would faithfully honour it. */
+      const houses = await rd(SC.HOUSES_TAB);
+      const byId = new Map();
+      houses.forEach(h => { if (h.id) byId.set(h.id, h); });
+      const wrong = houseIds.filter(id => {
+        const h = byId.get(id);
+        return !h || h.HouseDeleted === '1' || SC.norm(h.HouseTerritoryNumber) !== SC.norm(territory);
+      });
+      if (wrong.length) return res.status(400).json({
+        error: wrong.length + ' of those numbers are not in ' + territory,
+      });
+
+      /* When they come back is the org's policy, not the phone's opinion.
+         The old code took the client's number when it looked sane and fell
+         back to a flat 20 hours otherwise — so a device with a wrong clock got
+         MORE time, and "midnight" was only ever true by coincidence. */
+      const expiresAt = await ST.packetExpiry(store, now);
 
       const assigneeId = String(body.assigneeId || '').trim();
       const guestName = String(body.guestName || '').trim();
@@ -475,7 +559,11 @@ module.exports = async (req, res) => {
         rd(TABS.assignments), rd(TABS.users), rd(TABS.territories),
       ]);
       const byId = {}; users.forEach(u => { byId[u.id] = publicUser(u); });
-      const t = terrs.find(x => x.name === territory);
+      const t = terrs.find(x => SC.norm(x.name) === SC.norm(territory));
+      // Whether some other group is out working today is not this caller's
+      // business, so the flag rides along only for a territory they are in.
+      const inTerritory = !!t && (me.role === 'admin' || t.ownerId === me.id ||
+        SC.splitIds(t.assigneeIds).indexOf(me.id) !== -1);
       const mine = assigns.filter(a =>
         (!territory || a.territory === territory) &&
         a.active !== '0' &&
@@ -484,7 +572,7 @@ module.exports = async (req, res) => {
       );
       return res.json({
         ok: true,
-        working: !!(t && t.working === '1'),
+        working: inTerritory && t.working === '1',
         assignments: mine.map(a => ({
           id: a.id, territory: a.territory,
           assigneeId: a.assigneeId,
@@ -512,7 +600,10 @@ module.exports = async (req, res) => {
           from: (byId[a.ownerId] || {}).name || 'Someone',
           expiresAt: Number(a.expiresAt || 0), usable: st.ok, reason: st.reason || '',
         };
-      }).filter(a => a.usable);
+      });
+      /* Ended packets are kept, with their reason. The endpoint computed one
+         and threw it away, so somebody whose numbers had been stopped saw a
+         blank screen instead of "they come back when he starts again". */
       return res.json({ ok: true, assignments: out });
     }
 
@@ -521,7 +612,10 @@ module.exports = async (req, res) => {
       const assigns = await rd(TABS.assignments);
       const a = assigns.find(x => x.id === String(body.id || ''));
       if (!a) return res.status(404).json({ error: 'No such assignment' });
-      if (a.ownerId !== me.id && me.role !== 'admin')
+      const terrs2 = await rd(TABS.territories);
+      const t2 = terrs2.find(x => SC.norm(x.name) === SC.norm(a.territory));
+      const isTerrOwner = !!t2 && t2.ownerId === me.id;
+      if (a.ownerId !== me.id && !isTerrOwner && me.role !== 'admin')
         return res.status(403).json({ error: 'Only the owner can withdraw this' });
       await wr(TABS.assignments, a._key, Object.assign({}, a, { active: '0' }));
       return res.json({ ok: true });
@@ -568,12 +662,23 @@ module.exports = async (req, res) => {
 
     /* ══ LIVE POSITION ══ */
 
+    /* The rows returned were already filtered by team membership, but the
+       caller's own membership was never checked — so any signed-in account
+       could drop a pin or broadcast audio into any group's channel just by
+       naming their territory. Guests satisfy this for free: teamFor counts
+       whoever holds a live packet. */
+    const requireChannel = async (territory, me) => {
+      const team = await teamFor(territory);
+      if (!team.has(me.id)) { const e = new Error('You are not working that territory'); e.code = 403; throw e; }
+    };
+
     if (action === 'postPresence') {
       const me = await requireActor();
       const territory = me.territory || String(body.territory || '').trim();
       const lat = Number(body.lat), lng = Number(body.lng);
       if (!territory || !isFinite(lat) || !isFinite(lng))
         return res.status(400).json({ error: 'territory, lat and lng are required' });
+      await requireChannel(territory, me);
 
       const rows = await rd(TABS.presence);
       const mine = rows.find(r => r.userId === me.id && r.territory === territory);
@@ -587,6 +692,7 @@ module.exports = async (req, res) => {
     if (action === 'getPresence') {
       const me = await requireActor();
       const territory = me.territory || String(body.territory || '').trim();
+      await requireChannel(territory, me);
       const team = await teamFor(territory);
       const [rows, users, assigns] = await Promise.all([
         rd(TABS.presence), rd(TABS.users), rd(TABS.assignments),
@@ -614,6 +720,7 @@ module.exports = async (req, res) => {
       const me = await requireActor();
       const territory = me.territory || String(body.territory || '').trim();
       const since = Number(body.since || 0);
+      await requireChannel(territory, me);
       const team = await teamFor(territory);
       const [pres, users, assigns] = await Promise.all([
         rd(TABS.presence), rd(TABS.users), rd(TABS.assignments),
@@ -673,6 +780,7 @@ module.exports = async (req, res) => {
       if (!audio) return res.status(400).json({ error: 'No audio' });
       if (audio.length > MAX_AUDIO_CHARS)
         return res.status(413).json({ error: 'That message is too long — keep it under about 10 seconds' });
+      await requireChannel(territory, me);
 
       const rows = await rd(TABS.voice);
       // Prune expired clips in the same pass, so the tab cannot grow forever.
@@ -689,6 +797,7 @@ module.exports = async (req, res) => {
       const me = await requireActor();
       const territory = me.territory || String(body.territory || '').trim();
       const since = Number(body.since || 0);
+      await requireChannel(territory, me);
       const team = await teamFor(territory);
       const [rows, users, assigns] = await Promise.all([
         rd(TABS.voice), rd(TABS.users), rd(TABS.assignments),
