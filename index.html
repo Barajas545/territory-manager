@@ -885,7 +885,7 @@ body.picking #fab{display:none;}
 
 /* ═══ CONFIG ═══ */
 var API="https://territory-manager-silk.vercel.app/api/territory";
-var APP_VERSION="2.10.0";
+var APP_VERSION="2.10.1";
 
 /* ═══════════════════════════════════════════════════════════════════════
    OFFLINE DATA LAYER
@@ -3150,6 +3150,24 @@ function terrLogRow(r){
 
 /* One territory's card: who has it, since when, everyone before them, and the
    one action that closes it. */
+/* The roster arrives on its own request, so it may not be here yet when this
+   card is opened. An empty list would read as "there is nobody to give it to",
+   which is a different thing entirely — so say so and go and get it. */
+function peopleToHandTo(t){
+  if(!teamUsers.length)
+    return '<div class="row"><span class="row-txt"><span class="row-s">Loading…</span></span></div>';
+  var others=teamUsers.filter(function(u){return u.id!==t.ownerId;});
+  if(!others.length)
+    return '<div class="row"><span class="row-txt"><span class="row-s">'+
+      'Nobody else has an account yet.</span></span></div>';
+  return others.map(function(u){
+    return '<button class="user-row" data-give-terr="'+esc(u.id)+'">'+
+      '<span class="who">'+esc(initials(u.name))+'</span>'+
+      '<span class="row-txt"><span class="ur-t">'+esc(u.name)+'</span></span>'+
+      '<span class="row-act">›</span></button>';
+  }).join("");
+}
+
 function openTerrCard(name){
   var t=terrLog.territories.filter(function(x){return x.name===name;})[0]||{name:name};
   var mine=terrLog.records.filter(function(r){return r.territory===name;});
@@ -3175,12 +3193,7 @@ function openTerrCard(name){
       '<button class="btn btn-p" id="tlReturn" style="width:100%;margin-bottom:12px">'+
       'Mark as returned</button>':"")+
     '<div class="lbl">Hand it to</div>'+
-    '<div class="card">'+teamUsers.filter(function(u){return u.id!==t.ownerId;}).map(function(u){
-      return '<button class="user-row" data-give-terr="'+esc(u.id)+'">'+
-        '<span class="who">'+esc(initials(u.name))+'</span>'+
-        '<span class="row-txt"><span class="ur-t">'+esc(u.name)+'</span></span>'+
-        '<span class="row-act">›</span></button>';
-    }).join("")+'</div>'+
+    '<div class="card" id="tlPeople">'+peopleToHandTo(t)+'</div>'+
     '<div class="lbl">Before that</div>'+
     (mine.length
       ?'<div class="card">'+mine.map(function(r){return terrLogRow(r);}).join("")+'</div>'
@@ -3218,19 +3231,28 @@ function openTerrCard(name){
       return refresh();
     }).catch(function(e){$("#tlErr").textContent=e.message;sb.disabled=false;});
   });
-  $("#pBody").querySelectorAll("[data-give-terr]").forEach(function(b){
-    b.addEventListener("click",function(){
-      var to=teamUsers.filter(function(u){return u.id===b.dataset["giveTerr"];})[0];
-      if(!to)return;
-      if(!confirm("Hand "+name+" to "+to.name+"?"+(who?"\n\n"+who+" gives it back today.":"")))return;
-      b.disabled=true;
-      team("assignTerritory",{territory:name,ownerId:to.id}).then(function(){
-        toast(name+" is "+String(to.name).split(" ")[0]+"'s ✓");
-        return refresh();
-      }).catch(function(e){$("#tlErr").textContent=e.message;b.disabled=false;});
+  var wireHandTo=function(){
+    $("#pBody").querySelectorAll("[data-give-terr]").forEach(function(b){
+      b.addEventListener("click",function(){
+        var to=teamUsers.filter(function(u){return u.id===b.dataset["giveTerr"];})[0];
+        if(!to)return;
+        if(!confirm("Hand "+name+" to "+to.name+"?"+(who?"\n\n"+who+" gives it back today.":"")))return;
+        b.disabled=true;
+        team("assignTerritory",{territory:name,ownerId:to.id}).then(function(){
+          toast(name+" is "+String(to.name).split(" ")[0]+"'s ✓");
+          return refresh();
+        }).catch(function(e){$("#tlErr").textContent=e.message;b.disabled=false;});
+      });
     });
-  });
+  };
+  wireHandTo();
   $("#tlBack").addEventListener("click",drawTerrLog);
+  if(!teamUsers.length&&me)
+    team("listTerritories",{}).then(function(r){
+      teamUsers=r.users||[];
+      var el=$("#tlPeople");
+      if(el){el.innerHTML=peopleToHandTo(t);wireHandTo();}
+    }).catch(function(){});
 }
 
 /* ── the Do Not Visit list ──────────────────────────────────────────────
