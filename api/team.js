@@ -12,6 +12,7 @@ const crypto = require('crypto');
 const AS = require('./_assign');
 const SC = require('./_scope');
 const ST = require('./_settings');
+const TL = require('./_terrlog');
 const { makeStore } = require('./_store');
 // Session tokens are signed and verified in _auth.js, so the territory
 // endpoint validates them with exactly the code that issues them here.
@@ -26,6 +27,7 @@ const TABS = {
   territories: AS.TERR_TAB,
   assignments: AS.ASSIGN_TAB,
   settings: ST.SETTINGS_TAB,
+  terrlog: TL.TERRLOG_TAB,
   presence: {
     name: 'Presence',
     cols: ['userId','territory','lat','lng','acc','ts'],
@@ -106,6 +108,8 @@ module.exports = async (req, res) => {
        single request, because several actions here legitimately need the same
        table twice (teamFor re-reads what its caller just read). */
     const store = makeStore();
+    // Resolved lazily: only the record-card paths need it.
+    const orgDay = async () => ST.localDay(now, (await ST.readSettings(store)).tz);
     const rd = spec => store.read(spec);
     const wr = (spec, key, obj) => store.update(spec, key, obj);
     const ap = (spec, obj) => store.create(spec, obj);
@@ -371,6 +375,96 @@ module.exports = async (req, res) => {
       return res.json({ ok: true });
     }
 
+    /* Handing a territory back. The same thing as assigning it to nobody, but
+       said in the words the person doing it would use, and it stamps the return
+       date on the open record rather than silently dropping it. */
+    if (action === 'returnTerritory') {
+      const me = await requireAdmin();
+      const name = String(body.territory || '').trim();
+      const terrs = await rd(TABS.territories);
+      const t = terrs.find(x => SC.norm(x.name) === SC.norm(name));
+      if (!t) return res.status(404).json({ error: 'No such territory' });
+      const today = await orgDay();
+      /* Somebody has held this since before the card existed: give them a line
+         with an unknown start date rather than clearing the owner and leaving
+         no evidence they ever had it. */
+      if (t.ownerId) {
+        const uu = await rd(TABS.users);
+        await TL.ensureOpen(store, t.name, t.ownerId,
+          (uu.find(u => u.id === t.ownerId) || {}).name || '', me.id, nowIso, today);
+      }
+      const closed = await TL.closeOpen(store, t.name, me.id, nowIso, today, body.note);
+      const rec = Object.assign({}, t, { ownerId: '', updatedAt: nowIso, working: '0' });
+      delete rec._key;
+      await wr(TABS.territories, t._key, rec);
+      return res.json({ ok: true, closed: closed });
+    }
+
+    /* The date a territory actually went out, for one that was already in
+       somebody's hands before the card existed. Only ever fills a blank — it
+       cannot rewrite a date the app itself recorded. */
+    if (action === 'setTerritoryStart') {
+      const me = await requireAdmin();
+      const name = String(body.territory || '').trim();
+      const on = String(body.assignedOn || '').trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(on)) return res.status(400).json({ error: 'Pick a date' });
+      if (on > await orgDay()) return res.status(400).json({ error: 'That date is in the future' });
+      const terrs = await rd(TABS.territories);
+      const t = terrs.find(x => SC.norm(x.name) === SC.norm(name));
+      if (!t) return res.status(404).json({ error: 'No such territory' });
+      if (!t.ownerId) return res.status(400).json({ error: 'Nobody has this one' });
+      const users = await rd(TABS.users);
+      await TL.ensureOpen(store, t.name, t.ownerId,
+        (users.find(u => u.id === t.ownerId) || {}).name || '', me.id, nowIso, '');
+      const rows = await TL.readLog(store);
+      const open = TL.openFor(rows, t.name);
+      if (!open) return res.status(404).json({ error: 'No open record' });
+      if (open.assignedOn) return res.status(400).json({ error: 'That one already has a date' });
+      const rec = Object.assign({}, open, { assignedOn: on, assignedAt: on + 'T12:00:00.000Z' });
+      delete rec._key;
+      await store.update(TL.TERRLOG_TAB, open._key, rec);
+      return res.json({ ok: true, assignedOn: on });
+    }
+
+    /* The record card, for the admin who keeps it. */
+    if (action === 'territoryHistory') {
+      await requireAdmin();
+      const [rows, users, terrs] = await Promise.all([
+        TL.readLog(store), rd(TABS.users), rd(TABS.territories),
+      ]);
+      const byId = {}; users.forEach(u => { byId[u.id] = publicUser(u); });
+      const only = String(body.territory || '').trim();
+      const wanted = only ? rows.filter(r => SC.norm(r.territory) === SC.norm(only)) : rows;
+      return res.json({
+        ok: true,
+        /* Every territory, including the ones nobody is holding — an empty
+           shelf is exactly what an admin needs to see. */
+        territories: terrs.map(t => {
+          const open = TL.openFor(rows, t.name);
+          return {
+            name: t.name,
+            ownerId: t.ownerId || '',
+            owner: byId[t.ownerId] || null,
+            assignedOn: open ? (open.assignedOn || '') : '',
+            hasRecord: !!open,
+            working: t.working === '1',
+          };
+        }),
+        records: wanted.sort(TL.byNewest).map(r => ({
+          id: r.id, territory: r.territory,
+          userId: r.userId,
+          assignedOn: r.assignedOn || '', returnedOn: r.returnedOn || '',
+          // The name is snapshotted when it is written, so the history still
+          // reads correctly after somebody's account is deleted.
+          who: (byId[r.userId] || {}).name || r.userName || 'Someone',
+          assignedAt: r.assignedAt, returnedAt: r.returnedAt || '',
+          assignedBy: (byId[r.assignedBy] || {}).name || '',
+          returnedBy: (byId[r.returnedBy] || {}).name || '',
+          note: r.note || '',
+        })),
+      });
+    }
+
     if (action === 'deleteTerritory') {
       await requireAdmin();
       const terrs = await rd(TABS.territories);
@@ -404,6 +498,7 @@ module.exports = async (req, res) => {
       const grant = await SC.resolveGrants(store, claims, now);
       const isAdmin = grant.kind === 'admin';
       const policy = await ST.readSettings(store);
+      const logRows = await TL.readLog(store);
       const mine = t => isAdmin || grant.territories.has(SC.norm(t.name)) ||
         grant.packets.some(a => SC.norm(a.territory) === SC.norm(t.name));
       const display = set => terrs.filter(t => set.has(SC.norm(t.name))).map(t => t.name);
@@ -429,6 +524,7 @@ module.exports = async (req, res) => {
           name: t.name,
           ownerId: t.ownerId,
           owner: byId[t.ownerId] || null,
+          assignedOn: (TL.openFor(logRows, t.name) || {}).assignedOn || '',
           assigneeIds: String(t.assigneeIds || '').split(',').filter(Boolean),
           assignees: String(t.assigneeIds || '').split(',').filter(Boolean).map(id => byId[id]).filter(Boolean),
         })),
@@ -461,7 +557,15 @@ module.exports = async (req, res) => {
       };
       if (existing) await wr(TABS.territories, existing._key, rec);
       else await ap(TABS.territories, rec);
-      return res.json({ ok: true });
+
+      /* The record card. Assigning a territory to somebody is a check-out and
+         it is written down, because "who had this in March" is not a question
+         a field that gets overwritten can answer. */
+      const users = await rd(TABS.users);
+      const nameOf = id => (users.find(u => u.id === id) || {}).name || '';
+      const handover = await TL.recordHandover(store, name,
+        existing ? existing.ownerId : '', ownerId, nameOf, me.id, nowIso, await orgDay(), body.note);
+      return res.json({ ok: true, recorded: handover.changed });
     }
 
     /* Everyone the territory is shared with — owner plus assignees. */
@@ -580,6 +684,13 @@ module.exports = async (req, res) => {
       };
       if (t) await wr(TABS.territories, t._key, trec);
       else await ap(TABS.territories, trec);
+      /* Taking on an unclaimed territory by handing numbers out of it is a
+         check-out like any other, and goes on the card. */
+      if (trec.ownerId !== (t ? t.ownerId : '')) {
+        const uu = await rd(TABS.users);
+        await TL.recordHandover(store, trec.name, t ? t.ownerId : '', trec.ownerId,
+          id => (uu.find(u => u.id === id) || {}).name || '', me.id, nowIso, await orgDay(), '');
+      }
 
       return res.json({ ok: true, assignment: rec, guestCode: rec.guestCode, expiresAt });
     }

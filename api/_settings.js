@@ -64,6 +64,14 @@ function endOfNight(now, tz, nights) {
   return want - tzOffsetMin(first, tz) * 60000;
 }
 
+/* The calendar day at that instant, where these people live. A record card
+   says "12 March", and the server's own clock is UTC — so an evening handover
+   in California would otherwise be written down as the following day. */
+function localDay(ms, tz) {
+  const off = tzOffsetMin(ms, tz || DEFAULT_TZ);
+  return new Date(ms + off * 60000).toISOString().slice(0, 10);
+}
+
 /* Read lazily and only where it is needed — handing numbers out — so the
    per-request house paths never pay for it. */
 async function readSettings(store) {
@@ -98,6 +106,6 @@ async function packetExpiry(store, now) {
 
 module.exports = {
   SETTINGS_TAB, ALLOWED_NIGHTS, DEFAULT_NIGHTS, DEFAULT_TZ, HARD_MAX_MS,
-  COLOR_KEYS, DEFAULT_COLORS, isHexColor,
+  COLOR_KEYS, DEFAULT_COLORS, isHexColor, localDay,
   validTimeZone, tzOffsetMin, endOfNight, readSettings, writeSetting, packetExpiry,
 };
