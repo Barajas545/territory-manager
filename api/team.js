@@ -13,6 +13,7 @@ const AS = require('./_assign');
 const SC = require('./_scope');
 const ST = require('./_settings');
 const TL = require('./_terrlog');
+const NT = require('./_notes');
 const { makeStore } = require('./_store');
 // Session tokens are signed and verified in _auth.js, so the territory
 // endpoint validates them with exactly the code that issues them here.
@@ -28,6 +29,7 @@ const TABS = {
   assignments: AS.ASSIGN_TAB,
   settings: ST.SETTINGS_TAB,
   terrlog: TL.TERRLOG_TAB,
+  notes: NT.NOTES_TAB,
   presence: {
     name: 'Presence',
     cols: ['userId','territory','lat','lng','acc','ts'],
@@ -675,6 +677,7 @@ module.exports = async (req, res) => {
         createdAt: nowIso, expiresAt: String(expiresAt), active: '1',
       };
       await ap(TABS.assignments, rec);
+      const noteText = await NT.setNote(store, rec.id, body.message, me.id, me.name, nowIso);
 
       // Handing out numbers implies you are working the territory; not doing
       // this silently produces packets that refuse to open.
@@ -692,7 +695,7 @@ module.exports = async (req, res) => {
           id => (uu.find(u => u.id === id) || {}).name || '', me.id, nowIso, await orgDay(), '');
       }
 
-      return res.json({ ok: true, assignment: rec, guestCode: rec.guestCode, expiresAt });
+      return res.json({ ok: true, assignment: rec, guestCode: rec.guestCode, expiresAt, message: noteText });
     }
 
     if (action === 'listAssignments') {
@@ -702,6 +705,7 @@ module.exports = async (req, res) => {
         rd(TABS.assignments), rd(TABS.users), rd(TABS.territories),
       ]);
       const byId = {}; users.forEach(u => { byId[u.id] = publicUser(u); });
+      const noteRows = await NT.readNotes(store);
       const t = terrs.find(x => SC.norm(x.name) === SC.norm(territory));
       // Whether some other group is out working today is not this caller's
       // business, so the flag rides along only for a territory they are in.
@@ -724,6 +728,7 @@ module.exports = async (req, res) => {
           guestCode: a.guestCode,
           houseIds: AS.houseIdList(a),
           expiresAt: Number(a.expiresAt || 0),
+          message: (NT.forPacket(noteRows, a.id) || {}).text || '',
         })),
       });
     }
@@ -748,6 +753,22 @@ module.exports = async (req, res) => {
          and threw it away, so somebody whose numbers had been stopped saw a
          blank screen instead of "they come back when he starts again". */
       return res.json({ ok: true, assignments: out });
+    }
+
+    /* Changing what the helper reads at the top of their screen. Whoever
+       handed the numbers out owns the message. */
+    if (action === 'setPacketMessage') {
+      const me = await requireUser();
+      const assigns = await rd(TABS.assignments);
+      const a = assigns.find(x => x.id === String(body.id || ''));
+      if (!a) return res.status(404).json({ error: 'No such assignment' });
+      const terrs = await rd(TABS.territories);
+      const t = terrs.find(x => SC.norm(x.name) === SC.norm(a.territory));
+      const isTerrOwner = !!t && t.ownerId === me.id;
+      if (a.ownerId !== me.id && !isTerrOwner && me.role !== 'admin')
+        return res.status(403).json({ error: 'Only the person who handed these out can change this' });
+      const text = await NT.setNote(store, a.id, body.text, me.id, me.name, nowIso);
+      return res.json({ ok: true, message: text });
     }
 
     if (action === 'revokeAssignment') {
@@ -778,12 +799,15 @@ module.exports = async (req, res) => {
       const st = AS.packetState(a, t, now);
       if (!st.ok) return res.status(403).json({ error: st.reason });
       const owner = users.find(u => u.id === a.ownerId);
+      const note = NT.forPacket(await NT.readNotes(store), a.id);
       return res.json({
         ok: true,
         token: sign({ g: a.id, exp: Math.min(Number(a.expiresAt), now + AS.MAX_TTL_MS) }),
         guest: {
           name: a.guestName, territory: a.territory,
           from: owner ? owner.name : 'the territory holder',
+          fromPhone: owner ? (owner.phone || '') : '',
+          message: note ? note.text : '',
           houseIds: AS.houseIdList(a),
           expiresAt: Number(a.expiresAt || 0),
         },
@@ -795,11 +819,18 @@ module.exports = async (req, res) => {
       if (!claims || !claims.g) return res.status(401).json({ error: 'Not a guest session' });
       const packet = await AS.loadPacket(store, claims.g, now);
       if (!packet.state.ok) return res.status(403).json({ error: packet.state.reason });
+      const [gusers, gnote] = await Promise.all([
+        rd(TABS.users), NT.readNotes(store).then(rows => NT.forPacket(rows, packet.assignment.id)),
+      ]);
+      const gowner = gusers.find(u => u.id === packet.assignment.ownerId);
       return res.json({
         ok: true,
         territory: packet.assignment.territory,
         houseIds: AS.houseIdList(packet.assignment),
         expiresAt: Number(packet.assignment.expiresAt || 0),
+        from: gowner ? gowner.name : '',
+        fromPhone: gowner ? (gowner.phone || '') : '',
+        message: gnote ? gnote.text : '',
       });
     }
 
