@@ -376,6 +376,30 @@ body.picking #fab{display:none;}
 #nextCard .nc-row button{flex:1;min-height:42px;border-radius:var(--r-md);font-size:14px;font-weight:750;}
 #ncDir{background:var(--surface-2);color:var(--text);}
 #ncDone{background:var(--brand);color:var(--brand-ink);}
+/* ── the helper's app ──
+   Somebody who was handed a few numbers for the afternoon should open this and
+   see a street, not an application. No tabs, no search, no filters, no menu —
+   the whole screen is the list, plus one card saying who sent them and one
+   button to give the numbers back. */
+body.guest #tabbar,
+body.guest .toolbar,
+body.guest #topbar,
+body.guest #fab,
+body.guest #pickBar{display:none!important;}
+body.guest .house{padding-top:10px;padding-bottom:10px;}
+
+#guestHead{flex:0 0 auto;padding:calc(var(--safe-t) + 12px) 14px 12px;
+  background:var(--surface);border-bottom:1px solid var(--border);}
+#guestHead .gh-top{display:flex;align-items:center;gap:11px;}
+#guestHead .gh-txt{flex:1;min-width:0;}
+#guestHead .gh-from{display:block;font-size:16px;font-weight:750;line-height:1.2;}
+#guestHead .gh-sub{display:block;font-size:12.5px;color:var(--text-2);margin-top:2px;}
+#guestHead .gh-msg{margin-top:11px;padding:11px 13px;border-radius:var(--r-md);
+  background:var(--unit-soft);color:var(--unit);font-size:14.5px;font-weight:600;
+  line-height:1.45;white-space:pre-wrap;word-break:break-word;}
+#guestHead .gh-back{margin-top:11px;width:100%;height:44px;border-radius:var(--r-md);
+  background:var(--surface-2);color:var(--text-2);font-size:14px;font-weight:700;}
+
 .guest-banner{padding:11px 14px;background:var(--unit-soft);color:var(--unit);
   font-size:13.5px;font-weight:650;text-align:center;}
 
@@ -885,7 +909,7 @@ body.picking #fab{display:none;}
 
 /* ═══ CONFIG ═══ */
 var API="https://territory-manager-silk.vercel.app/api/territory";
-var APP_VERSION="2.10.1";
+var APP_VERSION="2.11.0";
 
 /* ═══════════════════════════════════════════════════════════════════════
    OFFLINE DATA LAYER
@@ -1707,7 +1731,8 @@ function houseSubtitle(h){
   bits.push(esc(visitLabel(h.HouseLastVisitDate)));
   if(h.HouseNotes)bits.push(esc(h.HouseNotes));
   else if(h.HouseLanguage)bits.push(esc(h.HouseLanguage));
-  if(pending[h.id])bits.push('<span class="pend">• not synced</span>');
+  // A helper is told this once, plainly, at the top of their screen.
+  if(pending[h.id]&&!guestMode)bits.push('<span class="pend">• not synced</span>');
   return bits.join(" · ");
 }
 
@@ -1814,14 +1839,21 @@ function houseRow(h,label,isUnit){
    addressed by entry id, because position stops being identity the moment
    another phone's visit can sync in between. */
 function visitCells(h){
-  var live=visitEntries(h),shown=live.slice(-4),out='<div class="vrow">',i,e,k;
-  for(i=0;i<4;i++){
+  /* A helper gets one box: the whole job is "what happened at this door", and
+     four of them is three more decisions than that needs. */
+  var boxes=guestMode?1:4;
+  var live=visitEntries(h),shown=live.slice(-boxes),out='<div class="vrow">',i,e,k;
+  for(i=0;i<boxes;i++){
     e=shown[i];
     if(e){
       k=kindOf(e);
+      /* A helper's box shows what was recorded last so they can see the door is
+         done, but tapping it records a NEW visit — never opens somebody else's
+         to be edited. */
       out+='<button class="vc on k-'+(k||"X")+'" data-act="cell" data-id="'+esc(h.id)+'"'+
-        ' data-eid="'+esc(e.i||"")+'" title="'+esc(e.t||"")+'"'+
-        ' aria-label="Visit '+(i+1)+', '+esc(labelFor(k))+', '+esc(fmtDateOr(e.d,"date not recorded"))+'">'+
+        (guestMode?"":' data-eid="'+esc(e.i||"")+'"')+' title="'+esc(e.t||"")+'"'+
+        ' aria-label="'+(guestMode?"Record a visit. Last: ":"Visit "+(i+1)+", ")+
+          esc(labelFor(k))+', '+esc(fmtDateOr(e.d,"date not recorded"))+'">'+
         esc(markOf(e))+'</button>';
     }else{
       out+='<button class="vc'+(i===shown.length?' next':'')+'" data-act="cell" data-id="'+esc(h.id)+'"'+
@@ -2157,6 +2189,7 @@ function saveChanges(id,changes,msg){
   });
 }
 function afterLocalChange(){
+  if(guestMode)drawGuestHead();
   records=buildRecords();
   renderHouses();renderRV();refreshMapPins();updateSyncUI();
   if(routeOn)drawRoute();
@@ -2850,9 +2883,12 @@ function drawPicker(){
       '<span class="pk-b vc k-'+k+'">'+esc(d.m)+'</span>'+
       '<span class="pk-l">'+esc(d.l)+'</span></button>';
   };
+  /* No return visit for a helper: it starts something that outlives the
+     afternoon and belongs to somebody who will still be here for it. */
   $("#cBody").innerHTML=
     '<div class="cell-grid">'+
-      tile("NH",true)+tile("M")+tile("W")+tile("BZ")+tile("CB")+tile("RV",true)+
+      tile("NH",true)+tile("M")+tile("W")+tile("BZ")+tile("CB")+
+      (guestMode?"":tile("RV",true))+
       '<div class="pk-hr"></div>'+
     '</div>'+
     '<div class="f" style="margin-top:10px"><label for="cNote">Note (optional)</label>'+
@@ -3909,7 +3945,8 @@ function normPacket(a,whoFallback){
     expiresAt:Number(a.expiresAt||0),
     // Only ever a boolean when the server actually sent one.
     live:(typeof a.live==="boolean")?a.live:null,
-    from:a.from||""
+    from:a.from||"",
+    message:a.message||""
   };
 }
 
@@ -4272,13 +4309,19 @@ function drawAssignPicker(ids,terr){
     '<div class="lbl">Someone without the app</div>'+
     '<div class="f"><label for="gvName">Their name</label>'+
       '<input id="gvName" placeholder="Hermano Lopez" autocomplete="off"></div>'+
+    /* The one thing the list cannot tell them. It sits at the top of their
+       screen, which for somebody without an account is nearly the whole app. */
+    '<div class="f"><label for="gvMsg">Anything they should know (optional)</label>'+
+      '<textarea id="gvMsg" rows="2" maxlength="400" '+
+      'placeholder="Start at the top of the street"></textarea></div>'+
     '<button class="btn btn-p" id="gvGo" style="width:100%">Create a code for them</button>'+
     '<div id="gvErr" style="color:var(--bad);font-size:13.5px;margin-top:10px"></div>';
 
   $("#pBody").querySelectorAll("[data-give]").forEach(function(b){
     b.addEventListener("click",function(){
       b.disabled=true;
-      makeAssignment({territory:terr,houseIds:ids,assigneeId:b.dataset.give},
+      makeAssignment({territory:terr,houseIds:ids,assigneeId:b.dataset.give,
+        message:(($("#gvMsg")||{}).value||"").trim()},
         (teamUsers.find(function(u){return u.id===b.dataset.give;})||{}).name);
     });
   });
@@ -4286,7 +4329,8 @@ function drawAssignPicker(ids,terr){
     var name=$("#gvName").value.trim();
     if(!name){$("#gvErr").textContent="Type their name first";return;}
     this.disabled=true;
-    makeAssignment({territory:terr,houseIds:ids,guestName:name},name);
+    makeAssignment({territory:terr,houseIds:ids,guestName:name,
+      message:(($("#gvMsg")||{}).value||"").trim()},name);
   });
 }
 
@@ -4300,6 +4344,7 @@ function makeAssignment(payload,who){
     var p=normPacket(r.assignment||{},who);
     p.houseIds=payload.houseIds.slice();   // the response sends them as a string
     p.who=who||p.who;p.live=true;
+    p.message=r.message||payload.message||"";
     if(r.guestCode)p.guestCode=r.guestCode;
     held.list.push(p);
     working=true;refreshWorkingBtn();refreshHeldBtn();
@@ -4335,7 +4380,12 @@ function showHandoff(p){
   $("#pSub").textContent=c+" number"+(c===1?"":"s")+" · "+p.territory+(ends?" · "+ends:"");
 
   var nums='<div class="lbl">The numbers they have</div>'+
-    '<div class="card">'+heldNumbers(p.houseIds)+'</div>';
+    '<div class="card">'+heldNumbers(p.houseIds)+'</div>'+
+    '<div class="f"><label for="hoMsg">Anything they should know</label>'+
+      '<textarea id="hoMsg" rows="2" maxlength="400" '+
+      'placeholder="Start at the top of the street">'+esc(p.message||"")+'</textarea></div>'+
+    '<button class="btn btn-s" id="hoMsgGo" style="width:100%;margin-bottom:12px">'+
+      'Save this message</button>';
   var back='<button class="btn btn-d" id="hoBack" style="width:100%"'+
       (offlineNow()?" disabled":"")+'>Take these numbers back</button>'+
     '<div id="hoErr" style="color:var(--bad);font-size:13.5px;margin-top:10px"></div>';
@@ -4398,6 +4448,17 @@ function showHandoff(p){
     });
   }
   $("#hoBack").addEventListener("click",function(){takeBack(p,this);});
+  var mg=$("#hoMsgGo");
+  if(mg)mg.addEventListener("click",function(){
+    var text=($("#hoMsg").value||"").trim();
+    mg.disabled=true;
+    team("setPacketMessage",{id:p.id,text:text}).then(function(r){
+      p.message=r.message||"";
+      toast(p.message?"Message saved ✓":"Message removed");
+    }).catch(function(e){
+      var el=$("#hoErr");if(el)el.textContent=e.message;else toast(e.message,true);
+    }).then(function(){mg.disabled=false;});
+  });
   openSheet("#sh-pick");
 }
 
@@ -4444,17 +4505,52 @@ function applyGuestChrome(){
   $("#btnPick").style.display="none";
   $("#btnWorking").style.display="none";
   heldClear();refreshHeldBtn();refreshChrome();
-  var b=document.getElementById("guestBanner");
-  if(!b){
-    b=document.createElement("div");
-    b.id="guestBanner";b.className="guest-banner";
-    var tb=$("#topbar");tb.parentNode.insertBefore(b,tb.nextSibling);
-  }
-  b.textContent="Helping "+(guestInfo.from||"the territory holder")+" · "+
-    (guestInfo.houseIds||[]).length+" numbers · ends tonight";
-  $("#scopeName").textContent=guestInfo.territory||"My numbers";
+  // The tabs are gone, so make sure they are looking at the houses.
+  showView("houses");
+  drawGuestHead();
   renderTeamCard();
   updatePttVisibility();
+  renderHouses();
+}
+
+/* Everything a helper is told, in one card: who sent them, anything that
+   person wrote, and the way to hand the numbers back. */
+function drawGuestHead(){
+  var head=document.getElementById("guestHead");
+  if(!head){
+    head=document.createElement("div");
+    head.id="guestHead";
+    var app=document.getElementById("app")||document.body;
+    app.insertBefore(head,app.firstChild);
+  }
+  var from=(guestInfo&&guestInfo.from)||"the territory holder";
+  var count=((guestInfo&&guestInfo.houseIds)||[]).length;
+  var msg=(guestInfo&&guestInfo.message)||"";
+  head.innerHTML=
+    '<div class="gh-top">'+
+      '<span class="who">'+esc(initials(from))+'</span>'+
+      '<span class="gh-txt">'+
+        '<span class="gh-from">'+esc(from)+'</span>'+
+        '<span class="gh-sub">gave you '+count+' number'+(count===1?"":"s")+
+          ' in '+esc((guestInfo&&guestInfo.territory)||"this territory")+
+          ' · '+esc(endsWord(guestInfo&&guestInfo.expiresAt)||"today")+'</span>'+
+      '</span>'+
+    '</div>'+
+    (msg?'<div class="gh-msg">'+esc(msg)+'</div>':"")+
+    /* The sync pill lives in a bar this screen does not have, so say it here.
+       Somebody who has walked a street with no signal needs to know their
+       afternoon is still on the phone waiting, not lost. */
+    (pendingCount()
+      ?'<div class="gh-sub" style="margin-top:9px">'+pendingCount()+
+        ' visit'+(pendingCount()===1?"":"s")+' still on this phone — they send themselves '+
+        'when you have signal.</div>'
+      :"")+
+    '<button class="gh-back" id="ghBack">Give the numbers back</button>';
+  $("#ghBack").addEventListener("click",function(){
+    var n=pendingCount();
+    if(confirm(n?("You have "+n+" visit"+(n===1?"":"s")+" not sent yet.\n\nThey will be lost. Give the numbers back anyway?")
+                :"Give the numbers back?\n\nThey come off this phone."))leaveGuest();
+  });
 }
 
 function restoreGuest(){
@@ -4478,6 +4574,7 @@ function leaveGuest(){
   mirror={};pending={};records=[];needsAuth=true;
   Promise.all([idb.clear(S_MIRROR),idb.clear(S_PENDING)]).catch(function(){});
   var b=document.getElementById("guestBanner");if(b)b.remove();
+  var gh=document.getElementById("guestHead");if(gh)gh.remove();
   document.body.classList.remove("guest");
   $("#fab").style.display="";$("#btnPick").style.display="";
   heldClear();working=false;myPackets=[];
