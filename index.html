@@ -885,7 +885,7 @@ body.picking #fab{display:none;}
 
 /* ═══ CONFIG ═══ */
 var API="https://territory-manager-silk.vercel.app/api/territory";
-var APP_VERSION="2.9.0";
+var APP_VERSION="2.10.0";
 
 /* ═══════════════════════════════════════════════════════════════════════
    OFFLINE DATA LAYER
@@ -2673,6 +2673,11 @@ function renderTeamCard(){
       '<span class="row-s">Share a territory with others</span></span>'+
       '<span class="row-act">›</span></button>'+
     (scope.kind==="admin"?
+      '<button class="row" id="tmTerrLog"><span class="row-ico">\u{1F5FA}\u{FE0F}</span>'+
+        '<span class="row-txt"><span class="row-t">Territories</span>'+
+        '<span class="row-s">Who has what, and who has had it</span></span>'+
+        '<span class="row-act">›</span></button>':"")+
+    (scope.kind==="admin"?
       '<button class="row" id="tmDNV"><span class="row-ico">\u{1F6AB}</span>'+
         '<span class="row-txt"><span class="row-t">Do not visit</span>'+
         '<span class="row-s" id="tmDNVSub">'+esc(dnvSub())+'</span></span>'+
@@ -2695,6 +2700,7 @@ function renderTeamCard(){
   $("#tmAssign").addEventListener("click",openAssign);
   $("#tmHeld").addEventListener("click",openHeld);
   var dv=$("#tmDNV");if(dv)dv.addEventListener("click",openDNVList);
+  var tl=$("#tmTerrLog");if(tl)tl.addEventListener("click",openTerrLog);
   $("#tmAssign").style.display=scope.canHandOut?"":"none";
   $("#tmHeld").style.display=(scope.canHandOut||heldTotal()>0)?"":"none";
   var pe=$("#tmPeople");if(pe)pe.addEventListener("click",openAdmin);
@@ -3050,6 +3056,183 @@ function drawDNVClear(){
   });
 }
 
+/* ── the territory record card ──────────────────────────────────────────
+   Who has each territory now, since when, and everyone who has had it before.
+   The congregation's paper card, kept by the app. */
+var terrLog={territories:[],records:[],at:0};
+
+function daysHeld(day){
+  var t=parseDay(day);
+  if(!t)return 0;
+  return Math.max(0,Math.floor((Date.now()-t.getTime())/86400000));
+}
+/* Says nothing when the start date was never written down, rather than
+   guessing at one. Every territory that was already out when the card was
+   introduced is in exactly that state. */
+function heldFor(day){
+  if(!day)return "";
+  var d=daysHeld(day);
+  if(d===0)return "since today";
+  if(d===1)return "1 day";
+  if(d<60)return d+" days";
+  return Math.round(d/30.4)+" months";
+}
+function sinceWords(day){
+  return day?("Since "+fmtDate(day)+" · "+heldFor(day)):"Start date not recorded";
+}
+/* A territory nobody has finished in four months is the thing an overseer is
+   looking for on the card. */
+function longHeld(day){return !!day&&daysHeld(day)>=120;}
+
+function openTerrLog(){
+  $("#pTitle").textContent="Territories";
+  $("#pSub").textContent="Who has what, and who has had it";
+  $("#pBody").innerHTML='<div class="empty">Loading…</div>';
+  openSheet("#sh-pick");
+  team("territoryHistory",{}).then(function(r){
+    terrLog={territories:r.territories||[],records:r.records||[],at:Date.now()};
+    drawTerrLog();
+  }).catch(function(e){
+    $("#pBody").innerHTML='<div class="empty">'+esc(e.message)+'</div>';
+  });
+}
+
+function drawTerrLog(){
+  var out=terrLog.territories.slice().sort(function(a,b){
+    // The ones somebody is holding first, longest-held at the top of those.
+    if(!!a.ownerId!==!!b.ownerId)return a.ownerId?-1:1;
+    return String(a.assignedOn||"").localeCompare(String(b.assignedOn||""));
+  });
+  var held=out.filter(function(t){return t.ownerId;});
+  var slow=held.filter(function(t){return longHeld(t.assignedOn);});
+  // Coming back from one territory's card has to restore the heading too.
+  $("#pTitle").textContent="Territories";
+  $("#pSub").textContent=held.length+" of "+out.length+" out";
+
+  $("#pBody").innerHTML=
+    (slow.length?'<div id="dnvBanner"><b>'+slow.length+' out for a while</b>'+
+      'Four months or more since they were handed over. Worth asking how they are getting on.</div>':"")+
+    '<div class="lbl" style="margin-top:0">Now</div>'+
+    '<div class="card">'+out.map(function(t){
+      var who=(t.owner&&t.owner.name)||"";
+      return '<button class="row" data-terrlog="'+esc(t.name)+'">'+
+        '<span class="who '+(who?"":"gray")+'">'+esc(who?initials(who):"—")+'</span>'+
+        '<span class="row-txt"><span class="row-t">'+esc(t.name)+'</span>'+
+        '<span class="row-s">'+(who
+          ? esc(who)+' · '+esc(heldFor(t.assignedOn)||"start date not recorded")
+          : 'Nobody has this one')+'</span></span>'+
+        (who&&longHeld(t.assignedOn)?'<span class="dnv-due">'+daysHeld(t.assignedOn)+'d</span>':'')+
+        '<span class="row-act">›</span></button>';
+    }).join("")+'</div>'+
+    '<div class="lbl">History</div>'+
+    (terrLog.records.length
+      ?'<div class="card">'+terrLog.records.map(function(r){return terrLogRow(r);}).join("")+'</div>'
+      :'<div class="empty" style="padding:22px">Nothing has been handed over yet.</div>');
+
+  $("#pBody").querySelectorAll("[data-terrlog]").forEach(function(b){
+    b.addEventListener("click",function(){openTerrCard(b.dataset.terrlog);});
+  });
+}
+
+function terrLogRow(r){
+  // Keyed on the day, which is what the server sends and what a card shows.
+  var open=!r.returnedOn;
+  return '<div class="row"><span class="row-txt">'+
+    '<span class="row-t">'+esc(r.who)+' · '+esc(r.territory)+'</span>'+
+    '<span class="row-s" style="white-space:normal">'+
+      esc(r.assignedOn?fmtDate(r.assignedOn):"date not recorded")+' → '+
+      (open?'<b>still out</b>':esc(r.returnedOn?fmtDate(r.returnedOn):"date not recorded"))+
+      (r.note?' · '+esc(r.note):"")+
+    '</span></span>'+
+    (open?'<span class="pill-tag pend">out</span>':"")+
+    '</div>';
+}
+
+/* One territory's card: who has it, since when, everyone before them, and the
+   one action that closes it. */
+function openTerrCard(name){
+  var t=terrLog.territories.filter(function(x){return x.name===name;})[0]||{name:name};
+  var mine=terrLog.records.filter(function(r){return r.territory===name;});
+  var who=(t.owner&&t.owner.name)||"";
+  $("#pTitle").textContent=name;
+  $("#pSub").textContent=who?("With "+who):"Nobody has this one";
+  $("#pBody").innerHTML=
+    '<div class="card"><div class="row">'+
+      '<span class="who '+(who?"":"gray")+'">'+esc(who?initials(who):"—")+'</span>'+
+      '<span class="row-txt"><span class="row-t">'+esc(who||"Not assigned")+'</span>'+
+      '<span class="row-s">'+(who
+        ? esc(sinceWords(t.assignedOn))
+        : 'Hand it to somebody below')+'</span></span></div></div>'+
+    /* A territory that was already out when the card was introduced has no
+       start date. The admin is the only one who knows it, so ask. */
+    (who&&!t.assignedOn
+      ?'<div class="f"><label for="tlStart">When did they get it?</label>'+
+        '<input id="tlStart" type="date" max="'+esc(todayStr())+'"></div>'+
+        '<button class="btn btn-s" id="tlSetStart" style="width:100%;margin-bottom:12px">'+
+        'Record that date</button>':"")+
+    (who?'<div class="f"><label for="tlNote">Note (optional)</label>'+
+      '<input id="tlNote" placeholder="Finished the whole territory" autocomplete="off"></div>'+
+      '<button class="btn btn-p" id="tlReturn" style="width:100%;margin-bottom:12px">'+
+      'Mark as returned</button>':"")+
+    '<div class="lbl">Hand it to</div>'+
+    '<div class="card">'+teamUsers.filter(function(u){return u.id!==t.ownerId;}).map(function(u){
+      return '<button class="user-row" data-give-terr="'+esc(u.id)+'">'+
+        '<span class="who">'+esc(initials(u.name))+'</span>'+
+        '<span class="row-txt"><span class="ur-t">'+esc(u.name)+'</span></span>'+
+        '<span class="row-act">›</span></button>';
+    }).join("")+'</div>'+
+    '<div class="lbl">Before that</div>'+
+    (mine.length
+      ?'<div class="card">'+mine.map(function(r){return terrLogRow(r);}).join("")+'</div>'
+      :'<div class="empty" style="padding:22px">Nothing recorded for this one yet.</div>')+
+    '<button class="btn btn-s" id="tlBack" style="width:100%;margin-top:12px">All territories</button>'+
+    '<div id="tlErr" style="color:var(--bad);font-size:13.5px;margin-top:10px"></div>';
+
+  var refresh=function(){
+    loadTeam();
+    return team("territoryHistory",{}).then(function(r){
+      terrLog={territories:r.territories||[],records:r.records||[],at:Date.now()};
+      drawTerrLog();
+    }).catch(function(e){toast(e.message,true);});
+  };
+  var rb=$("#tlReturn");
+  if(rb)rb.addEventListener("click",function(){
+    var note=($("#tlNote")||{}).value||"";
+    // No esc() here: a native dialog shows text, so escaping only puts
+    // "&#039;" in front of somebody's name.
+    if(!confirm("Mark "+name+" as returned?\n\n"+who+" stops working it, anybody helping "+
+      "with numbers there loses them, and today's date goes on the card."))return;
+    rb.disabled=true;
+    team("returnTerritory",{territory:name,note:note.trim()}).then(function(){
+      toast("Marked as returned ✓");
+      return refresh();
+    }).catch(function(e){$("#tlErr").textContent=e.message;rb.disabled=false;});
+  });
+  var sb=$("#tlSetStart");
+  if(sb)sb.addEventListener("click",function(){
+    var on=($("#tlStart")||{}).value||"";
+    if(!on){$("#tlErr").textContent="Pick the date they got it";return;}
+    sb.disabled=true;
+    team("setTerritoryStart",{territory:name,assignedOn:on}).then(function(){
+      toast("Date recorded ✓");
+      return refresh();
+    }).catch(function(e){$("#tlErr").textContent=e.message;sb.disabled=false;});
+  });
+  $("#pBody").querySelectorAll("[data-give-terr]").forEach(function(b){
+    b.addEventListener("click",function(){
+      var to=teamUsers.filter(function(u){return u.id===b.dataset["giveTerr"];})[0];
+      if(!to)return;
+      if(!confirm("Hand "+name+" to "+to.name+"?"+(who?"\n\n"+who+" gives it back today.":"")))return;
+      b.disabled=true;
+      team("assignTerritory",{territory:name,ownerId:to.id}).then(function(){
+        toast(name+" is "+String(to.name).split(" ")[0]+"'s ✓");
+        return refresh();
+      }).catch(function(e){$("#tlErr").textContent=e.message;b.disabled=false;});
+    });
+  });
+  $("#tlBack").addEventListener("click",drawTerrLog);
+}
+
 /* ── the Do Not Visit list ──────────────────────────────────────────────
    Not a real territory holding copies of the records — moving a house into one
    would break every packet naming it and take the red row off the street where
@@ -3373,7 +3556,11 @@ function drawAssign(pick){
       '<div class="card"><div class="row"><span class="who '+(ownerName?"":"gray")+'">'+
         esc(ownerName?initials(ownerName):"?")+'</span>'+
         '<span class="row-txt"><span class="row-t">'+esc(ownerName||"Not claimed yet")+'</span>'+
-        '<span class="row-s">'+(t.ownerId?"Runs this territory":"Nobody is running this one")+'</span></span></div></div>'+
+        '<span class="row-s">'+(t.ownerId
+          ?esc(sinceWords(t.assignedOn))
+          :"Nobody is running this one")+'</span></span></div></div>'+
+      (canEdit?'<p style="font-size:13px;color:var(--text-2);margin-bottom:8px">'+
+        'Hand it to somebody else under <b>More → Territories</b>.</p>':"")+
       '<div class="lbl">Helpers</div>'+
       (canEdit?"":'<p style="font-size:13px;color:var(--text-2);margin-bottom:8px">'+
         'An admin decides who a territory belongs to.</p>')+
