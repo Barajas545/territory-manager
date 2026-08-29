@@ -283,7 +283,7 @@ module.exports = async (req, res) => {
      lot. Auth actions live on /api/team, which stays reachable so a signed-out
      app can still get back in. */
   const claims = claimsFrom(req);
-  if (!claims) return res.status(401).json({ error: 'Sign in to use this territory' });
+  if (!claims) return res.status(401).json({ error: 'Inicia sesión para usar este territorio' });
 
   try {
     const store = makeStore();
@@ -353,8 +353,8 @@ module.exports = async (req, res) => {
       const rec = sanitize(body, grant);
       const terr = grant.kind === 'admin' ? String(body.HouseTerritoryNumber || '')
         : String(body.HouseTerritoryNumber || '');
-      if (!terr.trim()) return res.status(400).json({ error: 'Which territory is this house in?' });
-      if (!ownsTerritory(terr)) return res.status(403).json({ error: 'That territory is not yours' });
+      if (!terr.trim()) return res.status(400).json({ error: '¿En qué territorio está este domicilio?' });
+      if (!ownsTerritory(terr)) return res.status(403).json({ error: 'Ese territorio no es tuyo' });
       rec.HouseTerritoryNumber = terr;
       // Honour a client-supplied id so a house created offline keeps its
       // identity after sync, instead of needing an id remap.
@@ -364,7 +364,7 @@ module.exports = async (req, res) => {
          path has always guarded this; the single-create path had not. */
       const already = await store.read(HOUSES);
       if (already.some(r => r.id === rec.id))
-        return res.status(409).json({ error: 'A house with that id already exists' });
+        return res.status(409).json({ error: 'Ya existe un domicilio con ese id' });
       rec.HouseVisitLog = seedLog(rec) || rec.HouseVisitLog || '';
       stampAuthors({}, rec, grant);
       deriveSlots(rec);
@@ -377,9 +377,9 @@ module.exports = async (req, res) => {
     if (req.method === 'PATCH') {
       const body = await parseBody(req);
       const rows = await withHouses();
-      if (!canWrite(body.id)) return res.status(403).json({ error: 'That house is not on your list' });
+      if (!canWrite(body.id)) return res.status(403).json({ error: 'Ese domicilio no está en tu lista' });
       const existing = rows.find(r => r.id === body.id);
-      if (!existing) return res.status(404).json({ error: 'Not found' });
+      if (!existing) return res.status(404).json({ error: 'No se encontró' });
 
       let fields;
       if (narrowId(body.id, existing)) {
@@ -412,13 +412,13 @@ module.exports = async (req, res) => {
       }
       const rows = await withHouses();
       const existing = rows.find(r => r.id === body.id);
-      if (!existing) return res.status(404).json({ error: 'Not found' });
+      if (!existing) return res.status(404).json({ error: 'No se encontró' });
       // Being handed a house is not authority to delete it.
       if (!canRead(body.id) || !ownsTerritory(existing.HouseTerritoryNumber))
-        return res.status(403).json({ error: 'That house is not yours to remove' });
+        return res.status(403).json({ error: 'Ese domicilio no es tuyo para quitarlo' });
       // Removing the record would remove the decision recorded on it.
       if (lockedFor(existing))
-        return res.status(403).json({ error: 'That number is marked Do Not Visit' });
+        return res.status(403).json({ error: 'Ese número está marcado No visitar' });
       const rec = Object.assign({}, existing, { HouseDeleted: '1', HouseUpdatedAt: now });
       await store.update(HOUSES, existing._key, rec);
       return res.json({ ok: true });
@@ -508,7 +508,7 @@ module.exports = async (req, res) => {
          batch instead — its own catch leaves the queue on disk untouched. */
       if (rejected.length && String(req.headers['x-tm-client'] || '') !== '3') {
         return res.status(409).json({
-          error: 'Update the app — some of what this phone saved is no longer yours to change.',
+          error: 'Actualiza la app — algo de lo que guardó este teléfono ya no es tuyo para cambiarlo.',
         });
       }
 

@@ -143,7 +143,7 @@ module.exports = async (req, res) => {
     }
     const requireActor = async () => {
       const a = await currentActor();
-      if (!a) { const e = new Error('Not signed in'); e.code = 401; throw e; }
+      if (!a) { const e = new Error('No has iniciado sesión'); e.code = 401; throw e; }
       return a;
     };
     /* 401 means "you are not signed in" and the app responds by signing out.
@@ -151,16 +151,16 @@ module.exports = async (req, res) => {
        different thing, and answering 401 there would wipe the phone's queue of
        unsent notes on the way out. */
     const requireUser = async () => {
-      if (!claims || !claims.uid) { const e = new Error('Not signed in'); e.code = 401; throw e; }
+      if (!claims || !claims.uid) { const e = new Error('No has iniciado sesión'); e.code = 401; throw e; }
       const users = await rd(TABS.users);
       const u = users.find(x => x.id === claims.uid);
-      if (!u) { const e = new Error('This account no longer exists'); e.code = 403; throw e; }
-      if (u.active === '0') { const e = new Error('This account has been turned off'); e.code = 403; throw e; }
+      if (!u) { const e = new Error('Esta cuenta ya no existe'); e.code = 403; throw e; }
+      if (u.active === '0') { const e = new Error('Esta cuenta está desactivada'); e.code = 403; throw e; }
       return u;
     };
     const requireAdmin = async () => {
       const u = await requireUser();
-      if (SC.norm(u.role) !== 'admin') { const e = new Error('Admins only'); e.code = 403; throw e; }
+      if (SC.norm(u.role) !== 'admin') { const e = new Error('Solo los administradores'); e.code = 403; throw e; }
       return u;
     };
 
@@ -180,11 +180,11 @@ module.exports = async (req, res) => {
        exists — so it is open for exactly as long as there is nothing to protect. */
     if (action === 'bootstrapAdmin') {
       const users = await rd(TABS.users);
-      if (users.length) return res.status(400).json({ error: 'Setup already completed' });
+      if (users.length) return res.status(400).json({ error: 'La configuración ya se hizo' });
       const name = String(body.name || '').trim();
       const pw = String(body.password || '');
-      if (!name) return res.status(400).json({ error: 'Name is required' });
-      if (pw.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+      if (!name) return res.status(400).json({ error: 'Falta el nombre' });
+      if (pw.length < 6) return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
       const { hash, salt } = hashPassword(pw);
       const rec = {
         id: uid(), name, phone: String(body.phone || '').trim(), email: String(body.email || '').trim(),
@@ -204,7 +204,7 @@ module.exports = async (req, res) => {
       // Same message either way: distinguishing them tells an attacker which
       // names are real.
       if (!u || !passwordMatches(body.password, u.passHash, u.passSalt))
-        return res.status(401).json({ error: 'Wrong name or password' });
+        return res.status(401).json({ error: 'Nombre o contraseña incorrectos' });
       return res.json({
         ok: true,
         token: sign({ uid: u.id, exp: now + TOKEN_TTL_MS }),
@@ -218,9 +218,9 @@ module.exports = async (req, res) => {
       const users = await rd(TABS.users);
       const code = String(body.setupCode || '').trim().toUpperCase();
       const u = users.find(x => x.setupCode && x.setupCode === code && x.active !== '0');
-      if (!u) return res.status(400).json({ error: 'That setup code is not valid' });
+      if (!u) return res.status(400).json({ error: 'Ese código no es válido' });
       const pw = String(body.password || '');
-      if (pw.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+      if (pw.length < 6) return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
 
       const { hash, salt } = hashPassword(pw);
       const updated = Object.assign({}, u, {
@@ -241,9 +241,9 @@ module.exports = async (req, res) => {
     if (action === 'changePassword') {
       const u = await requireUser();
       if (!passwordMatches(body.currentPassword, u.passHash, u.passSalt))
-        return res.status(401).json({ error: 'Current password is wrong' });
+        return res.status(401).json({ error: 'La contraseña actual no es correcta' });
       const pw = String(body.newPassword || '');
-      if (pw.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+      if (pw.length < 6) return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
       const { hash, salt } = hashPassword(pw);
       await wr(TABS.users, u._key,
         Object.assign({}, u, { passHash: hash, passSalt: salt, updatedAt: nowIso }));
@@ -271,7 +271,7 @@ module.exports = async (req, res) => {
       const admin = await requireAdmin();
       const nights = parseInt(body.nights, 10);
       if (ST.ALLOWED_NIGHTS.indexOf(nights) === -1)
-        return res.status(400).json({ error: 'Pick one of the offered options' });
+        return res.status(400).json({ error: 'Escoge una de las opciones' });
       await ST.writeSetting(store, 'returnNights', nights, admin.id);
       return res.json({ ok: true, nights: nights });
     }
@@ -283,7 +283,7 @@ module.exports = async (req, res) => {
       const admin = await requireAdmin();
       const given = body.colors || {};
       const bad = ST.COLOR_KEYS.filter(k => given[k] !== undefined && !ST.isHexColor(given[k]));
-      if (bad.length) return res.status(400).json({ error: 'That is not a colour' });
+      if (bad.length) return res.status(400).json({ error: 'Eso no es un color' });
       for (const k of ST.COLOR_KEYS) {
         // An explicit empty value means "back to the one we shipped".
         if (given[k] === undefined) continue;
@@ -296,7 +296,7 @@ module.exports = async (req, res) => {
     if (action === 'setOrgTimeZone') {
       const admin = await requireAdmin();
       const tz = String(body.tz || '').trim();
-      if (!ST.validTimeZone(tz)) return res.status(400).json({ error: 'That is not a time zone name' });
+      if (!ST.validTimeZone(tz)) return res.status(400).json({ error: 'Ese no es un nombre de zona horaria' });
       await ST.writeSetting(store, 'timeZone', tz, admin.id);
       return res.json({ ok: true, tz: tz });
     }
@@ -321,9 +321,9 @@ module.exports = async (req, res) => {
       await requireAdmin();
       const users = await rd(TABS.users);
       const name = String(body.name || '').trim();
-      if (!name) return res.status(400).json({ error: 'Name is required' });
+      if (!name) return res.status(400).json({ error: 'Falta el nombre' });
       if (users.some(u => norm(u.name) === norm(name) && u.active !== '0'))
-        return res.status(400).json({ error: 'Someone with that name already exists' });
+        return res.status(400).json({ error: 'Ya hay alguien con ese nombre' });
       const code = setupCode();
       const rec = {
         id: uid(), name, phone: String(body.phone || '').trim(), email: String(body.email || '').trim(),
@@ -339,7 +339,7 @@ module.exports = async (req, res) => {
       await requireAdmin();
       const users = await rd(TABS.users);
       const u = users.find(x => x.id === body.id);
-      if (!u) return res.status(404).json({ error: 'No such user' });
+      if (!u) return res.status(404).json({ error: 'No existe esa persona' });
       const code = setupCode();
       await wr(TABS.users, u._key, Object.assign({}, u,
         { passHash: '', passSalt: '', setupCode: code, mustSetup: '1', updatedAt: nowIso }));
@@ -350,13 +350,13 @@ module.exports = async (req, res) => {
       const me = await requireAdmin();
       const users = await rd(TABS.users);
       const u = users.find(x => x.id === body.id);
-      if (!u) return res.status(404).json({ error: 'No such user' });
+      if (!u) return res.status(404).json({ error: 'No existe esa persona' });
       const active = body.active ? '1' : '0';
       if (u.id === me.id && active === '0')
-        return res.status(400).json({ error: 'You cannot deactivate yourself' });
+        return res.status(400).json({ error: 'No puedes desactivar tu propia cuenta' });
       if (active === '0' && u.role === 'admin' &&
           users.filter(x => x.role === 'admin' && x.active !== '0').length <= 1)
-        return res.status(400).json({ error: 'That is the only admin left' });
+        return res.status(400).json({ error: 'Es el único administrador que queda' });
       await wr(TABS.users, u._key, Object.assign({}, u, { active, updatedAt: nowIso }));
       return res.json({ ok: true });
     }
@@ -365,10 +365,10 @@ module.exports = async (req, res) => {
       const me = await requireAdmin();
       const users = await rd(TABS.users);
       const u = users.find(x => x.id === body.id);
-      if (!u) return res.status(404).json({ error: 'No such user' });
-      if (u.id === me.id) return res.status(400).json({ error: 'You cannot delete yourself' });
+      if (!u) return res.status(404).json({ error: 'No existe esa persona' });
+      if (u.id === me.id) return res.status(400).json({ error: 'No puedes borrar tu propia cuenta' });
       if (u.role === 'admin' && users.filter(x => x.role === 'admin' && x.active !== '0').length <= 1)
-        return res.status(400).json({ error: 'That is the only admin left' });
+        return res.status(400).json({ error: 'Es el único administrador que queda' });
       await dl(TABS.users, [u._key]);
       // Take their position row with them; a ghost pin on the map is worse
       // than no pin.
@@ -385,7 +385,7 @@ module.exports = async (req, res) => {
       const name = String(body.territory || '').trim();
       const terrs = await rd(TABS.territories);
       const t = terrs.find(x => SC.norm(x.name) === SC.norm(name));
-      if (!t) return res.status(404).json({ error: 'No such territory' });
+      if (!t) return res.status(404).json({ error: 'No existe ese territorio' });
       const today = await orgDay();
       /* Somebody has held this since before the card existed: give them a line
          with an unknown start date rather than clearing the owner and leaving
@@ -409,19 +409,19 @@ module.exports = async (req, res) => {
       const me = await requireAdmin();
       const name = String(body.territory || '').trim();
       const on = String(body.assignedOn || '').trim();
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(on)) return res.status(400).json({ error: 'Pick a date' });
-      if (on > await orgDay()) return res.status(400).json({ error: 'That date is in the future' });
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(on)) return res.status(400).json({ error: 'Escoge una fecha' });
+      if (on > await orgDay()) return res.status(400).json({ error: 'Esa fecha todavía no llega' });
       const terrs = await rd(TABS.territories);
       const t = terrs.find(x => SC.norm(x.name) === SC.norm(name));
-      if (!t) return res.status(404).json({ error: 'No such territory' });
-      if (!t.ownerId) return res.status(400).json({ error: 'Nobody has this one' });
+      if (!t) return res.status(404).json({ error: 'No existe ese territorio' });
+      if (!t.ownerId) return res.status(400).json({ error: 'Nadie lo tiene' });
       const users = await rd(TABS.users);
       await TL.ensureOpen(store, t.name, t.ownerId,
         (users.find(u => u.id === t.ownerId) || {}).name || '', me.id, nowIso, '');
       const rows = await TL.readLog(store);
       const open = TL.openFor(rows, t.name);
-      if (!open) return res.status(404).json({ error: 'No open record' });
-      if (open.assignedOn) return res.status(400).json({ error: 'That one already has a date' });
+      if (!open) return res.status(404).json({ error: 'No hay un registro abierto' });
+      if (open.assignedOn) return res.status(400).json({ error: 'Ese ya tiene fecha' });
       const rec = Object.assign({}, open, { assignedOn: on, assignedAt: on + 'T12:00:00.000Z' });
       delete rec._key;
       await store.update(TL.TERRLOG_TAB, open._key, rec);
@@ -471,7 +471,7 @@ module.exports = async (req, res) => {
       await requireAdmin();
       const terrs = await rd(TABS.territories);
       const t = terrs.find(x => x.name === String(body.territory || ''));
-      if (!t) return res.status(404).json({ error: 'No such territory' });
+      if (!t) return res.status(404).json({ error: 'No existe ese territorio' });
       await dl(TABS.territories, [t._key]);
       return res.json({ ok: true });
     }
@@ -480,10 +480,10 @@ module.exports = async (req, res) => {
       const me = await requireAdmin();
       const users = await rd(TABS.users);
       const u = users.find(x => x.id === body.id);
-      if (!u) return res.status(404).json({ error: 'No such user' });
+      if (!u) return res.status(404).json({ error: 'No existe esa persona' });
       const role = body.role === 'admin' ? 'admin' : 'user';
       if (u.id === me.id && role !== 'admin')
-        return res.status(400).json({ error: 'You cannot remove your own admin access' });
+        return res.status(400).json({ error: 'No puedes quitarte tu propio acceso de administrador' });
       await wr(TABS.users, u._key, Object.assign({}, u, { role, updatedAt: nowIso }));
       return res.json({ ok: true });
     }
@@ -542,7 +542,7 @@ module.exports = async (req, res) => {
     if (action === 'assignTerritory') {
       const me = await requireAdmin();
       const name = String(body.territory || '').trim();
-      if (!name) return res.status(400).json({ error: 'Territory is required' });
+      if (!name) return res.status(400).json({ error: 'Falta el territorio' });
       const terrs = await rd(TABS.territories);
       const existing = terrs.find(t => t.name === name);
 
@@ -602,17 +602,17 @@ module.exports = async (req, res) => {
     if (action === 'setTerritoryWorking') {
       const me = await requireUser();
       const name = String(body.territory || '').trim();
-      if (!name) return res.status(400).json({ error: 'Territory is required' });
+      if (!name) return res.status(400).json({ error: 'Falta el territorio' });
       const terrs = await rd(TABS.territories);
       const t = terrs.find(x => SC.norm(x.name) === SC.norm(name));
       // Never creates a row: a territory that does not exist cannot be started,
       // and inventing one here was a way to become an owner.
-      if (!t) return res.status(404).json({ error: 'No such territory' });
+      if (!t) return res.status(404).json({ error: 'No existe ese territorio' });
       /* Not assignees — this switch ends EVERYONE's access at once. Taking back
          what you personally handed out is the narrower right, and revoke
          already offers it. */
       if (t.ownerId !== me.id && me.role !== 'admin')
-        return res.status(403).json({ error: 'Only the person this territory is assigned to can start it' });
+        return res.status(403).json({ error: 'Solo la persona que tiene este territorio puede empezarlo' });
       const rec = Object.assign({}, t, {
         updatedAt: nowIso,
         working: body.working ? '1' : '0',
@@ -627,15 +627,15 @@ module.exports = async (req, res) => {
       const territory = String(body.territory || '').trim();
       const houseIds = Array.isArray(body.houseIds)
         ? body.houseIds.filter(x => typeof x === 'string' && x) : [];
-      if (!territory) return res.status(400).json({ error: 'Territory is required' });
-      if (!houseIds.length) return res.status(400).json({ error: 'Pick at least one house' });
+      if (!territory) return res.status(400).json({ error: 'Falta el territorio' });
+      if (!houseIds.length) return res.status(400).json({ error: 'Escoge al menos un domicilio' });
 
       const terrs = await rd(TABS.territories);
       const t = terrs.find(x => SC.norm(x.name) === SC.norm(territory));
-      if (!t) return res.status(404).json({ error: 'No such territory' });
+      if (!t) return res.status(404).json({ error: 'No existe ese territorio' });
       const shared = SC.splitIds(t.assigneeIds).indexOf(me.id) !== -1;
       if (t.ownerId !== me.id && !shared && me.role !== 'admin')
-        return res.status(403).json({ error: 'Only the person this territory is assigned to can hand out numbers' });
+        return res.status(403).json({ error: 'Solo la persona que tiene este territorio puede entregar números' });
 
       /* The houses must actually be the giver's to give. Without this an owner
          of one territory could mint a packet full of another territory's ids
@@ -648,14 +648,14 @@ module.exports = async (req, res) => {
         return !h || h.HouseDeleted === '1' || SC.norm(h.HouseTerritoryNumber) !== SC.norm(territory);
       });
       if (wrong.length) return res.status(400).json({
-        error: wrong.length + ' of those numbers are not in ' + territory,
+        error: 'Hay ' + wrong.length + ' número(s) que no están en ' + territory,
       });
       /* An address somebody asked us not to call on again is not work to hand
          out. Existing packets are left alone — the state is read from the house
          at the door, not baked into the packet. */
       const retired = houseIds.filter(id => SC.dnvState(byId.get(id)).on);
       if (retired.length) return res.status(400).json({
-        error: retired.length + ' of those numbers are marked Do Not Visit',
+        error: 'Hay ' + retired.length + ' número(s) marcados No visitar',
       });
 
       /* When they come back is the org's policy, not the phone's opinion.
@@ -667,7 +667,7 @@ module.exports = async (req, res) => {
       const assigneeId = String(body.assigneeId || '').trim();
       const guestName = String(body.guestName || '').trim();
       if (!assigneeId && !guestName)
-        return res.status(400).json({ error: 'Name the person, or pick an account' });
+        return res.status(400).json({ error: 'Escribe el nombre, o escoge una cuenta' });
 
       const rec = {
         id: AS.newId(), territory, ownerId: me.id,
@@ -761,12 +761,12 @@ module.exports = async (req, res) => {
       const me = await requireUser();
       const assigns = await rd(TABS.assignments);
       const a = assigns.find(x => x.id === String(body.id || ''));
-      if (!a) return res.status(404).json({ error: 'No such assignment' });
+      if (!a) return res.status(404).json({ error: 'No existe esa entrega' });
       const terrs = await rd(TABS.territories);
       const t = terrs.find(x => SC.norm(x.name) === SC.norm(a.territory));
       const isTerrOwner = !!t && t.ownerId === me.id;
       if (a.ownerId !== me.id && !isTerrOwner && me.role !== 'admin')
-        return res.status(403).json({ error: 'Only the person who handed these out can change this' });
+        return res.status(403).json({ error: 'Solo quien entregó estos números puede cambiar esto' });
       const text = await NT.setNote(store, a.id, body.text, me.id, me.name, nowIso);
       return res.json({ ok: true, message: text });
     }
@@ -775,12 +775,12 @@ module.exports = async (req, res) => {
       const me = await requireUser();
       const assigns = await rd(TABS.assignments);
       const a = assigns.find(x => x.id === String(body.id || ''));
-      if (!a) return res.status(404).json({ error: 'No such assignment' });
+      if (!a) return res.status(404).json({ error: 'No existe esa entrega' });
       const terrs2 = await rd(TABS.territories);
       const t2 = terrs2.find(x => SC.norm(x.name) === SC.norm(a.territory));
       const isTerrOwner = !!t2 && t2.ownerId === me.id;
       if (a.ownerId !== me.id && !isTerrOwner && me.role !== 'admin')
-        return res.status(403).json({ error: 'Only the owner can withdraw this' });
+        return res.status(403).json({ error: 'Solo quien los entregó puede quitarlos' });
       await wr(TABS.assignments, a._key, Object.assign({}, a, { active: '0' }));
       return res.json({ ok: true });
     }
@@ -790,7 +790,7 @@ module.exports = async (req, res) => {
        houses, and dies with the day. */
     if (action === 'guestLogin') {
       const code = String(body.code || '').trim().toUpperCase();
-      if (!code) return res.status(400).json({ error: 'No code' });
+      if (!code) return res.status(400).json({ error: 'Falta el código' });
       const [assigns, terrs, users] = await Promise.all([
         rd(TABS.assignments), rd(TABS.territories), rd(TABS.users),
       ]);
@@ -816,7 +816,7 @@ module.exports = async (req, res) => {
 
     /* Lets a guest app notice it has been cut off without waiting for a write. */
     if (action === 'guestStatus') {
-      if (!claims || !claims.g) return res.status(401).json({ error: 'Not a guest session' });
+      if (!claims || !claims.g) return res.status(401).json({ error: 'Esta no es una sesión de invitado' });
       const packet = await AS.loadPacket(store, claims.g, now);
       if (!packet.state.ok) return res.status(403).json({ error: packet.state.reason });
       const [gusers, gnote] = await Promise.all([
@@ -843,7 +843,7 @@ module.exports = async (req, res) => {
        whoever holds a live packet. */
     const requireChannel = async (territory, me) => {
       const team = await teamFor(territory);
-      if (!team.has(me.id)) { const e = new Error('You are not working that territory'); e.code = 403; throw e; }
+      if (!team.has(me.id)) { const e = new Error('No estás trabajando ese territorio'); e.code = 403; throw e; }
     };
 
     if (action === 'postPresence') {
@@ -851,7 +851,7 @@ module.exports = async (req, res) => {
       const territory = me.territory || String(body.territory || '').trim();
       const lat = Number(body.lat), lng = Number(body.lng);
       if (!territory || !isFinite(lat) || !isFinite(lng))
-        return res.status(400).json({ error: 'territory, lat and lng are required' });
+        return res.status(400).json({ error: 'Faltan el territorio y la ubicación' });
       await requireChannel(territory, me);
 
       const rows = await rd(TABS.presence);
@@ -950,10 +950,10 @@ module.exports = async (req, res) => {
       const me = await requireActor();
       const territory = me.territory || String(body.territory || '').trim();
       const audio = String(body.audio || '');
-      if (!territory) return res.status(400).json({ error: 'Territory is required' });
-      if (!audio) return res.status(400).json({ error: 'No audio' });
+      if (!territory) return res.status(400).json({ error: 'Falta el territorio' });
+      if (!audio) return res.status(400).json({ error: 'No se grabó nada' });
       if (audio.length > MAX_AUDIO_CHARS)
-        return res.status(413).json({ error: 'That message is too long — keep it under about 10 seconds' });
+        return res.status(413).json({ error: 'Ese mensaje es muy largo — que no pase de unos 10 segundos' });
       await requireChannel(territory, me);
 
       const rows = await rd(TABS.voice);
@@ -996,7 +996,7 @@ module.exports = async (req, res) => {
       });
     }
 
-    return res.status(400).json({ error: 'Unknown action: ' + action });
+    return res.status(400).json({ error: 'Actualiza la app — no reconozco esto: ' + action });
   } catch (err) {
     const msg = (err && err.message) || 'Server error';
     let code = err && err.code === 401 ? 401 : err && err.code === 403 ? 403 : 500;
