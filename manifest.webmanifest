@@ -1,7 +1,7 @@
 {
-  "name": "Territory Manager",
-  "short_name": "Territory",
-  "description": "Track door-to-door ministry visits, works fully offline.",
+  "name": "Administrador de Territorios",
+  "short_name": "Territorios",
+  "description": "Lleva el registro de las visitas de casa en casa; funciona sin conexión.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

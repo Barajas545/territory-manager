@@ -1,15 +1,15 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Territory">
+<meta name="apple-mobile-web-app-title" content="Territorios">
 <meta name="theme-color" content="#0D6B4F" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0D1117" media="(prefers-color-scheme: dark)">
-<title>Territory Manager</title>
+<title>Administrador de Territorios</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="icon" href="icons/icon-192.png">
@@ -660,12 +660,12 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
 
   <header id="topbar">
     <button class="scope-btn" id="scopeBtn">
-      <span class="scope-name" id="scopeName">All Territories</span>
+      <span class="scope-name" id="scopeName">Todos los territorios</span>
       <span class="count" id="scopeCount">0</span>
       <span class="chev">▼</span>
     </button>
     <span class="top-spacer"></span>
-    <button id="syncPill" title="Sync status"><span class="sdot"></span><span id="syncTxt">Synced</span></button>
+    <button id="syncPill" title="Estado de sincronización"><span class="sdot"></span><span id="syncTxt">Al día</span></button>
   </header>
 
   <div id="views">
@@ -675,28 +675,28 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
       <div class="toolbar">
         <div class="search-wrap">
           <span class="mag">🔍</span>
-          <input id="searchBox" type="search" placeholder="Search address, notes, language…" autocomplete="off">
-          <button id="searchClear" aria-label="Clear search">✕</button>
+          <input id="searchBox" type="search" placeholder="Buscar dirección, notas, idioma…" autocomplete="off">
+          <button id="searchClear" aria-label="Borrar búsqueda">✕</button>
         </div>
         <div class="tool-row" id="toolRow">
-          <button class="tool-btn" id="btnPick" aria-pressed="false">☑ Select</button>
-          <button class="tool-btn" id="btnWorking" aria-pressed="false" style="display:none">▶ Start working</button>
+          <button class="tool-btn" id="btnPick" aria-pressed="false">☑ Elegir</button>
+          <button class="tool-btn" id="btnWorking" aria-pressed="false" style="display:none">▶ Empezar</button>
           <button class="tool-btn" id="btnHeld" style="display:none"></button>
         </div>
         <div class="chips" id="filterChips">
-          <button class="chip" data-f="all" aria-pressed="true"><span class="cdot"></span>All <span class="cnum" id="n-all"></span></button>
-          <button class="chip" data-f="never" aria-pressed="false"><span class="cdot"></span>Never <span class="cnum" id="n-never"></span></button>
-          <button class="chip" data-f="overdue" aria-pressed="false"><span class="cdot"></span>Overdue <span class="cnum" id="n-overdue"></span></button>
-          <button class="chip" data-f="due" aria-pressed="false"><span class="cdot"></span>Due <span class="cnum" id="n-due"></span></button>
-          <button class="chip" data-f="recent" aria-pressed="false"><span class="cdot"></span>Recent <span class="cnum" id="n-recent"></span></button>
+          <button class="chip" data-f="all" aria-pressed="true"><span class="cdot"></span>Todos <span class="cnum" id="n-all"></span></button>
+          <button class="chip" data-f="never" aria-pressed="false"><span class="cdot"></span>Nunca <span class="cnum" id="n-never"></span></button>
+          <button class="chip" data-f="overdue" aria-pressed="false"><span class="cdot"></span>Atrasadas <span class="cnum" id="n-overdue"></span></button>
+          <button class="chip" data-f="due" aria-pressed="false"><span class="cdot"></span>Ya toca <span class="cnum" id="n-due"></span></button>
+          <button class="chip" data-f="recent" aria-pressed="false"><span class="cdot"></span>Recientes <span class="cnum" id="n-recent"></span></button>
         </div>
       </div>
       <div class="scroller" id="houseList"></div>
-      <button id="fab">＋ Add</button>
+      <button id="fab">＋ Agregar</button>
       <div id="pickBar">
-        <span class="pb-n" id="pbCount">0 selected</span>
-        <button id="pbCancel">Cancel</button>
-        <button id="pbAssign">Assign</button>
+        <span class="pb-n" id="pbCount">0 seleccionadas</span>
+        <button id="pbCancel">Cancelar</button>
+        <button id="pbAssign">Asignar</button>
       </div>
     </section>
 
@@ -704,17 +704,17 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
     <section class="view" id="view-map">
       <div id="map"></div>
       <div id="nextCard">
-        <div class="nc-l" id="ncLabel">Next stop</div>
+        <div class="nc-l" id="ncLabel">Siguiente parada</div>
         <div class="nc-a" id="ncAddr"></div>
         <div class="nc-m" id="ncMeta"></div>
-        <div class="nc-row"><button id="ncDir">🚗 Directions</button><button id="ncDone">Record visit</button></div>
+        <div class="nc-row"><button id="ncDir">🚗 Cómo llegar</button><button id="ncDone">Anotar visita</button></div>
       </div>
-      <div id="pttWrap"><div id="pttHint">Hold to talk</div>
-        <button id="ptt"><span class="pi">🎤</span><span>TALK</span></button></div>
+      <div id="pttWrap"><div id="pttHint">Mantén para hablar</div>
+        <button id="ptt"><span class="pi">🎤</span><span>HABLAR</span></button></div>
       <div class="map-fabs">
-        <button class="map-fab" id="locateBtn" title="Find me">📍</button>
-        <button class="map-fab" id="fitBtn" title="Fit all pins">⤢</button>
-        <button class="map-fab" id="routeBtn" title="Plan a route" aria-pressed="false">🧭</button>
+        <button class="map-fab" id="locateBtn" title="Mi ubicación">📍</button>
+        <button class="map-fab" id="fitBtn" title="Ver todas">⤢</button>
+        <button class="map-fab" id="routeBtn" title="Planear ruta" aria-pressed="false">🧭</button>
       </div>
     </section>
 
@@ -727,59 +727,59 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
     <section class="view" id="view-more">
       <div class="scroller">
         <div class="sec">
-          <div class="sec-t">Team</div>
+          <div class="sec-t">Grupo</div>
           <div class="card" id="teamCard"></div>
         </div>
         <div class="sec">
-          <div class="sec-t">Data</div>
+          <div class="sec-t">Datos</div>
           <div class="card">
             <button class="row" id="rowSync">
               <span class="row-ico">🔄</span>
-              <span class="row-txt"><span class="row-t">Sync now</span><span class="row-s" id="syncSub">—</span></span>
+              <span class="row-txt"><span class="row-t">Sincronizar ahora</span><span class="row-s" id="syncSub">—</span></span>
               <span class="row-act">›</span>
             </button>
             <div class="row">
               <span class="row-ico">✈️</span>
-              <span class="row-txt"><span class="row-t">Work offline</span><span class="row-s">Hold changes on this device until you sync</span></span>
-              <button class="sw" id="swOffline" role="switch" aria-checked="false" aria-label="Work offline"></button>
+              <span class="row-txt"><span class="row-t">Trabajar sin internet</span><span class="row-s">Guarda los cambios en este teléfono hasta que sincronices</span></span>
+              <button class="sw" id="swOffline" role="switch" aria-checked="false" aria-label="Trabajar sin internet"></button>
             </div>
             <button class="row" id="rowPending">
               <span class="row-ico">📥</span>
-              <span class="row-txt"><span class="row-t">Pending changes</span><span class="row-s" id="pendSub">Nothing waiting</span></span>
+              <span class="row-txt"><span class="row-t">Cambios pendientes</span><span class="row-s" id="pendSub">Nada pendiente</span></span>
               <span class="row-act">›</span>
             </button>
           </div>
         </div>
         <div class="sec">
-          <div class="sec-t">Territory</div>
+          <div class="sec-t">Territorio</div>
           <div class="card">
             <button class="row" id="rowExport">
               <span class="row-ico">📄</span>
-              <span class="row-txt"><span class="row-t">Export PDF</span><span class="row-s">Printable territory sheet</span></span>
+              <span class="row-txt"><span class="row-t">Exportar PDF</span><span class="row-s">Hoja del territorio para imprimir</span></span>
               <span class="row-act">›</span>
             </button>
             <button class="row" id="rowTerr">
               <span class="row-ico">🗂️</span>
-              <span class="row-txt"><span class="row-t">Territories</span><span class="row-s" id="terrSub">—</span></span>
+              <span class="row-txt"><span class="row-t">Territorios</span><span class="row-s" id="terrSub">—</span></span>
               <span class="row-act">›</span>
             </button>
           </div>
         </div>
         <div class="sec">
-          <div class="sec-t">App</div>
+          <div class="sec-t">Aplicación</div>
           <div class="card">
             <button class="row" id="rowInstall" style="display:none">
               <span class="row-ico">⬇️</span>
-              <span class="row-txt"><span class="row-t">Install on phone</span><span class="row-s">Adds an icon to your home screen</span></span>
+              <span class="row-txt"><span class="row-t">Instalar en el teléfono</span><span class="row-s">Agrega un ícono en tu pantalla de inicio</span></span>
               <span class="row-act">›</span>
             </button>
             <div class="row">
               <span class="row-ico">💾</span>
-              <span class="row-txt"><span class="row-t">Offline storage</span><span class="row-s" id="storeSub">Checking…</span></span>
+              <span class="row-txt"><span class="row-t">Guardado en el teléfono</span><span class="row-s" id="storeSub">Revisando…</span></span>
             </div>
             <div class="row">
               <span class="row-ico">ℹ️</span>
-              <span class="row-txt"><span class="row-t">Version</span><span class="row-s" id="verSub">—</span></span>
+              <span class="row-txt"><span class="row-t">Versión</span><span class="row-s" id="verSub">—</span></span>
             </div>
           </div>
         </div>
@@ -789,15 +789,15 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
   </div>
 
   <nav id="tabbar" role="tablist">
-    <button class="tab" role="tab" data-view="houses" aria-selected="true"><span class="ti">🏠</span><span class="tl">Houses</span></button>
-    <button class="tab" role="tab" data-view="map" aria-selected="false"><span class="ti">🗺️</span><span class="tl">Map</span></button>
-    <button class="tab" role="tab" data-view="rv" aria-selected="false"><span class="ti">📖</span><span class="tl">Return</span><span class="tbadge" id="rvBadge" style="display:none">0</span></button>
-    <button class="tab" role="tab" data-view="more" aria-selected="false"><span class="ti">⚙️</span><span class="tl">More</span></button>
+    <button class="tab" role="tab" data-view="houses" aria-selected="true"><span class="ti">🏠</span><span class="tl">Casas</span></button>
+    <button class="tab" role="tab" data-view="map" aria-selected="false"><span class="ti">🗺️</span><span class="tl">Mapa</span></button>
+    <button class="tab" role="tab" data-view="rv" aria-selected="false"><span class="ti">📖</span><span class="tl">Revisitas</span><span class="tbadge" id="rvBadge" style="display:none">0</span></button>
+    <button class="tab" role="tab" data-view="more" aria-selected="false"><span class="ti">⚙️</span><span class="tl">Más</span></button>
   </nav>
 </div>
 
 <div id="toast"></div>
-<div id="updateBar">A new version is ready<button id="updateGo">Reload</button></div>
+<div id="updateBar">Hay una versión nueva<button id="updateGo">Recargar</button></div>
 
 <!-- ══════════ SHEETS ══════════ -->
 <div class="scrim" id="scrim"></div>
@@ -809,8 +809,8 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
     <button class="x-btn" data-close>✕</button></div>
   <div class="sheet-bd" id="dBody"></div>
   <div class="sheet-ft">
-    <button class="btn btn-s" id="dEdit">✏️ Edit</button>
-    <button class="btn btn-p" id="dLog">Log visit</button>
+    <button class="btn btn-s" id="dEdit">✏️ Editar</button>
+    <button class="btn btn-p" id="dLog">Anotar visita</button>
   </div>
 </div>
 
@@ -820,7 +820,7 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
 <!-- return-visit thread -->
 <div class="sheet" id="sh-rv" style="height:88dvh">
   <div class="grab" data-drag></div>
-  <div class="sheet-hd"><div class="st"><div class="sheet-t" id="rTitle"></div><div class="sheet-s">Return visits</div></div>
+  <div class="sheet-hd"><div class="st"><div class="sheet-t" id="rTitle"></div><div class="sheet-s">Revisitas</div></div>
     <button class="x-btn" data-close>✕</button></div>
   <div class="sheet-bd" id="rBody"></div>
 </div>
@@ -828,39 +828,39 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
 <!-- edit / add house -->
 <div class="sheet" id="sh-form" style="height:92dvh">
   <div class="grab" data-drag></div>
-  <div class="sheet-hd"><div class="st"><div class="sheet-t" id="fTitle">Add house</div></div>
+  <div class="sheet-hd"><div class="st"><div class="sheet-t" id="fTitle">Agregar casa</div></div>
     <button class="x-btn" data-close>✕</button></div>
   <div class="sheet-bd">
     <input type="hidden" id="fId">
-    <div class="f"><label for="fAddr">Address</label><input id="fAddr" autocomplete="street-address" placeholder="6440 Ardilla Rd #1"></div>
+    <div class="f"><label for="fAddr">Dirección</label><input id="fAddr" autocomplete="street-address" placeholder="6440 Ardilla Rd #1"></div>
     <div class="grid2">
-      <div class="f"><label for="fCity">City</label><input id="fCity" autocomplete="address-level2"></div>
-      <div class="f"><label for="fZip">ZIP</label><input id="fZip" inputmode="numeric" autocomplete="postal-code"></div>
-      <div class="f"><label for="fState">State</label><input id="fState" value="CA"></div>
-      <div class="f"><label for="fTerr">Territory</label><input id="fTerr"></div>
-      <div class="f"><label for="fAssigned">Assigned to</label><input id="fAssigned"></div>
-      <div class="f"><label for="fLang">Language</label><input id="fLang"></div>
-      <div class="f"><label for="fLastVisit">Last visit</label><input id="fLastVisit" type="date"></div>
-      <div class="f"><label for="fVerified">On maps</label><select id="fVerified">
-        <option value="">Not checked</option><option value="Yes">Verified</option><option value="No">Not found</option></select></div>
+      <div class="f"><label for="fCity">Ciudad</label><input id="fCity" autocomplete="address-level2"></div>
+      <div class="f"><label for="fZip">Código postal</label><input id="fZip" inputmode="numeric" autocomplete="postal-code"></div>
+      <div class="f"><label for="fState">Estado</label><input id="fState" value="CA"></div>
+      <div class="f"><label for="fTerr">Territorio</label><input id="fTerr"></div>
+      <div class="f"><label for="fAssigned">Asignada a</label><input id="fAssigned"></div>
+      <div class="f"><label for="fLang">Idioma</label><input id="fLang"></div>
+      <div class="f"><label for="fLastVisit">Última visita</label><input id="fLastVisit" type="date"></div>
+      <div class="f"><label for="fVerified">En el mapa</label><select id="fVerified">
+        <option value="">Sin revisar</option><option value="Yes">Sí aparece</option><option value="No">No aparece</option></select></div>
     </div>
-    <div class="f"><label for="fGPS">GPS coordinates</label>
-      <div class="gps-row"><input id="fGPS" placeholder="35.4873, -120.6700"><button type="button" class="gps-btn" id="fGPSBtn" title="Use my location">📍</button></div></div>
-    <div class="f"><label for="fNotes">House notes</label><textarea id="fNotes" placeholder="Dog in yard, gate code, best time…"></textarea></div>
-    <div class="f"><label for="fPersonal">Personal notes</label><textarea id="fPersonal" placeholder="Who lives here, interests…"></textarea></div>
-    <div class="lbl">Visit results</div>
+    <div class="f"><label for="fGPS">Coordenadas GPS</label>
+      <div class="gps-row"><input id="fGPS" placeholder="35.4873, -120.6700"><button type="button" class="gps-btn" id="fGPSBtn" title="Usar mi ubicación">📍</button></div></div>
+    <div class="f"><label for="fNotes">Notas de la casa</label><textarea id="fNotes" placeholder="Perro en el patio, código del portón, mejor hora…"></textarea></div>
+    <div class="f"><label for="fPersonal">Notas personales</label><textarea id="fPersonal" placeholder="Quién vive aquí, intereses…"></textarea></div>
+    <div class="lbl">Resultados de las visitas</div>
     <div class="grid2">
     </div>
-    <button class="btn btn-d" id="fDelete" style="width:100%;margin-top:6px">Delete house</button>
+    <button class="btn btn-d" id="fDelete" style="width:100%;margin-top:6px">Borrar casa</button>
   </div>
-  <div class="sheet-ft"><button class="btn btn-p" id="fSave">Save</button></div>
+  <div class="sheet-ft"><button class="btn btn-p" id="fSave">Guardar</button></div>
 </div>
 
 <!-- sign in / setup code / first-run admin -->
 <div class="sheet" id="sh-auth" style="max-height:92dvh">
   <div class="grab" data-drag></div>
-  <div class="sheet-hd"><div class="st"><div class="sheet-t" id="auTitle">Sign in</div>
-    <div class="sheet-s" id="auSub">So your group can see where you are</div></div>
+  <div class="sheet-hd"><div class="st"><div class="sheet-t" id="auTitle">Entrar</div>
+    <div class="sheet-s" id="auSub">Así tu grupo sabe dónde estás</div></div>
     <button class="x-btn" data-close>✕</button></div>
   <div class="sheet-bd" id="auBody"></div>
 </div>
@@ -868,17 +868,17 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
 <!-- manage people (admin) -->
 <div class="sheet" id="sh-admin" style="height:88dvh">
   <div class="grab" data-drag></div>
-  <div class="sheet-hd"><div class="st"><div class="sheet-t">People</div>
+  <div class="sheet-hd"><div class="st"><div class="sheet-t">Personas</div>
     <div class="sheet-s" id="adSub"></div></div>
     <button class="x-btn" data-close>✕</button></div>
   <div class="sheet-bd" id="adBody" style="padding:10px 12px 20px"></div>
-  <div class="sheet-ft"><button class="btn btn-p" id="adAdd">＋ Add person</button></div>
+  <div class="sheet-ft"><button class="btn btn-p" id="adAdd">＋ Agregar persona</button></div>
 </div>
 
 <!-- who works this territory -->
 <div class="sheet" id="sh-assign" style="height:82dvh">
   <div class="grab" data-drag></div>
-  <div class="sheet-hd"><div class="st"><div class="sheet-t">Who works this territory</div>
+  <div class="sheet-hd"><div class="st"><div class="sheet-t">Quién trabaja este territorio</div>
     <div class="sheet-s" id="asSub"></div></div>
     <button class="x-btn" data-close>✕</button></div>
   <div class="sheet-bd" id="asBody" style="padding:10px 12px 20px"></div>
@@ -896,7 +896,7 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
 <!-- numbers handed out -->
 <div class="sheet" id="sh-held" style="height:82dvh">
   <div class="grab" data-drag></div>
-  <div class="sheet-hd"><div class="st"><div class="sheet-t">Numbers handed out</div>
+  <div class="sheet-hd"><div class="st"><div class="sheet-t">Números entregados</div>
     <div class="sheet-s" id="hdSub"></div></div>
     <button class="x-btn" data-close>✕</button></div>
   <div class="sheet-bd" id="hdBody" style="padding:10px 12px 20px"></div>
@@ -916,7 +916,7 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
 
 /* ═══ CONFIG ═══ */
 var API="https://territory-manager-silk.vercel.app/api/territory";
-var APP_VERSION="2.12.0";
+var APP_VERSION="2.13.0";
 
 /* ═══════════════════════════════════════════════════════════════════════
    OFFLINE DATA LAYER
@@ -950,7 +950,7 @@ function dbOpen() {
   // otherwise each open their own connection and leak one forever.
   if (_dbPromise) return _dbPromise;
   _dbPromise = new Promise(function (resolve, reject) {
-    if (!self.indexedDB) { reject(new Error('IndexedDB is unavailable (private browsing?)')); return; }
+    if (!self.indexedDB) { reject(new Error('el almacenamiento no está disponible (¿navegación privada?)')); return; }
     var req;
     try { req = indexedDB.open(DB_NAME, DB_VER); }
     catch (e) { reject(e); return; }
@@ -966,8 +966,8 @@ function dbOpen() {
       _db.onversionchange = function () { try { _db.close(); } catch (e) {} _db = null; _dbPromise = null; };
       resolve(_db);
     };
-    req.onerror = function () { reject(req.error || new Error('IndexedDB open failed')); };
-    req.onblocked = function () { reject(new Error('IndexedDB blocked by another tab')); };
+    req.onerror = function () { reject(req.error || new Error('no se pudo abrir el almacenamiento')); };
+    req.onblocked = function () { reject(new Error('otra pestaña está usando el almacenamiento')); };
   });
   _dbPromise.catch(function () { _dbPromise = null; }); // let a later attempt retry
   return _dbPromise;
@@ -986,8 +986,8 @@ function tx(store, mode, fn) {
         out.onerror = function (ev) { reqErr = out.error; if (ev && ev.stopPropagation) ev.stopPropagation(); };
       }
       t.oncomplete = function () { resolve(out && out.result !== undefined ? out.result : out); };
-      t.onerror = function () { reject(t.error || reqErr || new Error('IndexedDB transaction failed')); };
-      t.onabort = function () { reject(t.error || reqErr || new Error('IndexedDB transaction aborted')); };
+      t.onerror = function () { reject(t.error || reqErr || new Error('falló la operación de guardado')); };
+      t.onabort = function () { reject(t.error || reqErr || new Error('se canceló la operación de guardado')); };
     });
   });
 }
@@ -1210,7 +1210,7 @@ function sync(opts) {
     // Offline, signed out, or a server error: pending is untouched and still on
     // disk either way. Nothing is ever lost here.
     lastSyncError = e.message;
-    if (e.needsAuth) return { ok: false, needsAuth: true, error: 'Sign in to sync' };
+    if (e.needsAuth) return { ok: false, needsAuth: true, error: 'Inicia sesión para sincronizar' };
     return { ok: false, offline: netOffline(e), error: e.message };
   }).then(function (r) { syncing = false; inFlightIds = {}; return r; });
 }
@@ -1237,15 +1237,15 @@ function parseDay(v){
   var d=m?new Date(+m[1],+m[2]-1,+m[3]):new Date(s);
   return isNaN(d)?null:d;
 }
-function fmtDate(v){var d=parseDay(v);if(!d)return v?String(v):"Never";
-  return d.toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"});}
+function fmtDate(v){var d=parseDay(v);if(!d)return v?String(v):"Nunca";
+  return d.toLocaleDateString("es-MX",{month:"short",day:"numeric",year:"numeric"});}
 function daysSince(v){var d=parseDay(v);if(!d)return Infinity;
   var t=new Date();t.setHours(0,0,0,0);d.setHours(0,0,0,0);
   return Math.round((t.getTime()-d.getTime())/86400000);}
 function visitStatus(v){var d=daysSince(v);if(d===Infinity)return"never";
   if(d<=30)return"recent";if(d<=90)return"due";return"overdue";}
-function visitLabel(v){if(!v)return"Never visited";var d=daysSince(v);
-  if(d<=0)return"Visited today";if(d===1)return"Yesterday";if(d<365)return d+" days ago";
+function visitLabel(v){if(!v)return"Nunca visitada";var d=daysSince(v);
+  if(d<=0)return"Visitada hoy";if(d===1)return"Ayer";if(d<365)return"hace "+d+" días";
   return fmtDate(v);}
 function fullAddr(r){return[r.HouseAddress,r.HouseCity,r.HouseState,r.HouseZIP].filter(Boolean).join(", ");}
 function parseGPS(v){if(!v)return null;var p=String(v).split(",").map(function(s){return parseFloat(s.trim());});
@@ -1286,17 +1286,17 @@ function liveEntries(s){return parseLog(s).filter(function(e){return e&&!e.x;});
    look different on every phone, and are unreadable in sunlight at this size.
    The colour only repeats what the letter already says. */
 var KINDS=[
-  {k:"NH",m:"NH",l:"Not home",i:"\u{1F6AA}"},
-  {k:"M", m:"M", l:"Man",     i:"\u{1F464}"},
-  {k:"W", m:"W", l:"Woman",   i:"\u{1F464}"},
-  {k:"BZ",m:"BZ",l:"Busy",    i:"\u{23F3}"},
-  {k:"CB",m:"CB",l:"Come back",i:"\u{21A9}\u{FE0F}"},
-  {k:"RV",m:"RV",l:"Return visit",i:"\u{1F4D6}"},
-  {k:"DNV",m:"DNV",l:"Do not visit",i:"\u{26D4}"},
-  {k:"DNVX",m:"—",l:"Do not visit cleared",i:"\u{21A9}\u{FE0F}"},
+  {k:"NH",m:"NH",l:"No en casa",i:"\u{1F6AA}"},
+  {k:"M", m:"M", l:"Hombre",     i:"\u{1F464}"},
+  {k:"W", m:"W", l:"Mujer",   i:"\u{1F464}"},
+  {k:"BZ",m:"BZ",l:"Ocupado",    i:"\u{23F3}"},
+  {k:"CB",m:"CB",l:"Vuelva",i:"\u{21A9}\u{FE0F}"},
+  {k:"RV",m:"RV",l:"Revisita",i:"\u{1F4D6}"},
+  {k:"DNV",m:"DNV",l:"No visitar",i:"\u{26D4}"},
+  {k:"DNVX",m:"—",l:"No visitar quitado",i:"\u{21A9}\u{FE0F}"},
   // Legacy shapes, shown but never offered.
-  {k:"T", m:"T", l:"Talked",  i:"\u{1F4AC}"},
-  {k:"NI",m:"NI",l:"Not interested",i:"\u{1F6AB}"}
+  {k:"T", m:"T", l:"Hablamos",  i:"\u{1F4AC}"},
+  {k:"NI",m:"NI",l:"No interesado",i:"\u{1F6AB}"}
 ];
 var PICKABLE=["NH","M","W","BZ","CB","RV"];
 function kindDef(k){for(var i=0;i<KINDS.length;i++)if(KINDS[i].k===k)return KINDS[i];return null;}
@@ -1310,7 +1310,7 @@ function markOf(e){
   var t=String((e&&e.t)||"").trim();
   return t?t.slice(0,3):"•";
 }
-function labelFor(k){var d=kindDef(k);return d?d.l:"Visit";}
+function labelFor(k){var d=kindDef(k);return d?d.l:"Visita";}
 function textFor(k,note){var l=labelFor(k);return note?l+" — "+note:l;}
 
 /* Entries written before outcomes were structured carry theirs only in the
@@ -1383,7 +1383,7 @@ function dnvDueYears(h){
 function dnvDue(h){return dnvDueYears(h)>=2;}
 function whoName(uid){
   if(!uid)return"";
-  if(me&&me.id===uid)return String(me.name||"").split(" ")[0]||"you";
+  if(me&&me.id===uid)return String(me.name||"").split(" ")[0]||"tú";
   for(var i=0;i<teamUsers.length;i++)if(teamUsers[i].id===uid)return String(teamUsers[i].name||"").split(" ")[0];
   return"";
 }
@@ -1426,7 +1426,7 @@ function seedLogLocal(h){
 /* ═══ PORTED VERBATIM: address helpers + PDF generator ═══ */
 
 function extractStreet(addr){
-  if(!addr)return"Unknown Street";
+  if(!addr)return"Calle desconocida";
   var cleaned=addr.trim().replace(/\s+(APT|UNIT|STE|SUITE|#)\s*.*/i,"").replace(/^[\d,\s]+/,"").trim();
   return cleaned||addr;
 }
@@ -1460,7 +1460,7 @@ function hasApt(addr){return!!extractApt(addr);}
    second thing to learn. `results` only decides what goes IN the boxes. */
 function generateTerritoryPDF(terrNum,houses,results){
   if(!window.jspdf||!window.jspdf.jsPDF){
-    toast("PDF export needs to load once with a signal",true);return;
+    toast("La primera vez, el PDF necesita señal",true);return;
   }
   var jsPDF=window.jspdf.jsPDF;
   var pw=215.9,ph=279.4;
@@ -1668,7 +1668,7 @@ function generateTerritoryPDF(terrNum,houses,results){
     doc.setFillColor(245,245,243);
     doc.rect(ml+0.2,y+0.2,cw-0.4,aptHeaderH-0.4,"F");
     doc.setTextColor(0);
-    doc.text("  "+baseNum+" (Apts)",ml,y+3.8);
+    doc.text("  "+baseNum+" (Deptos)",ml,y+3.8);
     doc.setFont("helvetica","normal");
     return y+aptHeaderH;
   }
@@ -1730,19 +1730,19 @@ function generateTerritoryPDF(terrNum,houses,results){
 
   totalPages=pageNum;
   doc.setFontSize(7);doc.setFont("helvetica","normal");
-  var dateStr=new Date().toLocaleDateString("en-US",{weekday:"long",year:"numeric",month:"long",day:"numeric"});
+  var dateStr=new Date().toLocaleDateString("es-MX",{weekday:"long",year:"numeric",month:"long",day:"numeric"});
   for(var p=1;p<=totalPages;p++){
     doc.setPage(p);
     doc.text(dateStr,ml,ph-10);
     doc.setTextColor(0);
-    var pgText="Page "+p+" of "+totalPages;
+    var pgText="Página "+p+" de "+totalPages;
     doc.text(pgText,ml+cw-doc.getTextWidth(pgText),ph-10);
   }
 
-  var filename=(results?"Resultados_":"Territory_")+
+  var filename=(results?"Resultados_":"Territorio_")+
     (terrNum==="Unassigned"?"Unassigned":terrNum)+".pdf";
   doc.save(filename);
-  toast(results?"Results PDF exported ✓":"PDF exported ✓");
+  toast(results?"PDF de resultados listo ✓":"PDF listo ✓");
 }
 
 
@@ -1787,16 +1787,16 @@ function houseSubtitle(h){
   var bits=[];
   var vn=visitEntries(h).length;
   // The boxes show the last four; the count says the rest are still there.
-  if(vn>4)bits.push('<span class="vcount" data-act="hist" data-id="'+esc(h.id)+'">'+vn+' visits</span>');
+  if(vn>4)bits.push('<span class="vcount" data-act="hist" data-id="'+esc(h.id)+'">'+vn+' visitas</span>');
   var p=pending[h.id];
-  if(p&&p.blocked)bits.push('<span class="blocked">• held</span>');
+  if(p&&p.blocked)bits.push('<span class="blocked">• retenido</span>');
   var ht=heldTagFor(h.id);if(ht)bits.push(ht);
-  if(isRV(h))bits.push('<span class="rv-tag">Return visit</span>');
+  if(isRV(h))bits.push('<span class="rv-tag">Revisita</span>');
   bits.push(esc(visitLabel(h.HouseLastVisitDate)));
   if(h.HouseNotes)bits.push(esc(h.HouseNotes));
   else if(h.HouseLanguage)bits.push(esc(h.HouseLanguage));
   // A helper is told this once, plainly, at the top of their screen.
-  if(pending[h.id]&&!guestMode)bits.push('<span class="pend">• not synced</span>');
+  if(pending[h.id]&&!guestMode)bits.push('<span class="pend">• sin sincronizar</span>');
   return bits.join(" · ");
 }
 
@@ -1810,15 +1810,15 @@ function renderHouses(){
   if(!view.length){
     if(needsAuth&&!records.length){
       el.innerHTML='<div class="empty"><span class="big">🔒</span>'+
-        'Sign in to see your territory.<br>'+
-        '<span style="font-size:13.5px">Your notes are private to your group.</span>'+
+        'Inicia sesión para ver tu territorio.<br>'+
+        '<span style="font-size:13.5px">Tus notas son privadas para tu grupo.</span>'+
         '<div style="max-width:240px;margin:18px auto 0">'+
-        '<button class="btn btn-p" id="gateIn" style="width:100%">Sign in</button></div></div>';
+        '<button class="btn btn-p" id="gateIn" style="width:100%">Iniciar sesión</button></div></div>';
       var g=$("#gateIn");if(g)g.addEventListener("click",openAuth);
       return;
     }
     if(records.length){
-      el.innerHTML='<div class="empty"><span class="big">🔍</span>No houses match this filter.</div>';
+      el.innerHTML='<div class="empty"><span class="big">🔍</span>Ninguna casa coincide con este filtro.</div>';
       return;
     }
     /* Nothing to show has three different causes and they must not read the
@@ -1826,18 +1826,18 @@ function renderHouses(){
        the worst of the three. */
     if(!guestMode&&me&&scope.empty&&scope.kind!=="unknown"){
       el.innerHTML='<div class="empty"><span class="big">📋</span>'+
-        esc(scope.reason||"Nothing is assigned to you yet.")+'<br>'+
-        '<span style="font-size:13.5px">Numbers appear here as soon as somebody hands them to you.</span></div>';
+        esc(scope.reason||"Todavía no tienes nada asignado.")+'<br>'+
+        '<span style="font-size:13.5px">Los territorios aparecen aquí en cuanto alguien te los entrega.</span></div>';
       return;
     }
     if(lastSyncError&&!scope.canCreate){
       el.innerHTML='<div class="empty"><span class="big">📡</span>'+
-        'Could not check your numbers just now.<br>'+
-        '<span style="font-size:13.5px">They will appear when this phone has signal.</span></div>';
+        'No se pudieron revisar tus territorios ahora.<br>'+
+        '<span style="font-size:13.5px">Aparecerán cuando este teléfono tenga señal.</span></div>';
       return;
     }
     el.innerHTML='<div class="empty"><span class="big">🔍</span>'+
-      (scope.canCreate?"No houses yet. Tap Add to create one.":"No houses here yet.")+'</div>';
+      (scope.canCreate?"Aún no hay casas. Toca Agregar para crear una.":"Aún no hay casas aquí.")+'</div>';
     return;
   }
   var streets={};
@@ -1858,7 +1858,7 @@ function renderHouses(){
     groups.forEach(function(gr){
       var multi=gr.items.length>1&&gr.items.some(function(h){return hasApt(h.HouseAddress);});
       if(multi)html+='<div class="apt-hd">'+BLDG_SVG+esc(gr.num)+
-        '<span class="apt-n">'+gr.items.length+' units</span></div>';
+        '<span class="apt-n">'+gr.items.length+' deptos</span></div>';
       gr.items.forEach(function(h){
         var apt=extractApt(h.HouseAddress);
         var label=multi?(apt||gr.num):(extractNumber(h.HouseAddress)+(apt?" #"+apt:""));
@@ -1889,7 +1889,7 @@ function houseRow(h,label,isUnit){
       '<span class="house-txt">'+
         '<span class="house-num">'+
           esc(label)+
-          (h.HouseVerifiedOnMaps==="No"?'<span class="warn-mark" title="Not found on maps">⚠</span>':'')+
+          (h.HouseVerifiedOnMaps==="No"?'<span class="warn-mark" title="No se encontró en el mapa">⚠</span>':'')+
         '</span>'+
         '<span class="house-sub">'+(d.on?dnvSubtitle(h,d):houseSubtitle(h))+'</span>'+
       '</span>'+
@@ -1916,12 +1916,12 @@ function visitCells(h){
          to be edited. */
       out+='<button class="vc on k-'+(k||"X")+'" data-act="cell" data-id="'+esc(h.id)+'"'+
         (guestMode?"":' data-eid="'+esc(e.i||"")+'"')+' title="'+esc(e.t||"")+'"'+
-        ' aria-label="'+(guestMode?"Record a visit. Last: ":"Visit "+(i+1)+", ")+
-          esc(labelFor(k))+', '+esc(fmtDateOr(e.d,"date not recorded"))+'">'+
+        ' aria-label="'+(guestMode?"Registrar una visita. Última: ":"Visita "+(i+1)+", ")+
+          esc(labelFor(k))+', '+esc(fmtDateOr(e.d,"sin fecha registrada"))+'">'+
         esc(markOf(e))+'</button>';
     }else{
       out+='<button class="vc'+(i===shown.length?' next':'')+'" data-act="cell" data-id="'+esc(h.id)+'"'+
-        ' aria-label="Record a visit">'+(i===shown.length?"＋":"")+'</button>';
+        ' aria-label="Registrar una visita">'+(i===shown.length?"＋":"")+'</button>';
     }
   }
   return out+'</div>';
@@ -1929,15 +1929,15 @@ function visitCells(h){
 
 function dnvBand(h,d){
   return '<button class="dnv-band" data-act="dnv" data-id="'+esc(h.id)+'">'+
-    'DO NOT VISIT · '+esc(fmtDate(d.since))+
-    (dnvDue(h)?'<span class="dnv-due">'+Math.floor(dnvDueYears(h))+' years — check</span>':'')+
+    'NO VISITAR · '+esc(fmtDate(d.since))+
+    (dnvDue(h)?'<span class="dnv-due">'+Math.floor(dnvDueYears(h))+' años — revisar</span>':'')+
     '</button>';
 }
 
 /* A retired address is not work any more, so the subtitle stops reporting how
    long since anybody called and says what was decided instead. */
 function dnvSubtitle(h,d){
-  var bits=['<span class="dnv-tag">DO NOT VISIT</span>'];
+  var bits=['<span class="dnv-tag">NO VISITAR</span>'];
   if(d.reason)bits.push(esc(d.reason));
   if(d.since)bits.push(esc(fmtDate(d.since)));
   return bits.join(" · ");
@@ -1954,18 +1954,18 @@ function renderRV(){
   var el=$("#rvList");
   if(!list.length){
     el.innerHTML='<div class="empty"><span class="big">📖</span>'+
-      'No return visits yet.<br><span style="font-size:13.5px">Log a visit and choose '+
-      '<b>Return visit</b> to start one.</span></div>';
+      'Todavía no hay revisitas.<br><span style="font-size:13.5px">Anota una visita y elige '+
+      '<b>Revisita</b> para empezar una.</span></div>';
     return;
   }
   el.innerHTML=list.map(function(x){
     var newest=x.rv.slice().sort(function(a,b){return String(a.d).localeCompare(String(b.d));}).slice(-1)[0]||{};
     return '<button class="rv-card" data-act="rv" data-id="'+esc(x.h.id)+'">'+
       '<span class="rv-top"><span class="rv-badge"></span>'+
-        '<span class="rv-addr">'+esc(x.h.HouseAddress||"No address")+'</span>'+
+        '<span class="rv-addr">'+esc(x.h.HouseAddress||"Sin domicilio")+'</span>'+
         '<span class="rv-when">'+esc(x.last?fmtDate(x.last):"")+'</span></span>'+
       (newest.n?'<span class="rv-note">'+esc(newest.n)+'</span>':'')+
-      '<span class="rv-count">'+x.rv.length+(x.rv.length===1?" note":" notes")+'</span>'+
+      '<span class="rv-count">'+x.rv.length+(x.rv.length===1?" nota":" notas")+'</span>'+
     '</button>';
   }).join("");
 }
@@ -2022,7 +2022,7 @@ function openDetail(id){
   var h=byId(id);if(!h)return;
   curId=id;
   var st=visitStatus(h.HouseLastVisitDate);
-  $("#dTitle").textContent=h.HouseAddress||"No address";
+  $("#dTitle").textContent=h.HouseAddress||"Sin domicilio";
   $("#dSub").textContent=[h.HouseCity,h.HouseState,h.HouseZIP].filter(Boolean).join(", ");
   var rv=getRVs(h);
   // The whole history, oldest first — the four boxes on the row are only ever
@@ -2032,34 +2032,34 @@ function openDetail(id){
   $("#dBody").innerHTML=
     '<div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:6px">'+
       '<span class="badge b-'+st+'">● '+esc(visitLabel(h.HouseLastVisitDate))+'</span>'+
-      (rv.length?'<span class="badge b-rv">📖 '+rv.length+' return '+(rv.length===1?'visit':'visits')+'</span>':'')+
-      (pending[h.id]?'<span class="badge b-due">⏳ Not synced</span>':'')+
+      (rv.length?'<span class="badge b-rv">📖 '+rv.length+' revisita'+(rv.length===1?'':'s')+'</span>':'')+
+      (pending[h.id]?'<span class="badge b-due">⏳ Sin sincronizar</span>':'')+
     '</div>'+
     (h.HouseTerritoryNumber?'<div class="meta"><span class="mi">🗂️</span>'+esc(h.HouseTerritoryNumber)+'</div>':'')+
     (h.HouseTerritoryAssingnedTo?'<div class="meta"><span class="mi">👤</span>'+esc(h.HouseTerritoryAssingnedTo)+'</div>':'')+
     (h.HouseLanguage?'<div class="meta"><span class="mi">🌐</span>'+esc(h.HouseLanguage)+'</div>':'')+
     '<div class="meta"><span class="mi">🗺️</span>'+
-      (h.HouseVerifiedOnMaps==="Yes"?'Verified on maps ✓':
-       h.HouseVerifiedOnMaps==="No"?'Not found on maps ⚠️':'Map location not checked')+'</div>'+
+      (h.HouseVerifiedOnMaps==="Yes"?'Verificada en el mapa ✓':
+       h.HouseVerifiedOnMaps==="No"?'No aparece en el mapa ⚠️':'Sin revisar en el mapa')+'</div>'+
     (h.HouseGPSCoordinates?'<div class="meta"><span class="mi">📍</span>'+esc(h.HouseGPSCoordinates)+'</div>':'')+
     '<div style="display:flex;gap:8px;margin-top:14px">'+
-      '<button class="btn btn-s" id="dDir">🚗 Directions</button>'+
-      '<button class="btn btn-s" id="dRV">📖 Return visits</button>'+
+      '<button class="btn btn-s" id="dDir">🚗 Cómo llegar</button>'+
+      '<button class="btn btn-s" id="dRV">📖 Revisitas</button>'+
     '</div>'+
-    (h.HouseNotes?'<div class="lbl">House notes</div><div class="note-box">'+esc(h.HouseNotes)+'</div>':'')+
-    (h.HousePersonalNotes?'<div class="lbl">Personal notes</div><div class="note-box">'+esc(h.HousePersonalNotes)+'</div>':'')+
-    '<div class="lbl">Every visit</div>'+
+    (h.HouseNotes?'<div class="lbl">Notas de la casa</div><div class="note-box">'+esc(h.HouseNotes)+'</div>':'')+
+    (h.HousePersonalNotes?'<div class="lbl">Notas personales</div><div class="note-box">'+esc(h.HousePersonalNotes)+'</div>':'')+
+    '<div class="lbl">Todas las visitas</div>'+
     (visits.length
       ?'<div class="card">'+visits.map(function(e){
         var k=kindOf(e),who=whoName(e.u);
         return '<button class="row" data-act="cell" data-id="'+esc(h.id)+'" data-eid="'+esc(e.i||"")+'">'+
           '<span class="pk-b vc k-'+(k||"X")+'" style="width:40px;height:28px;font-size:12px">'+esc(markOf(e))+'</span>'+
-          '<span class="row-txt"><span class="row-t">'+esc(fmtDateOr(e.d,"date not recorded"))+
+          '<span class="row-txt"><span class="row-t">'+esc(fmtDateOr(e.d,"sin fecha"))+
             (who?' · '+esc(who):"")+'</span>'+
           '<span class="row-s" style="white-space:normal">'+esc(e.t||labelFor(k))+'</span></span>'+
           '<span class="row-act">›</span></button>';
       }).reverse().join("")+'</div>'
-      :'<div class="empty" style="padding:22px">Nothing recorded here yet.</div>')+
+      :'<div class="empty" style="padding:22px">Todavía no hay nada anotado aquí.</div>')+
     '<div style="height:8px"></div>';
 
   $("#dDir").addEventListener("click",function(){
@@ -2077,7 +2077,7 @@ $("#dLog").addEventListener("click",function(){var id=curId;closeSheet("#sh-deta
 function openRV(id){
   var h=byId(id);if(!h)return;
   curId=id;
-  $("#rTitle").textContent=h.HouseAddress||"Return visits";
+  $("#rTitle").textContent=h.HouseAddress||"Revisitas";
   drawRV();
   openSheet("#sh-rv");
 }
@@ -2086,15 +2086,15 @@ function drawRV(){
   var rv=getRVs(h).slice().sort(function(a,b){return String(b.d).localeCompare(String(a.d));});
   $("#rBody").innerHTML=
     '<div class="rv-add">'+
-      '<textarea id="rvNew" placeholder="What did you talk about? Who did you speak with?"></textarea>'+
+      '<textarea id="rvNew" placeholder="¿De qué hablaron? ¿Con quién hablaste?"></textarea>'+
     '</div>'+
-    '<button class="btn btn-p" id="rvAdd" style="width:100%">＋ Add return visit note</button>'+
-    (rv.length?'<div class="lbl">History</div><div class="tl">'+rv.map(function(x){
+    '<button class="btn btn-p" id="rvAdd" style="width:100%">＋ Agregar nota de revisita</button>'+
+    (rv.length?'<div class="lbl">Historial</div><div class="tl">'+rv.map(function(x){
       return '<div class="tl-item"><div class="tl-d">'+esc(fmtDate(x.d))+'</div>'+
         '<div class="tl-n">'+esc(x.n||"")+'</div>'+
-        '<button class="tl-del" data-act="rvdel" data-eid="'+esc(x.i||"")+'">Delete</button></div>';
+        '<button class="tl-del" data-act="rvdel" data-eid="'+esc(x.i||"")+'">Borrar</button></div>';
     }).join("")+'</div>'
-    :'<div class="empty" style="padding:30px 10px"><span class="big">📖</span>No notes yet.</div>');
+    :'<div class="empty" style="padding:30px 10px"><span class="big">📖</span>Todavía no hay notas.</div>');
   ownDraft("rvNew",curId);
 
   /* Every mutation here must await the write before redrawing. Redrawing
@@ -2104,12 +2104,12 @@ function drawRV(){
   var addBtn=$("#rvAdd");
   addBtn.addEventListener("click",function(){
     var box=$("#rvNew"), t=box.value.trim();
-    if(!t){toast("Write a note first",true);return;}
+    if(!t){toast("Escribe una nota primero",true);return;}
     if(addBtn.disabled)return;
     addBtn.disabled=true;box.disabled=true;
     var cur=parseLog(byId(curId).HouseReturnVisits);
     cur.push({i:entryId(),d:todayStr(),n:t});
-    saveChanges(curId,{HouseReturnVisits:JSON.stringify(cur),HouseLastVisitDate:todayStr()},"Return visit saved ✓")
+    saveChanges(curId,{HouseReturnVisits:JSON.stringify(cur),HouseLastVisitDate:todayStr()},"Revisita guardada ✓")
       .then(function(ok){
         clearDraft();          // it is committed now; do not offer it back later
         if(ok)drawRV();
@@ -2120,7 +2120,7 @@ function drawRV(){
     b.addEventListener("click",function(){
       var eid=b.dataset.eid;
       if(b.disabled)return;
-      if(!confirm("Delete this return-visit note?\n\nThis cannot be undone."))return;
+      if(!confirm("¿Borrar esta nota de revisita?\n\nEsto no se puede deshacer."))return;
       b.disabled=true;
       // Tombstone rather than splice: a removed entry would be restored by the
       // next sync from another device that still has it.
@@ -2128,7 +2128,7 @@ function drawRV(){
       var hit=false;
       stored.forEach(function(e){if(String(e.i)===eid){e.x=1;hit=true;}});
       if(!hit){b.disabled=false;return;}
-      saveChanges(curId,{HouseReturnVisits:JSON.stringify(stored)},"Note deleted")
+      saveChanges(curId,{HouseReturnVisits:JSON.stringify(stored)},"Nota borrada")
         .then(function(){drawRV();});
     });
   });
@@ -2158,7 +2158,7 @@ function setVerified(val){
   sel.value=val;
 }
 function openForm(h){
-  $("#fTitle").textContent=h?"Edit house":"Add house";
+  $("#fTitle").textContent=h?"Editar casa":"Agregar casa";
   $("#fDelete").style.display=(h&&scope.canDelete)?"flex":"none";
   $("#fId").value=h?h.id:"";
   FORM.forEach(function(p){$("#"+p[0]).value=h?(h[p[1]]||""):"";});
@@ -2177,13 +2177,13 @@ $("#fab").addEventListener("click",function(){openForm(null);});
 
 $("#fGPSBtn").addEventListener("click",function(){
   var b=this;
-  if(!navigator.geolocation){toast("GPS not available",true);return;}
+  if(!navigator.geolocation){toast("GPS no disponible",true);return;}
   b.classList.add("busy");
   navigator.geolocation.getCurrentPosition(function(p){
     b.classList.remove("busy");
     $("#fGPS").value=p.coords.latitude.toFixed(6)+", "+p.coords.longitude.toFixed(6);
-    toast("Location captured ✓");
-  },function(){b.classList.remove("busy");toast("Could not get location",true);},
+    toast("Ubicación guardada ✓");
+  },function(){b.classList.remove("busy");toast("No se pudo obtener la ubicación",true);},
   {enableHighAccuracy:true,timeout:15000});
 });
 
@@ -2195,7 +2195,7 @@ $("#fSave").addEventListener("click",function(){
   var data={};
   FORM.forEach(function(p){data[p[1]]=$("#"+p[0]).value;});
   data.HouseVerifiedOnMaps=$("#fVerified").value;
-  if(!data.HouseAddress.trim()){toast("Address is required",true);return;}
+  if(!data.HouseAddress.trim()){toast("Falta el domicilio",true);return;}
 
   var btn=this;btn.disabled=true;
   if(id){
@@ -2206,15 +2206,15 @@ $("#fSave").addEventListener("click",function(){
     var typed=$("#fLastVisit").value||"";
     if(typed!==cleanDate(h.HouseLastVisitDate)&&!visitEntries(h).length)
       data.HouseLastVisitDate=typed;
-    saveChanges(id,data,"House saved ✓").then(function(){
+    saveChanges(id,data,"Casa guardada ✓").then(function(){
       btn.disabled=false;closeSheet("#sh-form");
     });
   }else{
     data.HouseLastVisitDate=$("#fLastVisit").value||"";
     localCreate(data).then(function(){
-      afterLocalChange();toast("House added ✓");closeSheet("#sh-form");scheduleSync();
+      afterLocalChange();toast("Casa agregada ✓");closeSheet("#sh-form");scheduleSync();
     }).catch(function(e){
-      toast("Could not save on this phone: "+(e&&e.message||e),true);
+      toast("No se pudo guardar en este teléfono: "+(e&&e.message||e),true);
     }).then(function(){btn.disabled=false;});
   }
 });
@@ -2222,11 +2222,11 @@ $("#fSave").addEventListener("click",function(){
 $("#fDelete").addEventListener("click",function(){
   var id=$("#fId").value;if(!id)return;
   var h=byId(id);
-  if(!confirm("Delete "+(h&&h.HouseAddress?h.HouseAddress:"this house")+"?\n\nThis cannot be undone."))return;
+  if(!confirm("¿Borrar "+(h&&h.HouseAddress?h.HouseAddress:"esta casa")+"?\n\nEsto no se puede deshacer."))return;
   localDelete(id).then(function(){
-    afterLocalChange();toast("House deleted");closeSheet("#sh-form");scheduleSync();
+    afterLocalChange();toast("Casa borrada");closeSheet("#sh-form");scheduleSync();
   }).catch(function(e){
-    toast("Could not delete on this phone: "+(e&&e.message||e),true);
+    toast("No se pudo borrar en este teléfono: "+(e&&e.message||e),true);
     console.error("local delete failed",e);
   });
 });
@@ -2247,7 +2247,7 @@ function saveChanges(id,changes,msg){
     scheduleSync();
     return true;
   }).catch(function(e){
-    toast("Could not save on this phone: "+(e&&e.message||e),true);
+    toast("No se pudo guardar en este teléfono: "+(e&&e.message||e),true);
     console.error("local save failed",e);
     return false;
   });
@@ -2278,15 +2278,15 @@ function doSync(manual){
       records=buildRecords();
       renderHouses();renderRV();refreshMapPins();buildTerrSub();
       if(r.conflicts&&r.conflicts.length){
-        toast(r.conflicts.length+" house(s) also changed elsewhere — check notes");
+        toast(r.conflicts.length+" casa(s) también cambiaron en otro teléfono — revisa las notas");
       }else if(manual){
-        toast(r.pushed?("Synced "+r.pushed+" change"+(r.pushed===1?"":"s")+" ✓"):"Up to date ✓");
+        toast(r.pushed?(r.pushed===1?"1 cambio sincronizado ✓":r.pushed+" cambios sincronizados ✓"):"Todo al día ✓");
       }
     }else if(r.needsAuth){
       needsAuth=true;renderHouses();
       if(manual)openAuth();
     }else if(manual){
-      toast(r.offline?"You're offline — changes are saved on this phone":("Sync failed: "+r.error),true);
+      toast(r.offline?"Sin conexión — los cambios se guardan en este teléfono":("No se pudo sincronizar: "+r.error),true);
     }
     if(r.ok)needsAuth=false;
     updateSyncUI();
@@ -2298,15 +2298,15 @@ function updateSyncUI(forceState){
   // actually need to sign in sends them looking for the wrong problem.
   var state=forceState||(needsAuth?"locked":offlineMode?"offline":(n?"pending":(lastSyncError?"offline":"ok")));
   pill.className="";
-  if(state==="syncing"){pill.className="syncing";txt.textContent="Syncing…";}
-  else if(state==="locked"){pill.className="pending";txt.textContent="Sign in";}
-  else if(state==="offline"){pill.className="offline";txt.textContent=n?(n+" saved"):"Offline";}
-  else if(state==="pending"){pill.className="pending";txt.textContent=n+" to sync";}
-  else{txt.textContent="Synced";}
+  if(state==="syncing"){pill.className="syncing";txt.textContent="Sincronizando…";}
+  else if(state==="locked"){pill.className="pending";txt.textContent="Entrar";}
+  else if(state==="offline"){pill.className="offline";txt.textContent=n?(n+" guardados"):"Sin conexión";}
+  else if(state==="pending"){pill.className="pending";txt.textContent=n+" pendientes";}
+  else{txt.textContent="Al día";}
 
-  $("#pendSub").textContent=n?(n+" house"+(n===1?"":"s")+" waiting to upload"):"Nothing waiting";
+  $("#pendSub").textContent=n?(n+" casa"+(n===1?"":"s")+" por subir"):"Nada pendiente";
   idb.getMeta("lastSync").then(function(v){
-    $("#syncSub").textContent=v?("Last synced "+new Date(v).toLocaleString()):"Never synced";
+    $("#syncSub").textContent=v?("Última sincronización: "+new Date(v).toLocaleString()):"Nunca se ha sincronizado";
   });
 }
 $("#syncPill").addEventListener("click",function(){
@@ -2319,21 +2319,21 @@ $("#swOffline").addEventListener("click",function(){
   this.setAttribute("aria-checked",offlineMode?"true":"false");
   localStorage.setItem("tm_offline",offlineMode?"1":"0");
   updateSyncUI();
-  toast(offlineMode?"Working offline — changes stay on this phone":"Auto-sync on");
+  toast(offlineMode?"Trabajando sin conexión — los cambios se quedan en este teléfono":"Sincronización automática activada");
   if(!offlineMode)doSync(true);
 });
 $("#rowPending").addEventListener("click",function(){
   var ids=Object.keys(pending);
-  $("#pTitle").textContent="Pending changes";
-  $("#pSub").textContent=ids.length?(ids.length+" waiting"):"Nothing waiting";
+  $("#pTitle").textContent="Cambios pendientes";
+  $("#pSub").textContent=ids.length?(ids.length+" pendiente"+(ids.length===1?"":"s")):"Nada pendiente";
   $("#pBody").innerHTML=ids.length?ids.map(function(id){
     var h=byId(id)||{};var p=pending[id];
-    var what=p.deleted?"deleted":p.created?"new house":Object.keys(p.fields).length+" field(s) changed";
+    var what=p.deleted?"borrada":p.created?"casa nueva":Object.keys(p.fields).length+" campo(s) cambiado(s)";
     return '<div class="row" style="border-radius:12px;background:var(--surface);margin-bottom:6px;border:1px solid var(--border)">'+
       '<span class="row-ico">'+(p.deleted?"🗑️":p.created?"✨":"✏️")+'</span>'+
       '<span class="row-txt"><span class="row-t">'+esc(h.HouseAddress||id)+'</span>'+
       '<span class="row-s">'+esc(what)+'</span></span></div>';
-  }).join(""):'<div class="empty"><span class="big">✅</span>Everything is synced.</div>';
+  }).join(""):'<div class="empty"><span class="big">✅</span>Todo está sincronizado.</div>';
   openSheet("#sh-pick");
 });
 
@@ -2345,7 +2345,7 @@ function terrMap(){
 }
 function buildTerrSub(){
   var k=Object.keys(terrMap());
-  $("#terrSub").textContent=k.length+" territor"+(k.length===1?"y":"ies");
+  $("#terrSub").textContent=k.length+" territorio"+(k.length===1?"":"s");
   $("#verSub").textContent=APP_VERSION;
 }
 function pickerRow(label,sub,attr){
@@ -2355,22 +2355,22 @@ function pickerRow(label,sub,attr){
 }
 function openTerrPicker(){
   var m=terrMap(),keys=Object.keys(m).sort();
-  $("#pTitle").textContent="Territories";
-  $("#pSub").textContent=records.length+" houses total";
-  $("#pBody").innerHTML=pickerRow("All Territories",records.length+" houses",'data-terr="all"')+
-    keys.map(function(t){return pickerRow(t,m[t].length+" houses",'data-terr="'+esc(t)+'"');}).join("");
+  $("#pTitle").textContent="Territorios";
+  $("#pSub").textContent=records.length+" casas en total";
+  $("#pBody").innerHTML=pickerRow("Todos los territorios",records.length+" casas",'data-terr="all"')+
+    keys.map(function(t){return pickerRow(t,m[t].length+" casas",'data-terr="'+esc(t)+'"');}).join("");
   openSheet("#sh-pick");
 }
 $("#scopeBtn").addEventListener("click",openTerrPicker);
 $("#rowTerr").addEventListener("click",openTerrPicker);
 $("#rowExport").addEventListener("click",function(){
   var m=terrMap(),keys=Object.keys(m).sort();
-  if(!records.length){toast("No houses to export",true);return;}
+  if(!records.length){toast("No hay casas para exportar",true);return;}
   if(keys.length===1){askSheetKind(keys[0],m[keys[0]]);return;}
-  $("#pTitle").textContent="Export PDF";
-  $("#pSub").textContent="Pick a territory";
-  $("#pBody").innerHTML=pickerRow("All territories","One PDF per territory",'data-exp="__all__"')+
-    keys.map(function(t){return pickerRow(t,m[t].length+" houses",'data-exp="'+esc(t)+'"');}).join("");
+  $("#pTitle").textContent="Exportar PDF";
+  $("#pSub").textContent="Elige un territorio";
+  $("#pBody").innerHTML=pickerRow("Todos los territorios","Un PDF por territorio",'data-exp="__all__"')+
+    keys.map(function(t){return pickerRow(t,m[t].length+" casas",'data-exp="'+esc(t)+'"');}).join("");
   openSheet("#sh-pick");
 });
 $("#pBody").addEventListener("click",function(e){
@@ -2401,8 +2401,8 @@ function initMap(){
   if(typeof L==="undefined"){
     // Leaflet never loaded (first run with no signal, or a blocked CDN).
     document.getElementById("map").innerHTML='<div class="empty"><span class="big">\u{1F5FA}\u{FE0F}</span>'+
-      'The map needs to load once with a signal.<br><span style="font-size:13.5px">'+
-      'Your houses and notes still work offline \u2014 use the Houses tab.</span></div>';
+      'El mapa necesita señal la primera vez.<br><span style="font-size:13.5px">'+
+      'Tus casas y tus notas siguen funcionando sin conexión \u2014 usa la pestaña Casas.</span></div>';
     return;
   }
   map=L.map("map",{zoomControl:false,attributionControl:false}).setView([35.4873,-120.6700],14);
@@ -2428,7 +2428,7 @@ function refreshMapPins(){
       el.className="pin-pop";
       el.innerHTML='<div class="pp-a">'+esc(rec.HouseAddress||"")+'</div>'+
         '<div class="pp-s">'+esc(visitLabel(rec.HouseLastVisitDate))+'</div>'+
-        '<div class="pp-row"><button class="pp-det">Details</button><button class="pp-log">Log</button></div>';
+        '<div class="pp-row"><button class="pp-det">Detalles</button><button class="pp-log">Anotar</button></div>';
       el.querySelector(".pp-det").addEventListener("click",function(){map.closePopup();openDetail(h.id);});
       el.querySelector(".pp-log").addEventListener("click",function(){map.closePopup();openCell(h.id,"");});
       m.setPopupContent(el);
@@ -2470,13 +2470,13 @@ function fitPins(){
 }
 $("#fitBtn").addEventListener("click",fitPins);
 $("#locateBtn").addEventListener("click",function(){
-  if(!navigator.geolocation){toast("GPS not available",true);return;}
+  if(!navigator.geolocation){toast("GPS no disponible",true);return;}
   var b=this;b.style.opacity=".5";
   navigator.geolocation.getCurrentPosition(function(p){
     b.style.opacity="";
     map.setView([p.coords.latitude,p.coords.longitude],17);
     startMeWatch();
-  },function(){b.style.opacity="";toast("Could not get location",true);},{enableHighAccuracy:true,timeout:15000});
+  },function(){b.style.opacity="";toast("No se pudo obtener la ubicación",true);},{enableHighAccuracy:true,timeout:15000});
 });
 
 /* ═══ NAV ═══ */
@@ -2537,13 +2537,13 @@ $("#filterChips").addEventListener("click",function(e){
 /* ═══ STORAGE INFO ═══ */
 function showStorage(){
   var el=$("#storeSub");
-  if(!navigator.storage||!navigator.storage.estimate){el.textContent=records.length+" houses on this device";return;}
+  if(!navigator.storage||!navigator.storage.estimate){el.textContent=records.length+" casas en este teléfono";return;}
   navigator.storage.estimate().then(function(e){
     var mb=(e.usage||0)/1048576;
     navigator.storage.persisted?navigator.storage.persisted().then(function(p){
-      el.textContent=records.length+" houses · "+mb.toFixed(1)+" MB"+(p?" · protected":"");
-    }):el.textContent=records.length+" houses · "+mb.toFixed(1)+" MB";
-  }).catch(function(){el.textContent=records.length+" houses on this device";});
+      el.textContent=records.length+" casas · "+mb.toFixed(1)+" MB"+(p?" · protegido":"");
+    }):el.textContent=records.length+" casas · "+mb.toFixed(1)+" MB";
+  }).catch(function(){el.textContent=records.length+" casas en este teléfono";});
 }
 
 /* ═══ PWA ═══ */
@@ -2564,19 +2564,19 @@ $("#rowInstall").addEventListener("click",function(){
     deferredInstall.userChoice.then(function(){deferredInstall=null;$("#rowInstall").style.display="none";});
     return;
   }
-  $("#pTitle").textContent="Install on your phone";
-  $("#pSub").textContent="Keeps working with no signal";
+  $("#pTitle").textContent="Instalar en tu teléfono";
+  $("#pSub").textContent="Funciona sin señal";
   $("#pBody").innerHTML='<div style="padding:6px 6px 14px;font-size:15px;line-height:1.6">'+
     (isIOS
-      ? '<p style="margin-bottom:12px">In <b>Safari</b>:</p>'+
-        '<p>1. Tap the <b>Share</b> button <span style="font-size:17px">􀈂</span> at the bottom.</p>'+
-        '<p>2. Scroll down and tap <b>Add to Home Screen</b>.</p>'+
-        '<p>3. Tap <b>Add</b>.</p>'+
+      ? '<p style="margin-bottom:12px">En <b>Safari</b>:</p>'+
+        '<p>1. Toca el botón <b>Compartir</b> <span style="font-size:17px">􀈂</span> abajo.</p>'+
+        '<p>2. Baja y toca <b>Agregar a inicio</b>.</p>'+
+        '<p>3. Toca <b>Agregar</b>.</p>'+
         '<p style="margin-top:14px;color:var(--text-2);font-size:13.5px">'+
-        'Installing also tells iOS to stop clearing your saved data, so notes '+
-        'taken with no signal survive.</p>'
-      : '<p>Open your browser menu and choose <b>Install app</b> or '+
-        '<b>Add to Home screen</b>.</p>')+
+        'Al instalarla, iOS deja de borrar tus datos guardados, y las notas '+
+        'que tomas sin señal no se pierden.</p>'
+      : '<p>Abre el menú de tu navegador y elige <b>Instalar app</b> o '+
+        '<b>Agregar a inicio</b>.</p>')+
     '</div>';
   openSheet("#sh-pick");
 });
@@ -2654,12 +2654,12 @@ if(window.matchMedia)matchMedia("(prefers-color-scheme: dark)")
   .addEventListener("change",function(){applyRowColors(rowColors);});
 
 function scopeLabel(){
-  if(guestMode)return guestInfo&&guestInfo.territory||"My numbers";
-  if(scope.kind==="admin"||scope.kind==="unknown")return "All Territories";
-  if(scope.kind==="numbers")return "My numbers";
+  if(guestMode)return guestInfo&&guestInfo.territory||"Mis números";
+  if(scope.kind==="admin"||scope.kind==="unknown")return "Todos los territorios";
+  if(scope.kind==="numbers")return "Mis números";
   if(scope.territories.length===1)return scope.territories[0];
-  if(scope.territories.length)return "My territories";
-  return "My numbers";
+  if(scope.territories.length)return "Mis territorios";
+  return "Mis números";
 }
 
 /* Applied wherever refreshWorkingBtn is, so the two never disagree. */
@@ -2715,7 +2715,7 @@ function signOut(silent){
   Promise.all([idb.clear(S_MIRROR),idb.clear(S_PENDING)]).catch(function(){});
   renderHouses();renderRV();updateSyncUI();refreshWorkingBtn();refreshHeldBtn();refreshChrome();
   if(mapReady)refreshMapPins();
-  if(!silent)toast("Signed out");
+  if(!silent)toast("Sesión cerrada");
 }
 
 function refreshMe(){
@@ -2733,18 +2733,18 @@ function renderTeamCard(){
   var el=$("#teamCard");if(!el)return;
   if(guestMode){
     el.innerHTML=
-      '<div class="row"><span class="who">'+esc(initials(guestInfo.name||"Guest"))+'</span>'+
-        '<span class="row-txt"><span class="row-t">'+esc(guestInfo.name||"Guest")+'</span>'+
-        '<span class="row-s">Helping '+esc(guestInfo.from||"")+' \u00b7 '+
+      '<div class="row"><span class="who">'+esc(initials(guestInfo.name||"Invitado"))+'</span>'+
+        '<span class="row-txt"><span class="row-t">'+esc(guestInfo.name||"Invitado")+'</span>'+
+        '<span class="row-s">Ayudando a '+esc(guestInfo.from||"")+' \u00b7 '+
         esc(guestInfo.territory||"")+'</span></span></div>'+
       '<button class="row" id="tmLeave"><span class="row-ico">\u{1F6AA}</span>'+
-        '<span class="row-txt"><span class="row-t">Finish helping</span>'+
-        '<span class="row-s">Removes these numbers from this phone</span></span>'+
+        '<span class="row-txt"><span class="row-t">Terminar de ayudar</span>'+
+        '<span class="row-s">Quita estos números de este teléfono</span></span>'+
         '<span class="row-act">\u203A</span></button>';
     $("#tmLeave").addEventListener("click",function(){
       var n=pendingCount();
-      if(confirm(n?("You have "+n+" visit"+(n===1?"":"s")+" not uploaded yet.\n\nThey will be lost. Finish anyway?")
-                  :"Finish helping?\n\nThese numbers are removed from this phone."))leaveGuest();
+      if(confirm(n?("Tienes "+n+" visita"+(n===1?"":"s")+" sin subir.\n\nTodo eso se va a perder. ¿Terminar de todos modos?")
+                  :"¿Terminar de ayudar?\n\nEstos números se quitan de este teléfono."))leaveGuest();
     });
     updatePttVisibility();
     return;
@@ -2752,8 +2752,8 @@ function renderTeamCard(){
   if(!me){
     el.innerHTML=
       '<button class="row" id="tmSignIn"><span class="row-ico">\u{1F464}</span>'+
-        '<span class="row-txt"><span class="row-t">'+(teamHasUsers?"Sign in":"Set up this phone")+'</span>'+
-        '<span class="row-s">Share your location and talk to your group</span></span>'+
+        '<span class="row-txt"><span class="row-t">'+(teamHasUsers?"Iniciar sesión":"Configurar este teléfono")+'</span>'+
+        '<span class="row-s">Comparte tu ubicación y habla con tu grupo</span></span>'+
         '<span class="row-act">›</span></button>';
     $("#tmSignIn").addEventListener("click",openAuth);
     updatePttVisibility();
@@ -2762,37 +2762,37 @@ function renderTeamCard(){
   el.innerHTML=
     '<div class="row"><span class="who">'+esc(initials(me.name))+'</span>'+
       '<span class="row-txt"><span class="row-t">'+esc(me.name)+'</span>'+
-      '<span class="row-s">'+esc(me.phone||me.email||"Signed in")+
+      '<span class="row-s">'+esc(me.phone||me.email||"Sesión iniciada")+
       (me.role==="admin"?" · Admin":"")+'</span></span></div>'+
     myNumbersRow()+
     '<button class="row" id="tmAssign"><span class="row-ico">\u{1F465}</span>'+
-      '<span class="row-txt"><span class="row-t">Who works this territory</span>'+
-      '<span class="row-s">Share a territory with others</span></span>'+
+      '<span class="row-txt"><span class="row-t">Quién trabaja este territorio</span>'+
+      '<span class="row-s">Comparte un territorio con otros</span></span>'+
       '<span class="row-act">›</span></button>'+
     (scope.kind==="admin"?
       '<button class="row" id="tmTerrLog"><span class="row-ico">\u{1F5FA}\u{FE0F}</span>'+
-        '<span class="row-txt"><span class="row-t">Territories</span>'+
-        '<span class="row-s">Who has what, and who has had it</span></span>'+
+        '<span class="row-txt"><span class="row-t">Territorios</span>'+
+        '<span class="row-s">Quién tiene qué, y quién lo ha tenido</span></span>'+
         '<span class="row-act">›</span></button>':"")+
     (scope.kind==="admin"?
       '<button class="row" id="tmDNV"><span class="row-ico">\u{1F6AB}</span>'+
-        '<span class="row-txt"><span class="row-t">Do not visit</span>'+
+        '<span class="row-txt"><span class="row-t">No visitar</span>'+
         '<span class="row-s" id="tmDNVSub">'+esc(dnvSub())+'</span></span>'+
         '<span class="row-act">›</span></button>':"")+
     '<button class="row" id="tmHeld"><span class="row-ico">\u{1F4E4}</span>'+
-      '<span class="row-txt"><span class="row-t">Numbers handed out</span>'+
+      '<span class="row-txt"><span class="row-t">Números entregados</span>'+
       '<span class="row-s" id="tmHeldSub">'+esc(heldSub())+'</span></span>'+
       '<span class="row-act">›</span></button>'+
     (me.role==="admin"?
       '<button class="row" id="tmPeople"><span class="row-ico">\u{1F5C2}\u{FE0F}</span>'+
-        '<span class="row-txt"><span class="row-t">People</span>'+
-        '<span class="row-s">Add someone, or reset a password</span></span>'+
+        '<span class="row-txt"><span class="row-t">Personas</span>'+
+        '<span class="row-s">Agrega a alguien o restablece una contraseña</span></span>'+
         '<span class="row-act">›</span></button>':"")+
     '<button class="row" id="tmPw"><span class="row-ico">\u{1F511}</span>'+
-      '<span class="row-txt"><span class="row-t">Change my password</span></span>'+
+      '<span class="row-txt"><span class="row-t">Cambiar mi contraseña</span></span>'+
       '<span class="row-act">›</span></button>'+
     '<button class="row" id="tmOut"><span class="row-ico">\u{1F6AA}</span>'+
-      '<span class="row-txt"><span class="row-t">Sign out</span></span>'+
+      '<span class="row-txt"><span class="row-t">Cerrar sesión</span></span>'+
       '<span class="row-act">›</span></button>';
   $("#tmAssign").addEventListener("click",openAssign);
   $("#tmHeld").addEventListener("click",openHeld);
@@ -2805,9 +2805,9 @@ function renderTeamCard(){
   $("#tmOut").addEventListener("click",function(){
     var n=pendingCount();
     var warn=n
-      ?("You have "+n+" change"+(n===1?"":"s")+" not yet uploaded.\n\n"+
-        "Signing out removes the copy on this phone and those changes will be lost.\n\nSign out anyway?")
-      :"Sign out?\n\nThe territory is removed from this phone until you sign back in.";
+      ?("Tienes "+n+" cambio"+(n===1?"":"s")+" sin subir.\n\n"+
+        "Al cerrar sesión se quita la copia de este teléfono y se va a perder todo eso.\n\n¿Cerrar sesión de todos modos?")
+      :"¿Cerrar sesión?\n\nEl territorio se quita de este teléfono hasta que vuelvas a entrar.";
     if(confirm(warn))signOut();
   });
   updatePttVisibility();
@@ -2820,33 +2820,33 @@ function openAuth(){
   openSheet("#sh-auth");
 }
 function drawAuth(mode){
-  $("#auTitle").textContent=mode==="first"?"Set up the first account":mode==="code"?"Use a setup code":"Sign in";
+  $("#auTitle").textContent=mode==="first"?"Crear la primera cuenta":mode==="code"?"Usar un código":"Iniciar sesión";
   $("#auSub").textContent=mode==="first"
-    ?"This becomes the admin who can add everyone else"
-    :mode==="code"?"Enter the code the admin gave you":"So your group can see where you are";
+    ?"Esta será la cuenta de administrador que agrega a los demás"
+    :mode==="code"?"Escribe el código que te dio el administrador":"Para que tu grupo vea dónde estás";
 
   var seg=teamHasUsers
-    ? '<div class="seg"><button data-am="in" aria-selected="'+(mode==="in")+'">Sign in</button>'+
-      '<button data-am="code" aria-selected="'+(mode==="code")+'">I have a code</button></div>'
+    ? '<div class="seg"><button data-am="in" aria-selected="'+(mode==="in")+'">Entrar</button>'+
+      '<button data-am="code" aria-selected="'+(mode==="code")+'">Tengo un código</button></div>'
     : "";
 
   var form;
   if(mode==="first"){
-    form='<div class="f"><label for="auName">Your name</label><input id="auName" autocomplete="name"></div>'+
-      '<div class="f"><label for="auPhone">Phone</label><input id="auPhone" type="tel" autocomplete="tel"></div>'+
-      '<div class="f"><label for="auPw">Choose a password</label><input id="auPw" type="password" autocomplete="new-password"></div>'+
-      '<button class="btn btn-p" id="auGo" style="width:100%">Create admin account</button>';
+    form='<div class="f"><label for="auName">Tu nombre</label><input id="auName" autocomplete="name"></div>'+
+      '<div class="f"><label for="auPhone">Teléfono</label><input id="auPhone" type="tel" autocomplete="tel"></div>'+
+      '<div class="f"><label for="auPw">Escoge una contraseña</label><input id="auPw" type="password" autocomplete="new-password"></div>'+
+      '<button class="btn btn-p" id="auGo" style="width:100%">Crear cuenta de administrador</button>';
   }else if(mode==="code"){
-    form='<div class="f"><label for="auCode">Setup code</label><input id="auCode" autocapitalize="characters" placeholder="ABC123" value="'+esc(pendingSetupCode||"")+'"></div>'+
-      '<div class="f"><label for="auName">Your name</label><input id="auName" autocomplete="name"></div>'+
-      '<div class="f"><label for="auPhone">Phone</label><input id="auPhone" type="tel" autocomplete="tel"></div>'+
-      '<div class="f"><label for="auEmail">Email (optional)</label><input id="auEmail" type="email" autocomplete="email"></div>'+
-      '<div class="f"><label for="auPw">Choose a password</label><input id="auPw" type="password" autocomplete="new-password"></div>'+
-      '<button class="btn btn-p" id="auGo" style="width:100%">Set up my account</button>';
+    form='<div class="f"><label for="auCode">Código de acceso</label><input id="auCode" autocapitalize="characters" placeholder="ABC123" value="'+esc(pendingSetupCode||"")+'"></div>'+
+      '<div class="f"><label for="auName">Tu nombre</label><input id="auName" autocomplete="name"></div>'+
+      '<div class="f"><label for="auPhone">Teléfono</label><input id="auPhone" type="tel" autocomplete="tel"></div>'+
+      '<div class="f"><label for="auEmail">Correo (opcional)</label><input id="auEmail" type="email" autocomplete="email"></div>'+
+      '<div class="f"><label for="auPw">Escoge una contraseña</label><input id="auPw" type="password" autocomplete="new-password"></div>'+
+      '<button class="btn btn-p" id="auGo" style="width:100%">Crear mi cuenta</button>';
   }else{
-    form='<div class="f"><label for="auLogin">Your name or phone</label><input id="auLogin" autocomplete="username"></div>'+
-      '<div class="f"><label for="auPw">Password</label><input id="auPw" type="password" autocomplete="current-password"></div>'+
-      '<button class="btn btn-p" id="auGo" style="width:100%">Sign in</button>';
+    form='<div class="f"><label for="auLogin">Tu nombre o teléfono</label><input id="auLogin" autocomplete="username"></div>'+
+      '<div class="f"><label for="auPw">Contraseña</label><input id="auPw" type="password" autocomplete="current-password"></div>'+
+      '<button class="btn btn-p" id="auGo" style="width:100%">Iniciar sesión</button>';
   }
   $("#auBody").innerHTML=seg+form+'<div id="auErr" style="color:var(--bad);font-size:13.5px;margin-top:10px"></div>';
 
@@ -2861,23 +2861,23 @@ function drawAuth(mode){
     if(mode==="first"){
       act="bootstrapAdmin";
       payload={name:$("#auName").value.trim(),phone:$("#auPhone").value.trim(),password:pw};
-      if(!payload.name){err.textContent="Please enter your name";return;}
+      if(!payload.name){err.textContent="Escribe tu nombre";return;}
     }else if(mode==="code"){
       act="redeemSetup";
       payload={setupCode:$("#auCode").value.trim().toUpperCase(),name:$("#auName").value.trim(),
         phone:$("#auPhone").value.trim(),email:$("#auEmail").value.trim(),password:pw};
-      if(!payload.setupCode){err.textContent="Enter the code the admin gave you";return;}
+      if(!payload.setupCode){err.textContent="Escribe el código que te dio el administrador";return;}
     }else{
       act="login";
       payload={login:$("#auLogin").value.trim(),password:pw};
-      if(!payload.login){err.textContent="Enter your name or phone";return;}
+      if(!payload.login){err.textContent="Escribe tu nombre o teléfono";return;}
     }
-    if(act!=="login"&&pw.length<6){err.textContent="Password must be at least 6 characters";return;}
-    btn.disabled=true;btn.textContent="Please wait…";
+    if(act!=="login"&&pw.length<6){err.textContent="La contraseña debe tener al menos 6 caracteres";return;}
+    btn.disabled=true;btn.textContent="Espera…";
     team(act,payload).then(function(r){
       setSession(r.token,r.user);
       closeSheet("#sh-auth");
-      toast("Hello, "+String(r.user.name).split(" ")[0]+" ✓");
+      toast("Hola, "+String(r.user.name).split(" ")[0]+" ✓");
       // Signing in is the moment the territory becomes reachable, so fetch it
       // now. Without this the app sits on an empty locked screen until the
       // next sync tick, which looks exactly like the sign-in having failed.
@@ -2895,18 +2895,18 @@ function drawAuth(mode){
 }
 
 function openChangePassword(){
-  $("#pTitle").textContent="Change my password";
+  $("#pTitle").textContent="Cambiar mi contraseña";
   $("#pSub").textContent=me?me.name:"";
   $("#pBody").innerHTML=
-    '<div class="f"><label for="cpOld">Current password</label><input id="cpOld" type="password" autocomplete="current-password"></div>'+
-    '<div class="f"><label for="cpNew">New password</label><input id="cpNew" type="password" autocomplete="new-password"></div>'+
-    '<button class="btn btn-p" id="cpGo" style="width:100%">Save new password</button>'+
+    '<div class="f"><label for="cpOld">Contraseña actual</label><input id="cpOld" type="password" autocomplete="current-password"></div>'+
+    '<div class="f"><label for="cpNew">Nueva contraseña</label><input id="cpNew" type="password" autocomplete="new-password"></div>'+
+    '<button class="btn btn-p" id="cpGo" style="width:100%">Guardar contraseña</button>'+
     '<div id="cpErr" style="color:var(--bad);font-size:13.5px;margin-top:10px"></div>';
   $("#cpGo").addEventListener("click",function(){
     var b=this;$("#cpErr").textContent="";
     b.disabled=true;
     team("changePassword",{currentPassword:$("#cpOld").value,newPassword:$("#cpNew").value})
-      .then(function(){closeSheet("#sh-pick");toast("Password changed ✓");})
+      .then(function(){closeSheet("#sh-pick");toast("Contraseña cambiada ✓");})
       .catch(function(e){$("#cpErr").textContent=e.message;b.disabled=false;});
   });
   openSheet("#sh-pick");
@@ -2938,8 +2938,8 @@ function drawPicker(){
 
   $("#cTitle").textContent=shortLabel(h);
   $("#cSub").textContent=old
-    ?("Visit "+(idx>=0?idx+1:"")+" · "+fmtDateOr(old.d,"date not recorded"))
-    :"New visit · today";
+    ?("Visita "+(idx>=0?idx+1:"")+" · "+fmtDateOr(old.d,"fecha no registrada"))
+    :"Visita nueva · hoy";
 
   var tile=function(k,wide){
     var d=kindDef(k);
@@ -2955,12 +2955,12 @@ function drawPicker(){
       (guestMode?"":tile("RV",true))+
       '<div class="pk-hr"></div>'+
     '</div>'+
-    '<div class="f" style="margin-top:10px"><label for="cNote">Note (optional)</label>'+
-      '<textarea id="cNote" rows="2" placeholder="Anything worth remembering">'+
+    '<div class="f" style="margin-top:10px"><label for="cNote">Nota (opcional)</label>'+
+      '<textarea id="cNote" rows="2" placeholder="Algo que valga la pena recordar">'+
       esc(old?noteOf(old):"")+'</textarea></div>'+
-    (old?'<button class="btn btn-s" id="cDel" style="width:100%;margin-bottom:8px">Remove this visit</button>':"")+
+    (old?'<button class="btn btn-s" id="cDel" style="width:100%;margin-bottom:8px">Quitar esta visita</button>':"")+
     (guestMode?"":'<div class="cell-grid"><button class="pk danger wide" data-dnv="1">'+
-      '<span class="pk-b vc k-DNV">DNV</span><span class="pk-l">Do not visit</span></button></div>')+
+      '<span class="pk-b vc k-DNV">DNV</span><span class="pk-l">No visitar</span></button></div>')+
     '<div id="cErr" style="color:var(--bad);font-size:13.5px;margin-top:10px"></div>';
 
   $("#cBody").querySelectorAll("[data-k]").forEach(function(b){
@@ -3007,7 +3007,7 @@ function commitVisit(id,k){
   if(k==="RV"){
     var rv=parseLog(h.HouseReturnVisits);
     rvId=entryId();
-    var e={i:rvId,d:todayStr(),n:note||"Started a return visit"};
+    var e={i:rvId,d:todayStr(),n:note||"Se empezó una revisita"};
     if(me&&me.id&&!guestMode)e.u=me.id;
     rv.push(e);
     changes.HouseReturnVisits=JSON.stringify(rv);
@@ -3038,12 +3038,12 @@ function undoLast(){
     if(r)r.x=1;
     changes.HouseReturnVisits=JSON.stringify(rv);
   }
-  saveChanges(w.id,changes,"Undone");
+  saveChanges(w.id,changes,"Deshecho");
 }
 
 function toastUndo(msg){
   var t=$("#toast");
-  t.innerHTML=esc(msg)+'<button class="undo" id="tUndo">Undo</button>';
+  t.innerHTML=esc(msg)+'<button class="undo" id="tUndo">Deshacer</button>';
   t.className="show act";
   var b=$("#tUndo");
   if(b)b.addEventListener("click",function(){t.className="";undoLast();});
@@ -3055,14 +3055,14 @@ function removeVisit(id,eid){
   var h=byId(id);if(!h||!eid)return;
   var log=seedLogLocal(h),e=findEntry(log,eid);
   if(!e)return;
-  if(!confirm("Remove this visit?\n\nIt stays in the history as removed."))return;
+  if(!confirm("¿Quitar esta visita?\n\nQueda en el historial como quitada."))return;
   e.x=1;
   var changes={HouseVisitLog:JSON.stringify(log)};
   var live=log.filter(isVisitEntry).sort(cmpEntry);
   deriveSlotsLocal(changes,log);
   changes.HouseLastVisitDate=live.length?(live[live.length-1].d||""):"";
   closeSheet("#sh-cell");
-  saveChanges(id,changes,"Visit removed");
+  saveChanges(id,changes,"Visita quitada");
 }
 
 /* ── Do Not Visit ───────────────────────────────────────────────────────
@@ -3071,18 +3071,18 @@ function removeVisit(id,eid){
    hands, past a resync — and to make it hard to do by accident. */
 function drawDNVSet(){
   var h=byId(curCell.id);if(!h)return;
-  $("#cTitle").textContent="Do not visit";
+  $("#cTitle").textContent="No visitar";
   $("#cSub").textContent=shortLabel(h);
   $("#cBody").innerHTML=
-    '<p style="font-size:14.5px;margin-bottom:4px">Mark this number as Do Not Visit?</p>'+
+    '<p style="font-size:14.5px;margin-bottom:4px">¿Marcar este número como No visitar?</p>'+
     '<p style="font-size:13px;color:var(--text-2);margin-bottom:12px">'+
-      'Nobody in the group will be able to visit or change '+esc(shortLabel(h))+
-      ' — only an admin can undo it.</p>'+
-    '<div class="f"><label for="dnvWhy">Why? (required)</label>'+
-      '<textarea id="dnvWhy" rows="3" placeholder="What did they say?"></textarea></div>'+
-    '<p style="font-size:12.5px;color:var(--text-2);margin-bottom:12px">Recorded '+
-      esc(fmtDate(todayStr()))+(me?' by '+esc(String(me.name||"").split(" ")[0]):"")+'</p>'+
-    '<button class="btn btn-d" id="dnvGo" style="width:100%" disabled>Mark Do Not Visit</button>'+
+      'Nadie del grupo podrá visitar ni cambiar '+esc(shortLabel(h))+
+      ' — solo un administrador puede quitarlo.</p>'+
+    '<div class="f"><label for="dnvWhy">¿Por qué? (obligatorio)</label>'+
+      '<textarea id="dnvWhy" rows="3" placeholder="¿Qué dijeron?"></textarea></div>'+
+    '<p style="font-size:12.5px;color:var(--text-2);margin-bottom:12px">Registrado el '+
+      esc(fmtDate(todayStr()))+(me?' por '+esc(String(me.name||"").split(" ")[0]):"")+'</p>'+
+    '<button class="btn btn-d" id="dnvGo" style="width:100%" disabled>Marcar No visitar</button>'+
     '<div id="cErr" style="color:var(--bad);font-size:13.5px;margin-top:10px"></div>';
   var why=$("#dnvWhy"),go=$("#dnvGo");
   why.addEventListener("input",function(){go.disabled=why.value.trim().length<3;});
@@ -3091,14 +3091,14 @@ function drawDNVSet(){
     var w=why.value.trim();
     if(w.length<3)return;
     var log=seedLogLocal(h);
-    var ent={i:entryId(),d:todayStr(),t:"Do not visit — "+w,k:"DNV",r:w};
+    var ent={i:entryId(),d:todayStr(),t:"No visitar — "+w,k:"DNV",r:w};
     if(me&&me.id&&!guestMode)ent.u=me.id;
     log.push(ent);
     // Deliberately no visit date and no box: a decision not to call is not a call.
     closeSheet("#sh-cell");
     // No Undo here — clearing it needs an admin, so offering one would be the
     // app promising something it cannot do.
-    saveChanges(curCell.id,{HouseVisitLog:JSON.stringify(log)},"Marked Do Not Visit");
+    saveChanges(curCell.id,{HouseVisitLog:JSON.stringify(log)},"Marcada como no visitar");
   });
 }
 
@@ -3112,7 +3112,7 @@ function openDNVPanel(id){
 function drawDNVView(){
   var h=byId(curCell.id);if(!h)return;
   var marks=dnvMarks(h),isAdmin=scope.kind==="admin";
-  $("#cTitle").textContent="Do not visit";
+  $("#cTitle").textContent="No visitar";
   $("#cSub").textContent=shortLabel(h);
   $("#cBody").innerHTML=
     '<div class="card">'+marks.map(function(e){
@@ -3122,10 +3122,10 @@ function drawDNVView(){
         '<span class="row-s" style="white-space:normal">'+esc(e.r||e.t||"")+'</span></span></div>';
     }).join("")+'</div>'+
     (dnvDue(h)?'<p style="font-size:13.5px;color:var(--warn);font-weight:650;margin-bottom:10px">'+
-      'Marked '+Math.floor(dnvDueYears(h))+' years ago — worth checking whether anything has changed.</p>':"")+
+      'Marcada hace '+Math.floor(dnvDueYears(h))+' años — vale la pena ver si algo ha cambiado.</p>':"")+
     (isAdmin
-      ?'<button class="btn btn-s" id="dnvClear" style="width:100%">Unlock this number</button>'
-      :'<p style="font-size:13px;color:var(--text-2)">Only an admin can unlock this number.</p>')+
+      ?'<button class="btn btn-s" id="dnvClear" style="width:100%">Desbloquear este domicilio</button>'
+      :'<p style="font-size:13px;color:var(--text-2)">Solo un administrador puede desbloquear este domicilio.</p>')+
     '<div id="cErr" style="color:var(--bad);font-size:13.5px;margin-top:10px"></div>';
   var cb=$("#dnvClear");
   if(cb)cb.addEventListener("click",drawDNVClear);
@@ -3134,12 +3134,12 @@ function drawDNVView(){
 function drawDNVClear(){
   var h=byId(curCell.id);if(!h)return;
   $("#cBody").innerHTML=
-    '<p style="font-size:14.5px;margin-bottom:12px">Unlock '+esc(shortLabel(h))+'?</p>'+
-    '<div class="f"><label for="dnvWhy2">What changed? (required)</label>'+
-      '<textarea id="dnvWhy2" rows="3" placeholder="New people moved in"></textarea></div>'+
+    '<p style="font-size:14.5px;margin-bottom:12px">¿Desbloquear '+esc(shortLabel(h))+'?</p>'+
+    '<div class="f"><label for="dnvWhy2">¿Qué cambió? (obligatorio)</label>'+
+      '<textarea id="dnvWhy2" rows="3" placeholder="Se mudaron personas nuevas"></textarea></div>'+
     '<p style="font-size:12.5px;color:var(--text-2);margin-bottom:12px">'+
-      'What was written down stays in the history, with its date.</p>'+
-    '<button class="btn btn-p" id="dnvGo2" style="width:100%" disabled>Unlock this number</button>'+
+      'Lo que se escribió queda en el historial, con su fecha.</p>'+
+    '<button class="btn btn-p" id="dnvGo2" style="width:100%" disabled>Desbloquear este domicilio</button>'+
     '<div id="cErr" style="color:var(--bad);font-size:13.5px;margin-top:10px"></div>';
   var why=$("#dnvWhy2"),go=$("#dnvGo2");
   why.addEventListener("input",function(){go.disabled=why.value.trim().length<3;});
@@ -3148,11 +3148,11 @@ function drawDNVClear(){
     var w=why.value.trim();
     if(w.length<3)return;
     var log=seedLogLocal(h);
-    var ent={i:entryId(),d:todayStr(),t:"Do not visit cleared — "+w,k:"DNVX",r:w};
+    var ent={i:entryId(),d:todayStr(),t:"No visitar quitado — "+w,k:"DNVX",r:w};
     if(me&&me.id)ent.u=me.id;
     log.push(ent);
     closeSheet("#sh-cell");
-    saveChanges(curCell.id,{HouseVisitLog:JSON.stringify(log)},"Unlocked");
+    saveChanges(curCell.id,{HouseVisitLog:JSON.stringify(log)},"Desbloqueado");
   });
 }
 
@@ -3160,19 +3160,19 @@ function drawDNVClear(){
    one is what somebody hands to the overseer when the phone could not reach
    the internet — everything the app knows, on paper, in the usual form. */
 function askSheetKind(terr,houses){
-  $("#pTitle").textContent="Print "+terr;
-  $("#pSub").textContent=houses.length+" house"+(houses.length===1?"":"s");
+  $("#pTitle").textContent="Imprimir "+terr;
+  $("#pSub").textContent=houses.length+" casa"+(houses.length===1?"":"s");
   $("#pBody").innerHTML=
     '<div class="card">'+
       '<button class="row" data-sheet="blank">'+
         '<span class="row-ico">📄</span>'+
-        '<span class="row-txt"><span class="row-t">Blank sheet</span>'+
-        '<span class="row-s">The usual form, with room to write</span></span>'+
+        '<span class="row-txt"><span class="row-t">Hoja en blanco</span>'+
+        '<span class="row-s">La hoja de siempre, con espacio para escribir</span></span>'+
         '<span class="row-act">›</span></button>'+
       '<button class="row" data-sheet="results">'+
         '<span class="row-ico">🖊️</span>'+
-        '<span class="row-txt"><span class="row-t">With the results filled in</span>'+
-        '<span class="row-s">Every visit in red, with its date and note</span></span>'+
+        '<span class="row-txt"><span class="row-t">Con los resultados anotados</span>'+
+        '<span class="row-s">Cada visita en rojo, con su fecha y nota</span></span>'+
         '<span class="row-act">›</span></button>'+
     '</div>';
   $("#pBody").querySelectorAll("[data-sheet]").forEach(function(b){
@@ -3188,36 +3188,36 @@ function askSheetKind(terr,houses){
    screen: somebody has to add you, and then you choose your own password. A
    button that quietly did nothing would be worse than no button. */
 function showHowToJoin(){
-  var who=(guestInfo&&guestInfo.from)||"whoever gave you these numbers";
+  var who=(guestInfo&&guestInfo.from)||"quien te dio estos domicilios";
   var phone=(guestInfo&&guestInfo.fromPhone)||"";
-  $("#pTitle").textContent="Create an account";
-  $("#pSub").textContent="It takes about a minute";
+  $("#pTitle").textContent="Crear una cuenta";
+  $("#pSub").textContent="Toma como un minuto";
   $("#pBody").innerHTML=
-    '<p style="font-size:14.5px;margin-bottom:14px">With an account the numbers '+
-      'stay on your phone between days, you keep your own return visits, and you '+
-      'can be given a whole territory.</p>'+
-    '<div class="lbl" style="margin-top:0">How it works</div>'+
+    '<p style="font-size:14.5px;margin-bottom:14px">Con una cuenta los domicilios '+
+      'se quedan en tu teléfono de un día para otro, guardas tus propias revisitas y '+
+      'te pueden dar un territorio entero.</p>'+
+    '<div class="lbl" style="margin-top:0">Cómo funciona</div>'+
     '<div class="card">'+
       '<div class="row"><span class="who">1</span><span class="row-txt">'+
-        '<span class="row-t">Ask '+esc(who)+'</span>'+
-        '<span class="row-s" style="white-space:normal">They add your name and give '+
-        'you a six-character code.</span></span></div>'+
+        '<span class="row-t">Habla con '+esc(who)+'</span>'+
+        '<span class="row-s" style="white-space:normal">Agrega tu nombre y te da '+
+        'un código de seis caracteres.</span></span></div>'+
       '<div class="row"><span class="who">2</span><span class="row-txt">'+
-        '<span class="row-t">Scan the code they show you</span>'+
-        '<span class="row-s" style="white-space:normal">It opens this app with the '+
-        'code already filled in. They can also send you the link.</span></span></div>'+
+        '<span class="row-t">Escanea el código que te muestre</span>'+
+        '<span class="row-s" style="white-space:normal">Abre esta app con el '+
+        'código ya escrito. También te puede enviar el enlace.</span></span></div>'+
       '<div class="row"><span class="who">3</span><span class="row-txt">'+
-        '<span class="row-t">Choose your own password</span>'+
-        '<span class="row-s" style="white-space:normal">Nobody else sees it — not '+
-        'even them.</span></span></div>'+
+        '<span class="row-t">Elige tu propia contraseña</span>'+
+        '<span class="row-s" style="white-space:normal">Nadie más la ve — ni '+
+        'esa persona.</span></span></div>'+
     '</div>'+
     (phone?'<a class="btn btn-p" style="width:100%;display:flex;align-items:center;'+
       'justify-content:center;text-decoration:none;margin-top:12px" href="tel:'+
-      esc(phone)+'">Call '+esc(String(who).split(" ")[0])+'</a>':"")+
+      esc(phone)+'">Llamar a '+esc(String(who).split(" ")[0])+'</a>':"")+
     '<button class="btn btn-s" id="joinHaveCode" style="width:100%;margin-top:8px">'+
-      'I already have a code</button>'+
-    '<p style="font-size:13px;color:var(--text-2);margin-top:12px">Your numbers stay '+
-      'on this phone while you do this. Nothing is lost.</p>';
+      'Ya tengo un código</button>'+
+    '<p style="font-size:13px;color:var(--text-2);margin-top:12px">Tus domicilios se quedan '+
+      'en este teléfono mientras lo haces. No se pierde nada.</p>';
   $("#joinHaveCode").addEventListener("click",function(){
     closeSheet("#sh-pick");
     setTimeout(function(){teamHasUsers=true;openSheet("#sh-auth");drawAuth("code");},260);
@@ -3241,22 +3241,22 @@ function daysHeld(day){
 function heldFor(day){
   if(!day)return "";
   var d=daysHeld(day);
-  if(d===0)return "since today";
-  if(d===1)return "1 day";
-  if(d<60)return d+" days";
-  return Math.round(d/30.4)+" months";
+  if(d===0)return "desde hoy";
+  if(d===1)return "1 día";
+  if(d<60)return d+" días";
+  return Math.round(d/30.4)+" meses";
 }
 function sinceWords(day){
-  return day?("Since "+fmtDate(day)+" · "+heldFor(day)):"Start date not recorded";
+  return day?("Desde "+fmtDate(day)+" · "+heldFor(day)):"Fecha de inicio no registrada";
 }
 /* A territory nobody has finished in four months is the thing an overseer is
    looking for on the card. */
 function longHeld(day){return !!day&&daysHeld(day)>=120;}
 
 function openTerrLog(){
-  $("#pTitle").textContent="Territories";
-  $("#pSub").textContent="Who has what, and who has had it";
-  $("#pBody").innerHTML='<div class="empty">Loading…</div>';
+  $("#pTitle").textContent="Territorios";
+  $("#pSub").textContent="Quién tiene qué, y quién lo ha tenido";
+  $("#pBody").innerHTML='<div class="empty">Cargando…</div>';
   openSheet("#sh-pick");
   team("territoryHistory",{}).then(function(r){
     terrLog={territories:r.territories||[],records:r.records||[],at:Date.now()};
@@ -3275,28 +3275,28 @@ function drawTerrLog(){
   var held=out.filter(function(t){return t.ownerId;});
   var slow=held.filter(function(t){return longHeld(t.assignedOn);});
   // Coming back from one territory's card has to restore the heading too.
-  $("#pTitle").textContent="Territories";
-  $("#pSub").textContent=held.length+" of "+out.length+" out";
+  $("#pTitle").textContent="Territorios";
+  $("#pSub").textContent=held.length+" de "+out.length+" fuera";
 
   $("#pBody").innerHTML=
-    (slow.length?'<div id="dnvBanner"><b>'+slow.length+' out for a while</b>'+
-      'Four months or more since they were handed over. Worth asking how they are getting on.</div>':"")+
-    '<div class="lbl" style="margin-top:0">Now</div>'+
+    (slow.length?'<div id="dnvBanner"><b>'+slow.length+' llevan tiempo fuera</b>'+
+      'Cuatro meses o más desde que se entregaron. Vale la pena preguntar cómo van.</div>':"")+
+    '<div class="lbl" style="margin-top:0">Ahora</div>'+
     '<div class="card">'+out.map(function(t){
       var who=(t.owner&&t.owner.name)||"";
       return '<button class="row" data-terrlog="'+esc(t.name)+'">'+
         '<span class="who '+(who?"":"gray")+'">'+esc(who?initials(who):"—")+'</span>'+
         '<span class="row-txt"><span class="row-t">'+esc(t.name)+'</span>'+
         '<span class="row-s">'+(who
-          ? esc(who)+' · '+esc(heldFor(t.assignedOn)||"start date not recorded")
-          : 'Nobody has this one')+'</span></span>'+
+          ? esc(who)+' · '+esc(heldFor(t.assignedOn)||"fecha de inicio no registrada")
+          : 'Nadie lo tiene')+'</span></span>'+
         (who&&longHeld(t.assignedOn)?'<span class="dnv-due">'+daysHeld(t.assignedOn)+'d</span>':'')+
         '<span class="row-act">›</span></button>';
     }).join("")+'</div>'+
-    '<div class="lbl">History</div>'+
+    '<div class="lbl">Historial</div>'+
     (terrLog.records.length
       ?'<div class="card">'+terrLog.records.map(function(r){return terrLogRow(r);}).join("")+'</div>'
-      :'<div class="empty" style="padding:22px">Nothing has been handed over yet.</div>');
+      :'<div class="empty" style="padding:22px">Todavía no se ha entregado nada.</div>');
 
   $("#pBody").querySelectorAll("[data-terrlog]").forEach(function(b){
     b.addEventListener("click",function(){openTerrCard(b.dataset.terrlog);});
@@ -3309,11 +3309,11 @@ function terrLogRow(r){
   return '<div class="row"><span class="row-txt">'+
     '<span class="row-t">'+esc(r.who)+' · '+esc(r.territory)+'</span>'+
     '<span class="row-s" style="white-space:normal">'+
-      esc(r.assignedOn?fmtDate(r.assignedOn):"date not recorded")+' → '+
-      (open?'<b>still out</b>':esc(r.returnedOn?fmtDate(r.returnedOn):"date not recorded"))+
+      esc(r.assignedOn?fmtDate(r.assignedOn):"fecha no registrada")+' → '+
+      (open?'<b>sigue fuera</b>':esc(r.returnedOn?fmtDate(r.returnedOn):"fecha no registrada"))+
       (r.note?' · '+esc(r.note):"")+
     '</span></span>'+
-    (open?'<span class="pill-tag pend">out</span>':"")+
+    (open?'<span class="pill-tag pend">fuera</span>':"")+
     '</div>';
 }
 
@@ -3324,11 +3324,11 @@ function terrLogRow(r){
    which is a different thing entirely — so say so and go and get it. */
 function peopleToHandTo(t){
   if(!teamUsers.length)
-    return '<div class="row"><span class="row-txt"><span class="row-s">Loading…</span></span></div>';
+    return '<div class="row"><span class="row-txt"><span class="row-s">Cargando…</span></span></div>';
   var others=teamUsers.filter(function(u){return u.id!==t.ownerId;});
   if(!others.length)
     return '<div class="row"><span class="row-txt"><span class="row-s">'+
-      'Nobody else has an account yet.</span></span></div>';
+      'Nadie más tiene cuenta todavía.</span></span></div>';
   return others.map(function(u){
     return '<button class="user-row" data-give-terr="'+esc(u.id)+'">'+
       '<span class="who">'+esc(initials(u.name))+'</span>'+
@@ -3342,32 +3342,32 @@ function openTerrCard(name){
   var mine=terrLog.records.filter(function(r){return r.territory===name;});
   var who=(t.owner&&t.owner.name)||"";
   $("#pTitle").textContent=name;
-  $("#pSub").textContent=who?("With "+who):"Nobody has this one";
+  $("#pSub").textContent=who?("Con "+who):"Nadie lo tiene";
   $("#pBody").innerHTML=
     '<div class="card"><div class="row">'+
       '<span class="who '+(who?"":"gray")+'">'+esc(who?initials(who):"—")+'</span>'+
-      '<span class="row-txt"><span class="row-t">'+esc(who||"Not assigned")+'</span>'+
+      '<span class="row-txt"><span class="row-t">'+esc(who||"Sin asignar")+'</span>'+
       '<span class="row-s">'+(who
         ? esc(sinceWords(t.assignedOn))
-        : 'Hand it to somebody below')+'</span></span></div></div>'+
+        : 'Entrégalo a alguien de la lista')+'</span></span></div></div>'+
     /* A territory that was already out when the card was introduced has no
        start date. The admin is the only one who knows it, so ask. */
     (who&&!t.assignedOn
-      ?'<div class="f"><label for="tlStart">When did they get it?</label>'+
+      ?'<div class="f"><label for="tlStart">¿Cuándo lo recibió?</label>'+
         '<input id="tlStart" type="date" max="'+esc(todayStr())+'"></div>'+
         '<button class="btn btn-s" id="tlSetStart" style="width:100%;margin-bottom:12px">'+
-        'Record that date</button>':"")+
-    (who?'<div class="f"><label for="tlNote">Note (optional)</label>'+
-      '<input id="tlNote" placeholder="Finished the whole territory" autocomplete="off"></div>'+
+        'Guardar esa fecha</button>':"")+
+    (who?'<div class="f"><label for="tlNote">Nota (opcional)</label>'+
+      '<input id="tlNote" placeholder="Terminó todo el territorio" autocomplete="off"></div>'+
       '<button class="btn btn-p" id="tlReturn" style="width:100%;margin-bottom:12px">'+
-      'Mark as returned</button>':"")+
-    '<div class="lbl">Hand it to</div>'+
+      'Marcar como devuelto</button>':"")+
+    '<div class="lbl">Entregar a</div>'+
     '<div class="card" id="tlPeople">'+peopleToHandTo(t)+'</div>'+
-    '<div class="lbl">Before that</div>'+
+    '<div class="lbl">Antes de eso</div>'+
     (mine.length
       ?'<div class="card">'+mine.map(function(r){return terrLogRow(r);}).join("")+'</div>'
-      :'<div class="empty" style="padding:22px">Nothing recorded for this one yet.</div>')+
-    '<button class="btn btn-s" id="tlBack" style="width:100%;margin-top:12px">All territories</button>'+
+      :'<div class="empty" style="padding:22px">Todavía no hay nada anotado aquí.</div>')+
+    '<button class="btn btn-s" id="tlBack" style="width:100%;margin-top:12px">Todos los territorios</button>'+
     '<div id="tlErr" style="color:var(--bad);font-size:13.5px;margin-top:10px"></div>';
 
   var refresh=function(){
@@ -3382,21 +3382,21 @@ function openTerrCard(name){
     var note=($("#tlNote")||{}).value||"";
     // No esc() here: a native dialog shows text, so escaping only puts
     // "&#039;" in front of somebody's name.
-    if(!confirm("Mark "+name+" as returned?\n\n"+who+" stops working it, anybody helping "+
-      "with numbers there loses them, and today's date goes on the card."))return;
+    if(!confirm("¿Marcar "+name+" como devuelto?\n\n"+who+" deja de trabajarlo, quien esté ayudando "+
+      "con domicilios ahí los pierde, y la fecha de hoy queda en la tarjeta."))return;
     rb.disabled=true;
     team("returnTerritory",{territory:name,note:note.trim()}).then(function(){
-      toast("Marked as returned ✓");
+      toast("Marcado como devuelto ✓");
       return refresh();
     }).catch(function(e){$("#tlErr").textContent=e.message;rb.disabled=false;});
   });
   var sb=$("#tlSetStart");
   if(sb)sb.addEventListener("click",function(){
     var on=($("#tlStart")||{}).value||"";
-    if(!on){$("#tlErr").textContent="Pick the date they got it";return;}
+    if(!on){$("#tlErr").textContent="Elige la fecha en que lo recibió";return;}
     sb.disabled=true;
     team("setTerritoryStart",{territory:name,assignedOn:on}).then(function(){
-      toast("Date recorded ✓");
+      toast("Fecha guardada ✓");
       return refresh();
     }).catch(function(e){$("#tlErr").textContent=e.message;sb.disabled=false;});
   });
@@ -3405,10 +3405,10 @@ function openTerrCard(name){
       b.addEventListener("click",function(){
         var to=teamUsers.filter(function(u){return u.id===b.dataset["giveTerr"];})[0];
         if(!to)return;
-        if(!confirm("Hand "+name+" to "+to.name+"?"+(who?"\n\n"+who+" gives it back today.":"")))return;
+        if(!confirm("¿Entregar "+name+" a "+to.name+"?"+(who?"\n\n"+who+" lo devuelve hoy.":"")))return;
         b.disabled=true;
         team("assignTerritory",{territory:name,ownerId:to.id}).then(function(){
-          toast(name+" is "+String(to.name).split(" ")[0]+"'s ✓");
+          toast(name+" ahora es de "+String(to.name).split(" ")[0]+" ✓");
           return refresh();
         }).catch(function(e){$("#tlErr").textContent=e.message;b.disabled=false;});
       });
@@ -3437,28 +3437,28 @@ function dnvHouses(){
 function dnvDueHouses(){return dnvHouses().filter(dnvDue);}
 
 function openDNVList(){
-  $("#pTitle").textContent="Do not visit";
+  $("#pTitle").textContent="No visitar";
   var list=dnvHouses(),due=dnvDueHouses();
   $("#pSub").textContent=list.length
-    ? list.length+" number"+(list.length===1?"":"s")+(due.length?" · "+due.length+" to check":"")
-    : "None";
+    ? list.length+" domicilio"+(list.length===1?"":"s")+(due.length?" · "+due.length+" por revisar":"")
+    : "Ninguno";
   $("#pBody").innerHTML=
-    (due.length?'<div id="dnvBanner"><b>'+due.length+' worth checking</b>'+
-      'Two years or more since these were marked or last called on. '+
-      'Things change — new people move in.</div>':"")+
+    (due.length?'<div id="dnvBanner"><b>'+due.length+' por revisar</b>'+
+      'Dos años o más desde que se marcaron o desde la última visita. '+
+      'Las cosas cambian — llega gente nueva.</div>':"")+
     (list.length
       ?'<div class="card">'+list.map(function(h){
         var d=dnvState(h),who=whoName(d.by);
         return '<button class="row" data-dnvh="'+esc(h.id)+'">'+
-          '<span class="row-txt"><span class="row-t">'+esc(h.HouseAddress||"No address")+'</span>'+
+          '<span class="row-txt"><span class="row-t">'+esc(h.HouseAddress||"Sin dirección")+'</span>'+
           '<span class="row-s" style="white-space:normal">'+esc(d.reason||"")+
             ' · '+esc(fmtDate(d.since))+(who?' · '+esc(who):"")+'</span></span>'+
-          (dnvDue(h)?'<span class="dnv-due">'+Math.floor(dnvDueYears(h))+'y</span>':'')+
+          (dnvDue(h)?'<span class="dnv-due">'+Math.floor(dnvDueYears(h))+'a</span>':'')+
           '<span class="row-act">›</span></button>';
       }).join("")+'</div>'
-      :'<div class="empty"><span class="big">\u{1F6AB}</span>No numbers are marked Do Not Visit.</div>')+
+      :'<div class="empty"><span class="big">\u{1F6AB}</span>Ningún domicilio está marcado como No visitar.</div>')+
     (list.length?'<button class="btn btn-s" id="dnvPdf" style="width:100%;margin-top:12px">'+
-      'Print this list</button>':"");
+      'Imprimir esta lista</button>':"");
   $("#pBody").querySelectorAll("[data-dnvh]").forEach(function(b){
     b.addEventListener("click",function(){
       closeSheet("#sh-pick");
@@ -3466,7 +3466,7 @@ function openDNVList(){
     });
   });
   var pdf=$("#dnvPdf");
-  if(pdf)pdf.addEventListener("click",function(){generateTerritoryPDF("Do not visit",dnvHouses());});
+  if(pdf)pdf.addEventListener("click",function(){generateTerritoryPDF("No visitar",dnvHouses());});
   openSheet("#sh-pick");
 }
 
@@ -3478,34 +3478,34 @@ function openDNVList(){
 var orgPolicy={nights:0,tz:"America/Los_Angeles",options:[0,1,2,6]};
 
 function nightsWords(nights){
-  if(nights===0)return "Tonight at midnight";
-  if(nights===1)return "Tomorrow at midnight";
-  return "In "+(nights+1)+" days, at midnight";
+  if(nights===0)return "Esta noche a medianoche";
+  if(nights===1)return "Mañana a medianoche";
+  return "En "+(nights+1)+" días, a medianoche";
 }
 
 function policyCard(){
-  return '<div class="lbl" style="margin-top:0">Numbers</div>'+
+  return '<div class="lbl" style="margin-top:0">Domicilios</div>'+
     '<div class="card"><button class="row" id="adPolicy">'+
       '<span class="row-ico">⏱️</span>'+
-      '<span class="row-txt"><span class="row-t">Numbers come back</span>'+
+      '<span class="row-txt"><span class="row-t">Los domicilios vuelven</span>'+
       '<span class="row-s">'+esc(nightsWords(orgPolicy.nights))+'</span></span>'+
       '<span class="row-act">›</span></button>'+
     '<button class="row" id="adColors">'+
       '<span class="row-ico">🎨</span>'+
-      '<span class="row-txt"><span class="row-t">Row colours</span>'+
-      '<span class="row-s">What the colours on the list mean</span></span>'+
+      '<span class="row-txt"><span class="row-t">Colores de las filas</span>'+
+      '<span class="row-s">Qué significan los colores de la lista</span></span>'+
       '<span class="row-act">›</span></button></div>';
 }
 
 var COLOR_ROWS=[
-  {k:"colorDnv",     l:"Do not visit",  s:"Nobody calls here"},
-  {k:"colorAssigned",l:"Assigned",      s:"Somebody else is working these"},
-  {k:"colorTalked",  l:"Spoke to someone",s:"A man or a woman was recorded"}
+  {k:"colorDnv",     l:"No visitar",  s:"Aquí nadie visita"},
+  {k:"colorAssigned",l:"Asignado",      s:"Otra persona los está trabajando"},
+  {k:"colorTalked",  l:"Habló con alguien",s:"Se anotó un hombre o una mujer"}
 ];
 
 function drawRowColors(){
-  $("#pTitle").textContent="Row colours";
-  $("#pSub").textContent="Everybody in the group sees these";
+  $("#pTitle").textContent="Colores de las filas";
+  $("#pSub").textContent="Todo el grupo ve estos colores";
   $("#pBody").innerHTML=
     '<div class="card">'+COLOR_ROWS.map(function(c){
       return '<div class="row"><span class="row-txt">'+
@@ -3516,11 +3516,11 @@ function drawRowColors(){
         '</div>';
     }).join("")+'</div>'+
     '<p style="font-size:13px;color:var(--text-2);margin-bottom:12px">'+
-      'The colour is a bar down the side of the row and a wash behind it — never a '+
-      'solid fill, so the writing stays readable in the sun and at night. A number '+
-      'marked Do not visit always wins, then one somebody else is holding.</p>'+
-    '<button class="btn btn-p" id="colSave" style="width:100%;margin-bottom:8px">Save colours</button>'+
-    '<button class="btn btn-s" id="colReset" style="width:100%">Back to the usual colours</button>'+
+      'El color es una barra al lado de la fila y un tono suave detrás — nunca un '+
+      'relleno sólido, para que la letra se lea al sol y de noche. Un domicilio '+
+      'marcado No visitar siempre gana, después el que tiene otra persona.</p>'+
+    '<button class="btn btn-p" id="colSave" style="width:100%;margin-bottom:8px">Guardar colores</button>'+
+    '<button class="btn btn-s" id="colReset" style="width:100%">Volver a los colores de siempre</button>'+
     '<div id="colErr" style="color:var(--bad);font-size:13.5px;margin-top:10px"></div>';
 
   // Live preview: the list behind the sheet repaints as the picker moves.
@@ -3542,27 +3542,27 @@ function drawRowColors(){
       applyRowColors(r.colors||next);
       renderHouses();
       closeSheet("#sh-pick");
-      toast("Colours saved ✓");
+      toast("Colores guardados ✓");
     }).catch(function(e){$("#colErr").textContent=e.message;b.disabled=false;});
   });
   openSheet("#sh-pick");
 }
 
 function drawReturnPolicy(){
-  $("#pTitle").textContent="Numbers come back";
-  $("#pSub").textContent="Applies to numbers handed out from now on";
+  $("#pTitle").textContent="Los domicilios vuelven";
+  $("#pSub").textContent="Aplica a los domicilios que se entreguen de ahora en adelante";
   $("#pBody").innerHTML=
     '<div class="card">'+(orgPolicy.options||[0,1,2,6]).map(function(nt){
       return '<button class="row" data-nights="'+nt+'">'+
         '<span class="row-txt"><span class="row-t">'+esc(nightsWords(nt))+'</span>'+
-        '<span class="row-s">'+(nt===0?"The usual — everyone starts fresh each day"
-          :"They keep the same numbers for "+(nt+1)+" days")+'</span></span>'+
+        '<span class="row-s">'+(nt===0?"Lo de siempre — cada día se empieza de nuevo"
+          :"Se quedan con los mismos domicilios "+(nt+1)+" días")+'</span></span>'+
         (orgPolicy.nights===nt?'<span class="row-act">✓</span>':'<span class="row-act">›</span>')+
         '</button>';
     }).join("")+'</div>'+
-    '<p style="font-size:13px;color:var(--text-2)">Numbers already handed out keep '+
-      'the time they were given. Whoever has them can always be sent home early '+
-      'with Stop working, or by taking their numbers back.</p>'+
+    '<p style="font-size:13px;color:var(--text-2)">Los domicilios ya entregados conservan '+
+      'la hora que tenían. A quien los tiene siempre se le puede terminar antes '+
+      'con Dejar de trabajar, o quitándole los domicilios.</p>'+
     '<div id="rpErr" style="color:var(--bad);font-size:13.5px;margin-top:10px"></div>';
   $("#pBody").querySelectorAll("[data-nights]").forEach(function(b){
     b.addEventListener("click",function(){
@@ -3571,7 +3571,7 @@ function drawReturnPolicy(){
       team("setReturnPolicy",{nights:nt}).then(function(){
         orgPolicy.nights=nt;
         closeSheet("#sh-pick");drawAdmin();
-        toast("Numbers come back "+nightsWords(nt).toLowerCase()+" ✓");
+        toast("Los domicilios vuelven "+nightsWords(nt).toLowerCase()+" ✓");
       }).catch(function(e){$("#rpErr").textContent=e.message;b.disabled=false;});
     });
   });
@@ -3581,19 +3581,19 @@ function drawReturnPolicy(){
 /* ── admin: people ── */
 function openAdmin(){openSheet("#sh-admin");drawAdmin();}
 function drawAdmin(){
-  $("#adBody").innerHTML='<div class="empty">Loading…</div>';
+  $("#adBody").innerHTML='<div class="empty">Cargando…</div>';
   team("listUsers",{}).then(function(r){
     teamUsers=r.users||[];
     if(r.policy){orgPolicy=r.policy;if(r.policy.colors)applyRowColors(r.policy.colors);}
-    $("#adSub").textContent=teamUsers.length+" "+(teamUsers.length===1?"person":"people");
-    $("#adBody").innerHTML=policyCard()+'<div class="lbl">People</div><div class="card">'+teamUsers.map(function(u){
+    $("#adSub").textContent=teamUsers.length+" "+(teamUsers.length===1?"persona":"personas");
+    $("#adBody").innerHTML=policyCard()+'<div class="lbl">Personas</div><div class="card">'+teamUsers.map(function(u){
       var tags=(u.role==="admin"?'<span class="pill-tag admin">admin</span> ':"")+
-        (u.mustSetup?'<span class="pill-tag pend">code '+esc(u.setupCode||"")+'</span> ':"")+
-        (!u.active?'<span class="pill-tag off">off</span>':"");
+        (u.mustSetup?'<span class="pill-tag pend">código '+esc(u.setupCode||"")+'</span> ':"")+
+        (!u.active?'<span class="pill-tag off">inactivo</span>':"");
       return '<button class="user-row" data-u="'+esc(u.id)+'">'+
         '<span class="who '+(u.active?"":"gray")+'">'+esc(initials(u.name))+'</span>'+
         '<span class="row-txt"><span class="ur-t">'+esc(u.name)+'</span>'+
-        '<span class="ur-s">'+esc(u.phone||u.email||"No contact details")+'</span></span>'+
+        '<span class="ur-s">'+esc(u.phone||u.email||"Sin datos de contacto")+'</span></span>'+
         '<span style="display:flex;gap:4px;align-items:center;flex:0 0 auto">'+tags+'</span></button>';
     }).join("")+'</div>';
     $("#adBody").querySelectorAll("[data-u]").forEach(function(b){
@@ -3619,14 +3619,14 @@ function showCode(title,sub,intro,code){
   $("#pTitle").textContent=title;
   $("#pSub").textContent=sub;
   $("#pBody").innerHTML=
-    '<p style="font-size:14.5px;margin-bottom:2px">Point their camera at this. It opens '+
-      'the app with the code already filled in — they only choose a password.</p>'+
+    '<p style="font-size:14.5px;margin-bottom:2px">Que apunte su cámara aquí. Abre '+
+      'la app con el código ya escrito — solo elige una contraseña.</p>'+
     '<div class="qr-wrap" id="qrSetup"></div>'+
-    '<button class="btn btn-s" id="setupShare" style="width:100%;margin-bottom:12px">Send the link instead</button>'+
-    '<div class="lbl">Or they can type this code</div>'+
+    '<button class="btn btn-s" id="setupShare" style="width:100%;margin-bottom:12px">Mejor enviar el enlace</button>'+
+    '<div class="lbl">O puede escribir este código</div>'+
     '<div class="code-box">'+esc(code)+'</div>'+
     '<p style="font-size:13px;color:var(--text-2)">'+intro+'<br>'+
-    'They choose their own password. The code stops working once it is used.</p>';
+    'Elige su propia contraseña. El código deja de servir cuando se usa.</p>';
 
   var box=$("#qrSetup");
   try{
@@ -3638,16 +3638,16 @@ function showCode(title,sub,intro,code){
     box.innerHTML=qr.createSvgTag({cellSize:6,margin:2,scalable:true});
   }catch(e){
     box.innerHTML='<p style="color:#333;font-size:13px;text-align:center">'+
-      'Could not draw the code here — send the link or read out the characters.</p>';
+      'No se pudo dibujar el código aquí — envía el enlace o dicta los caracteres.</p>';
   }
 
   $("#setupShare").addEventListener("click",function(){
-    var text=String(sub||"").split(" ")[0]+", set up the territory app here: "+url;
-    if(navigator.share)navigator.share({title:"Territory Manager",text:text,url:url}).catch(function(){});
+    var text=String(sub||"").split(" ")[0]+", configura aquí la app de territorios: "+url;
+    if(navigator.share)navigator.share({title:"Administrador de Territorios",text:text,url:url}).catch(function(){});
     else if(navigator.clipboard){
-      navigator.clipboard.writeText(url).then(function(){toast("Link copied ✓");})
-        .catch(function(){prompt("Copy this link:",url);});
-    }else prompt("Copy this link:",url);
+      navigator.clipboard.writeText(url).then(function(){toast("Enlace copiado ✓");})
+        .catch(function(){prompt("Copia este enlace:",url);});
+    }else prompt("Copia este enlace:",url);
   });
   openSheet("#sh-pick");
 }
@@ -3656,15 +3656,15 @@ function userActions(id){
   $("#pTitle").textContent=u.name;
   $("#pSub").textContent=u.phone||u.email||"";
   $("#pBody").innerHTML=
-    (u.mustSetup&&u.setupCode?'<div class="lbl" style="margin-top:0">Setup code — give this to them</div>'+
+    (u.mustSetup&&u.setupCode?'<div class="lbl" style="margin-top:0">Código de registro — dáselo a esta persona</div>'+
       '<div class="code-box">'+esc(u.setupCode)+'</div>'+
-      '<button class="btn" data-ua="qr" style="width:100%;margin-bottom:8px">Show the scannable code</button>':"")+
-    '<button class="btn btn-s" data-ua="reset" style="width:100%;margin-bottom:8px">Reset password</button>'+
+      '<button class="btn" data-ua="qr" style="width:100%;margin-bottom:8px">Mostrar el código para escanear</button>':"")+
+    '<button class="btn btn-s" data-ua="reset" style="width:100%;margin-bottom:8px">Restablecer contraseña</button>'+
     '<button class="btn btn-s" data-ua="role" style="width:100%;margin-bottom:8px">'+
-      (u.role==="admin"?"Remove admin":"Make admin")+'</button>'+
+      (u.role==="admin"?"Quitar admin":"Hacer admin")+'</button>'+
     '<button class="btn btn-s" data-ua="active" style="width:100%;margin-bottom:8px">'+
-      (u.active?"Deactivate":"Reactivate")+'</button>'+
-    '<button class="btn btn-d" data-ua="del" style="width:100%">Delete this person</button>'+
+      (u.active?"Desactivar":"Reactivar")+'</button>'+
+    '<button class="btn btn-d" data-ua="del" style="width:100%">Eliminar a esta persona</button>'+
     '<div id="uaErr" style="color:var(--bad);font-size:13.5px;margin-top:10px"></div>';
   $("#pBody").querySelectorAll("[data-ua]").forEach(function(b){
     b.addEventListener("click",function(){
@@ -3672,17 +3672,17 @@ function userActions(id){
       // Showing the code again is a pure re-render — it must NOT mint a new one,
       // or the code already written down somewhere would quietly stop working.
       if(a==="qr"){
-        showCode("Give them this code",u.name,
-          esc(u.name)+" can also open the app and tap <b>More → Sign in → I have a code</b>.",
+        showCode("Dale este código",u.name,
+          esc(u.name)+" también puede abrir la app y tocar <b>Más → Iniciar sesión → Tengo un código</b>.",
           u.setupCode);
         return;
       }
-      if(a==="reset"){run=team("resetPassword",{id:id});msg="Password reset";}
-      else if(a==="role"){run=team("setUserRole",{id:id,role:u.role==="admin"?"user":"admin"});msg="Role changed";}
-      else if(a==="active"){run=team("setUserActive",{id:id,active:!u.active});msg="Updated";}
+      if(a==="reset"){run=team("resetPassword",{id:id});msg="Contraseña restablecida";}
+      else if(a==="role"){run=team("setUserRole",{id:id,role:u.role==="admin"?"user":"admin"});msg="Rol cambiado";}
+      else if(a==="active"){run=team("setUserActive",{id:id,active:!u.active});msg="Actualizado";}
       else{
-        if(!confirm("Delete "+u.name+"?\n\nThis cannot be undone."))return;
-        run=team("deleteUser",{id:id});msg="Deleted";
+        if(!confirm("¿Eliminar a "+u.name+"?\n\nEsto no se puede deshacer."))return;
+        run=team("deleteUser",{id:id});msg="Eliminado";
       }
       b.disabled=true;
       run.then(function(r){
@@ -3690,8 +3690,8 @@ function userActions(id){
         drawAdmin();
         if(a==="reset"&&r.setupCode){
           setTimeout(function(){
-            showCode("New setup code",u.name,"Give this code to "+esc(u.name)+
-              ". They enter it to set a new password.",r.setupCode);
+            showCode("Nuevo código",u.name,"Dale este código a "+esc(u.name)+
+              ". Lo escribe para poner una contraseña nueva.",r.setupCode);
           },280);
         }else toast(msg+" ✓");
       }).catch(function(e){$("#uaErr").textContent=e.message;b.disabled=false;});
@@ -3701,21 +3701,21 @@ function userActions(id){
 }
 
 $("#adAdd").addEventListener("click",function(){
-  $("#pTitle").textContent="Add a person";
-  $("#pSub").textContent="They choose their own password using the code";
+  $("#pTitle").textContent="Agregar una persona";
+  $("#pSub").textContent="Ellos eligen su propia contraseña con el código";
   $("#pBody").innerHTML=
-    '<div class="f"><label for="nuName">Name</label><input id="nuName" autocomplete="off"></div>'+
-    '<div class="f"><label for="nuPhone">Phone (optional)</label><input id="nuPhone" type="tel"></div>'+
-    '<button class="btn btn-p" id="nuGo" style="width:100%">Create and get code</button>'+
+    '<div class="f"><label for="nuName">Nombre</label><input id="nuName" autocomplete="off"></div>'+
+    '<div class="f"><label for="nuPhone">Teléfono (opcional)</label><input id="nuPhone" type="tel"></div>'+
+    '<button class="btn btn-p" id="nuGo" style="width:100%">Crear y ver el código</button>'+
     '<div id="nuErr" style="color:var(--bad);font-size:13.5px;margin-top:10px"></div>';
   $("#nuGo").addEventListener("click",function(){
     var b=this,name=$("#nuName").value.trim();
-    if(!name){$("#nuErr").textContent="Name is required";return;}
+    if(!name){$("#nuErr").textContent="Escribe el nombre";return;}
     b.disabled=true;
     team("createUser",{name:name,phone:$("#nuPhone").value.trim()}).then(function(r){
       drawAdmin();
-      showCode("Give them this code",name,
-        esc(name)+" can also open the app and tap <b>More → Sign in → I have a code</b>.",
+      showCode("Dale este código",name,
+        esc(name)+" también puede abrir la app y tocar <b>Más → Entrar → Tengo un código</b>.",
         r.setupCode);
     }).catch(function(e){$("#nuErr").textContent=e.message;b.disabled=false;});
   });
@@ -3725,14 +3725,14 @@ $("#adAdd").addEventListener("click",function(){
 /* ── assignment ── */
 function openAssign(){openSheet("#sh-assign");drawAssign();}
 function drawAssign(pick){
-  $("#asBody").innerHTML='<div class="empty">Loading…</div>';
+  $("#asBody").innerHTML='<div class="empty">Cargando…</div>';
   team("listTerritories",{}).then(function(r){
     teamUsers=r.users||[];teamTerritories=r.territories||[];
     var names={};
     records.forEach(function(h){names[h.HouseTerritoryNumber||"Unassigned"]=1;});
     teamTerritories.forEach(function(t){names[t.name]=1;});
     var keys=Object.keys(names).sort();
-    if(!keys.length){$("#asBody").innerHTML='<div class="empty">No territories yet.</div>';return;}
+    if(!keys.length){$("#asBody").innerHTML='<div class="empty">Todavía no hay territorios.</div>';return;}
     var cur=pick||(terrFilter!=="all"&&names[terrFilter]?terrFilter:keys[0]);
     $("#asSub").textContent=cur;
     var t=teamTerritories.find(function(x){return x.name===cur;})||{name:cur,ownerId:"",assigneeIds:[]};
@@ -3740,21 +3740,21 @@ function drawAssign(pick){
     var ownerName=(t.owner&&t.owner.name)||"";
 
     $("#asBody").innerHTML=
-      '<div class="f"><label for="asTerr">Territory</label><select id="asTerr">'+
+      '<div class="f"><label for="asTerr">Territorio</label><select id="asTerr">'+
         keys.map(function(k){return '<option value="'+esc(k)+'"'+(k===cur?" selected":"")+'>'+esc(k)+'</option>';}).join("")+
       '</select></div>'+
-      '<div class="lbl">Assigned to</div>'+
+      '<div class="lbl">Asignado a</div>'+
       '<div class="card"><div class="row"><span class="who '+(ownerName?"":"gray")+'">'+
         esc(ownerName?initials(ownerName):"?")+'</span>'+
-        '<span class="row-txt"><span class="row-t">'+esc(ownerName||"Not claimed yet")+'</span>'+
+        '<span class="row-txt"><span class="row-t">'+esc(ownerName||"Todavía sin asignar")+'</span>'+
         '<span class="row-s">'+(t.ownerId
           ?esc(sinceWords(t.assignedOn))
-          :"Nobody is running this one")+'</span></span></div></div>'+
+          :"Nadie está a cargo")+'</span></span></div></div>'+
       (canEdit?'<p style="font-size:13px;color:var(--text-2);margin-bottom:8px">'+
-        'Hand it to somebody else under <b>More → Territories</b>.</p>':"")+
-      '<div class="lbl">Helpers</div>'+
+        'Pásalo a otra persona en <b>Más → Territorios</b>.</p>':"")+
+      '<div class="lbl">Ayudantes</div>'+
       (canEdit?"":'<p style="font-size:13px;color:var(--text-2);margin-bottom:8px">'+
-        'An admin decides who a territory belongs to.</p>')+
+        'Un administrador decide de quién es un territorio.</p>')+
       '<div class="card">'+teamUsers.filter(function(u){return u.id!==t.ownerId;}).map(function(u){
         var on=(t.assigneeIds||[]).indexOf(u.id)!==-1;
         return '<div class="row"><span class="who '+(on?"":"gray")+'">'+esc(initials(u.name))+'</span>'+
@@ -3764,8 +3764,8 @@ function drawAssign(pick){
           (canEdit?"":' disabled style="opacity:.4"')+'></button></div>';
       }).join("")+'</div>'+
       '<p style="font-size:13px;color:var(--text-2);margin-top:12px">'+
-      'Helpers see each other on the map and can talk with the button there, '+
-      'while the Map tab is open.</p>';
+      'Los ayudantes se ven en el mapa y pueden hablar con el botón de ahí, '+
+      'mientras la pestaña Mapa esté abierta.</p>';
 
     $("#asTerr").addEventListener("change",function(){drawAssign(this.value);});
     $("#asBody").querySelectorAll("[data-as]").forEach(function(b){
@@ -3777,7 +3777,7 @@ function drawAssign(pick){
           if(x.getAttribute("aria-checked")==="true")ids.push(x.dataset.as);
         });
         team("assignTerritory",{territory:cur,assigneeIds:ids})
-          .then(function(){toast("Saved ✓");})
+          .then(function(){toast("Guardado ✓");})
           .catch(function(e){toast(e.message,true);drawAssign(cur);});
       });
     });
@@ -3862,7 +3862,7 @@ function pickMime(){
 function pttHint(t,resetMs){
   var h=$("#pttHint");if(!h)return;
   h.textContent=t;
-  if(resetMs)setTimeout(function(){h.textContent="Hold to talk";},resetMs);
+  if(resetMs)setTimeout(function(){h.textContent="Mantén para hablar";},resetMs);
 }
 
 function startTalk(){
@@ -3881,25 +3881,25 @@ function startTalk(){
       mediaRec=null;
       btn.classList.remove("rec");
       var secs=Math.round((Date.now()-started)/1000);
-      if(secs<1||blob.size<800){pttHint("Hold to talk");return;}
-      pttHint("Sending…");
+      if(secs<1||blob.size<800){pttHint("Mantén para hablar");return;}
+      pttHint("Enviando…");
       var fr=new FileReader();
       fr.onload=function(){
         var dataUrl=String(fr.result);
-        if(dataUrl.length>44000){pttHint("Too long — keep it under 10s",2600);return;}
+        if(dataUrl.length>44000){pttHint("Muy largo — menos de 10s",2600);return;}
         team("postVoice",{territory:activeTerritory(),audio:dataUrl,dur:secs})
-          .then(function(){pttHint("Sent ✓",1600);})
+          .then(function(){pttHint("Enviado ✓",1600);})
           .catch(function(e){pttHint(String(e.message).slice(0,44),2800);});
       };
       fr.readAsDataURL(blob);
     };
     mediaRec.start();
     btn.classList.add("rec");
-    pttHint("Listening… release to send");
+    pttHint("Escuchando… suelta para enviar");
     haptic(15);
     // Hard stop: a stuck button must not record until the battery dies.
     recStop=setTimeout(stopTalk,10000);
-  }).catch(function(){pttHint("Microphone blocked",2800);});
+  }).catch(function(){pttHint("Micrófono bloqueado",2800);});
 }
 function stopTalk(){
   if(recStop){clearTimeout(recStop);recStop=null;}
@@ -3941,7 +3941,7 @@ function playNext(){
     // Autoplay stays blocked until the page has been interacted with.
     playing=false;
     audioQueue.unshift(c);
-    toast("Tap the screen to hear "+String(c.name).split(" ")[0],true);
+    toast("Toca la pantalla para oír a "+String(c.name).split(" ")[0],true);
   });
 }
 
@@ -4006,7 +4006,7 @@ function setPicking(on){
 }
 function updatePickBar(){
   var n=pickedCount();
-  $("#pbCount").textContent=n+" selected";
+  $("#pbCount").textContent=n+" seleccionadas";
   $("#pbAssign").disabled=!n;
   $("#pbAssign").style.opacity=n?"1":".5";
 }
@@ -4022,13 +4022,13 @@ function refreshWorkingBtn(){
   var can=me&&!guestMode&&terrFilter!=="all"&&mine;
   b.style.display=can?"block":"none";
   b.setAttribute("aria-pressed",working?"true":"false");
-  b.textContent=working?"■ Stop working":"▶ Start working";
+  b.textContent=working?"■ Parar":"▶ Trabajar";
 }
 /* Shared by the toolbar switch and the ledger's "Start working" button, so
    both run the same confirm, the same request and the same repaint. */
 function setWorking(next,btn,terr){
   terr=terr||terrFilter;
-  if(!next&&!confirm("Stop working "+terr+"?\n\nAnyone helping today loses access to their numbers straight away."))return;
+  if(!next&&!confirm("¿Parar "+terr+"?\n\nQuien esté ayudando hoy pierde el acceso a sus números de inmediato."))return;
   if(btn)btn.disabled=true;
   team("setTerritoryWorking",{territory:terr,working:next}).then(function(r){
     if(terr===terrFilter)working=r.working;
@@ -4037,11 +4037,11 @@ function setWorking(next,btn,terr){
     held.list.forEach(function(p){if(p.territory===terr)p.live=r.working;});
     refreshWorkingBtn();refreshHeldBtn();renderHouses();
     if(heldOpen())drawHeld();
-    toast(r.working?("Working "+terr):"Stopped — helpers are signed out");
+    toast(r.working?("Trabajando "+terr):"Parado — los ayudantes ya no tienen acceso");
   }).catch(function(e){toast(e.message,true);}).then(function(){if(btn)btn.disabled=false;});
 }
 $("#btnWorking").addEventListener("click",function(){
-  if(terrFilter==="all"){toast("Pick one territory first",true);return;}
+  if(terrFilter==="all"){toast("Primero elige un territorio",true);return;}
   setWorking(!working,this);
 });
 $("#btnHeld").addEventListener("click",openHeld);
@@ -4075,7 +4075,7 @@ function normPacket(a,whoFallback){
     :String(a.houseIds||"").split(",").filter(Boolean);
   return {
     id:a.id,territory:a.territory||"",
-    who:a.who||whoFallback||"Someone",
+    who:a.who||whoFallback||"Alguien",
     hasAccount:(a.hasAccount!==undefined)?!!a.hasAccount:!!a.assigneeId,
     guestCode:a.guestCode||"",houseIds:ids,
     expiresAt:Number(a.expiresAt||0),
@@ -4133,17 +4133,17 @@ function heldPeople(){var s={};liveHeld().forEach(function(p){s[p.who]=1;});retu
 
 function dnvSub(){
   var list=dnvHouses(),due=dnvDueHouses();
-  if(!list.length)return "No numbers are marked";
-  return list.length+" number"+(list.length===1?"":"s")+
-    (due.length?" · "+due.length+" worth checking again":"");
+  if(!list.length)return "Ningún número está marcado";
+  return list.length+" número"+(list.length===1?"":"s")+
+    (due.length?" · "+due.length+" para revisar otra vez":"");
 }
 
 function heldSub(){
-  if(held.at===0)return held.err?"Can't check right now":"Checking…";
+  if(held.at===0)return held.err?"No se puede revisar ahora":"Revisando…";
   var t=heldTotal();
-  if(!t)return "You have not handed any out";
+  if(!t)return "No has entregado ninguno";
   var m=heldPeople();
-  return t+" number"+(t===1?"":"s")+" with "+m+" "+(m===1?"person":"people");
+  return t+" número"+(t===1?"":"s")+" con "+m+" "+(m===1?"persona":"personas");
 }
 
 /* The one choke point: every mutation of `held` ends here. Writes display on
@@ -4155,9 +4155,9 @@ function refreshHeldBtn(){
   var show=!!me&&!guestMode&&(unknown||heldTotal()>0);
   b.style.display=show?"block":"none";
   if(show){
-    b.textContent=unknown?"\u{1F465} ?":"\u{1F465} "+heldTotal()+" out";
-    b.setAttribute("aria-label",unknown?"Can't check who has numbers"
-      :heldTotal()+" numbers handed out");
+    b.textContent=unknown?"\u{1F465} ?":"\u{1F465} "+heldTotal()+" fuera";
+    b.setAttribute("aria-label",unknown?"No se puede ver quién tiene números"
+      :heldTotal()+" números entregados");
   }
   var s=$("#tmHeldSub");if(s)s.textContent=heldSub();
 }
@@ -4168,9 +4168,9 @@ function heldTagFor(id){
   if(guestMode||!me||held.at===0)return "";
   var names=held.by[id];
   if(!names||!names.length)return "";
-  var t="Assigned to: "+(names.length===1?names[0]
-    :names.length===2?names[0]+" and "+names[1]
-    :names.length+" people");
+  var t="Asignado a: "+(names.length===1?names[0]
+    :names.length===2?names[0]+" y "+names[1]
+    :names.length+" personas");
   return '<span class="held-tag">'+esc(t)+'</span>';
 }
 
@@ -4195,14 +4195,14 @@ function myNumbersRow(){
   var sub;
   if(live.length){
     var ends=endsWord(live[0].expiresAt);
-    sub=n+" number"+(n===1?"":"s")+" from "+esc(String(live[0].from||"").split(" ")[0])+
+    sub=n+" número"+(n===1?"":"s")+" de "+esc(String(live[0].from||"").split(" ")[0])+
       (ends?" · "+esc(ends):"");
   }else{
     // An ended packet says why, rather than vanishing and leaving a blank app.
-    sub=esc(myPackets[0].reason||"Those numbers have been returned.");
+    sub=esc(myPackets[0].reason||"Esos números ya se devolvieron.");
   }
   return '<div class="row"><span class="row-ico">\u{1F4CD}</span>'+
-    '<span class="row-txt"><span class="row-t">Your numbers</span>'+
+    '<span class="row-txt"><span class="row-t">Tus números</span>'+
     '<span class="row-s">'+sub+'</span></span></div>';
 }
 
@@ -4236,7 +4236,7 @@ function loadHeld(){
   }).catch(function(e){
     if(seq!==heldSeq||!me||guestMode)return;
     held.scope=scope;
-    held.err=e.message||"Could not check";held.offline=netOffline(e);
+    held.err=e.message||"No se pudo revisar";held.offline=netOffline(e);
   }).then(function(){
     if(seq!==heldSeq)return;   // a newer answer is already on its way
     heldFetching=false;heldFetchScope=null;
@@ -4265,9 +4265,9 @@ function openHeld(){
    outlive tonight, and a phone left open crosses midnight on its own. */
 function endsWord(ms){
   if(!ms)return "";
-  if(ms<=Date.now())return "ended";
+  if(ms<=Date.now())return "terminado";
   var end=new Date();end.setHours(23,59,59,999);
-  return ms<=end.getTime()?"ends tonight":"ends tomorrow";
+  return ms<=end.getTime()?"termina hoy":"termina mañana";
 }
 function clockTime(ms){
   var d=new Date(ms),h=d.getHours(),m=d.getMinutes();
@@ -4302,7 +4302,7 @@ function numbersByStreet(ids){
 function heldNumbers(ids){
   if(!records.length)
     return '<p style="font-size:13.5px;color:var(--text-2);padding:11px 14px;margin:0">'+
-      'The numbers appear once this phone has synced.</p>';
+      'Los números aparecen cuando este teléfono se sincronice.</p>';
   var g=numbersByStreet(ids),html="";
   g.groups.forEach(function(gr){
     html+='<span class="nc-st">'+esc(gr.street)+'</span>'+
@@ -4315,18 +4315,18 @@ function heldNumbers(ids){
 }
 
 function drawHeld(){
-  var t=heldTotal(),scope=held.scope||"All territories";
+  var t=heldTotal(),scope=held.scope||"Todos los territorios";
   // Until the roster has been confirmed once, the header states the scope and
   // nothing else: "0 numbers out" would be a count we have not been given.
   $("#hdSub").textContent=held.at===0?scope
-    :scope+" · "+t+" number"+(t===1?"":"s")+" out";
+    :scope+" · "+t+" número"+(t===1?"":"s")+" entregado"+(t===1?"":"s");
   var body=$("#hdBody");
-  if(held.at===0&&!held.err){body.innerHTML='<div class="empty">Loading…</div>';return;}
+  if(held.at===0&&!held.err){body.innerHTML='<div class="empty">Cargando…</div>';return;}
   if(held.at===0&&held.err){
     body.innerHTML=held.offline
       ?'<div class="empty"><span class="big">\u{1F4F5}</span>'+
-        'Can\'t check who has numbers right now.<br>'+
-        '<span style="font-size:13.5px">You are offline. Try again when you have signal.</span></div>'
+        'No se puede ver quién tiene números ahora.<br>'+
+        '<span style="font-size:13.5px">Estás sin conexión. Intenta cuando tengas señal.</span></div>'
       :'<div class="empty">'+esc(held.err)+'</div>';
     return;
   }
@@ -4341,41 +4341,41 @@ function drawHeld(){
   var html="";
   if(held.err)
     html+='<p style="font-size:13.5px;color:var(--text-2);margin-bottom:12px">'+
-      'Last checked '+esc(clockTime(held.at))+'. '+
-      (held.offline?'You are offline, so this may have changed.':'Could not check just now.')+'</p>';
+      'Última revisión '+esc(clockTime(held.at))+'. '+
+      (held.offline?'Estás sin conexión, esto pudo cambiar.':'No se pudo revisar ahora mismo.')+'</p>';
   if(held.scope&&!working&&list.length)
     html+='<p style="font-size:13.5px;color:var(--text-2);margin-bottom:12px">'+
-      esc(held.scope)+' is stopped, so nobody can open these numbers. '+
-      'Start working '+esc(held.scope)+' and they come back.</p>'+
+      esc(held.scope)+' está parado, así que nadie puede abrir estos números. '+
+      'Vuelve a trabajar '+esc(held.scope)+' y regresan.</p>'+
       '<button class="btn btn-p" id="hdStart" style="width:100%;margin-bottom:12px">'+
-      'Start working '+esc(held.scope)+'</button>';
+      'Trabajar '+esc(held.scope)+'</button>';
 
   if(!list.length){
     html+='<div class="empty"><span class="big">\u{1F465}</span>'+
-      'You have not handed out any numbers.<br>'+
-      '<span style="font-size:13.5px">Tap Select on the Houses tab, pick some, then Assign.</span></div>';
+      'Todavía no has entregado números.<br>'+
+      '<span style="font-size:13.5px">Toca Elegir en la pestaña Casas, escoge algunas y luego Asignar.</span></div>';
   }else{
     list.forEach(function(p){
       var ended=!!(p.expiresAt&&p.expiresAt<=Date.now());
       var paused=!ended&&packetPaused(p)===true;
       var bits=[];
       if(!held.scope&&p.territory)bits.push(esc(p.territory));
-      bits.push(p.houseIds.length+" number"+(p.houseIds.length===1?"":"s"));
-      bits.push(ended?"ended":paused?"paused":esc(endsWord(p.expiresAt)));
-      if(p.from&&me&&p.from!==me.name)bits.push("from "+esc(p.from));
+      bits.push(p.houseIds.length+" número"+(p.houseIds.length===1?"":"s"));
+      bits.push(ended?"terminado":paused?"en pausa":esc(endsWord(p.expiresAt)));
+      if(p.from&&me&&p.from!==me.name)bits.push("de "+esc(p.from));
       html+='<div class="card held-card">'+
         '<div class="row"><span class="who '+(ended||paused?"gray":"held")+'">'+
           esc(initials(p.who))+'</span>'+
           '<span class="row-txt"><span class="row-t">'+esc(p.who)+'</span>'+
           '<span class="row-s">'+bits.filter(Boolean).join(" · ")+'</span></span>'+
-          (ended?'<span class="pill-tag off">ended</span>'
-            :paused?'<span class="pill-tag pend">paused</span>':'')+
+          (ended?'<span class="pill-tag off">terminado</span>'
+            :paused?'<span class="pill-tag pend">en pausa</span>':'')+
         '</div>'+
         heldNumbers(p.houseIds)+
         (ended?"":'<div class="held-acts">'+
-          (p.guestCode?'<button class="btn btn-s" data-hact="code" data-pkt="'+esc(p.id)+'">Show their code</button>':"")+
+          (p.guestCode?'<button class="btn btn-s" data-hact="code" data-pkt="'+esc(p.id)+'">Ver su código</button>':"")+
           '<button class="btn btn-d" data-hact="back" data-pkt="'+esc(p.id)+'"'+
-            (offlineNow()?" disabled":"")+'>Take back</button>'+
+            (offlineNow()?" disabled":"")+'>Quitar</button>'+
         '</div>')+
       '</div>';
     });
@@ -4397,8 +4397,8 @@ function drawHeld(){
 
 function takeBack(p,btn){
   var c=p.houseIds.length;
-  if(!confirm("Take back "+String(p.who).split(" ")[0]+"'s "+c+" number"+(c===1?"":"s")+"?"+
-    "\n\nThey lose them straight away."))return;
+  if(!confirm("¿Quitarle "+c+" número"+(c===1?"":"s")+" a "+String(p.who).split(" ")[0]+"?"+
+    "\n\nLos pierde de inmediato."))return;
   btn.disabled=true;
   team("revokeAssignment",{id:p.id}).then(function(){
     // By id, not by identity: a refresh in between replaces every packet
@@ -4406,7 +4406,7 @@ function takeBack(p,btn){
     held.list=held.list.filter(function(x){return x.id!==p.id;});
     refreshHeldBtn();renderHouses();
     if(openSheets.indexOf("#sh-pick")!==-1)closeSheet("#sh-pick");
-    toast("Numbers taken back ✓");
+    toast("Números recuperados ✓");
     if(heldOpen())drawHeld();
   }).catch(function(e){
     // Nothing goes until the server confirms: somebody who still has access
@@ -4421,19 +4421,19 @@ function takeBack(p,btn){
 $("#pbAssign").addEventListener("click",function(){
   var ids=pickedIds();
   if(!ids.length)return;
-  if(!me){toast("Sign in first to hand out numbers",true);openAuth();return;}
+  if(!me){toast("Entra primero para entregar números",true);openAuth();return;}
   var terr=terrFilter!=="all"?terrFilter:(byId(ids[0])||{}).HouseTerritoryNumber||"";
-  if(!terr){toast("These houses have no territory set",true);return;}
+  if(!terr){toast("Estas casas no tienen territorio",true);return;}
   drawAssignPicker(ids,terr);
   openSheet("#sh-pick");
 });
 
 function drawAssignPicker(ids,terr){
-  $("#pTitle").textContent="Assign "+ids.length+" number"+(ids.length===1?"":"s");
+  $("#pTitle").textContent="Asignar "+ids.length+" número"+(ids.length===1?"":"s");
   $("#pSub").textContent=terr;
   var others=teamUsers.filter(function(u){return !me||u.id!==me.id;});
   $("#pBody").innerHTML=
-    '<div class="lbl" style="margin-top:0">Someone with the app</div>'+
+    '<div class="lbl" style="margin-top:0">Alguien que ya tiene la app</div>'+
     (others.length?'<div class="card">'+others.map(function(u){
       return '<button class="user-row" data-give="'+esc(u.id)+'">'+
         '<span class="who">'+esc(initials(u.name))+'</span>'+
@@ -4441,16 +4441,16 @@ function drawAssignPicker(ids,terr){
         '<span class="ur-s">'+esc(u.phone||u.email||"")+'</span></span>'+
         '<span class="row-act">›</span></button>';
     }).join("")+'</div>'
-    :'<p style="font-size:13.5px;color:var(--text-2)">Nobody else has an account yet.</p>')+
-    '<div class="lbl">Someone without the app</div>'+
-    '<div class="f"><label for="gvName">Their name</label>'+
+    :'<p style="font-size:13.5px;color:var(--text-2)">Nadie más tiene cuenta todavía.</p>')+
+    '<div class="lbl">Alguien sin la app</div>'+
+    '<div class="f"><label for="gvName">Su nombre</label>'+
       '<input id="gvName" placeholder="Hermano Lopez" autocomplete="off"></div>'+
     /* The one thing the list cannot tell them. It sits at the top of their
        screen, which for somebody without an account is nearly the whole app. */
-    '<div class="f"><label for="gvMsg">Anything they should know (optional)</label>'+
+    '<div class="f"><label for="gvMsg">Algo que deba saber (opcional)</label>'+
       '<textarea id="gvMsg" rows="2" maxlength="400" '+
-      'placeholder="Start at the top of the street"></textarea></div>'+
-    '<button class="btn btn-p" id="gvGo" style="width:100%">Create a code for them</button>'+
+      'placeholder="Empieza por el principio de la calle"></textarea></div>'+
+    '<button class="btn btn-p" id="gvGo" style="width:100%">Crear su código</button>'+
     '<div id="gvErr" style="color:var(--bad);font-size:13.5px;margin-top:10px"></div>';
 
   $("#pBody").querySelectorAll("[data-give]").forEach(function(b){
@@ -4463,7 +4463,7 @@ function drawAssignPicker(ids,terr){
   });
   $("#gvGo").addEventListener("click",function(){
     var name=$("#gvName").value.trim();
-    if(!name){$("#gvErr").textContent="Type their name first";return;}
+    if(!name){$("#gvErr").textContent="Escribe su nombre primero";return;}
     this.disabled=true;
     makeAssignment({territory:terr,houseIds:ids,guestName:name,
       message:(($("#gvMsg")||{}).value||"").trim()},name);
@@ -4490,7 +4490,7 @@ function makeAssignment(payload,who){
   }).catch(function(e){
     // Nothing was queued — handing numbers out has no offline path — so say
     // that plainly instead of echoing sync's "saved on this phone".
-    var msg=netOffline(e)?"No signal — nothing was sent. Try again when you have a bar.":e.message;
+    var msg=netOffline(e)?"Sin señal — no se envió nada. Intenta cuando tengas señal.":e.message;
     var el=$("#gvErr");if(el)el.textContent=msg;else toast(msg,true);
     var g=$("#gvGo");if(g)g.disabled=false;
     $("#pBody").querySelectorAll("[data-give]").forEach(function(b){b.disabled=false;});
@@ -4512,30 +4512,30 @@ function showHandoff(p){
   var url=guest?guestUrl(p.guestCode):"";
   var ends=endsWord(p.expiresAt);
 
-  $("#pTitle").textContent=guest?("Give this to "+first):("Sent to "+first);
-  $("#pSub").textContent=c+" number"+(c===1?"":"s")+" · "+p.territory+(ends?" · "+ends:"");
+  $("#pTitle").textContent=guest?("Dale esto a "+first):("Enviado a "+first);
+  $("#pSub").textContent=c+" número"+(c===1?"":"s")+" · "+p.territory+(ends?" · "+ends:"");
 
-  var nums='<div class="lbl">The numbers they have</div>'+
+  var nums='<div class="lbl">Los números que tiene</div>'+
     '<div class="card">'+heldNumbers(p.houseIds)+'</div>'+
-    '<div class="f"><label for="hoMsg">Anything they should know</label>'+
+    '<div class="f"><label for="hoMsg">Algo que deba saber</label>'+
       '<textarea id="hoMsg" rows="2" maxlength="400" '+
-      'placeholder="Start at the top of the street">'+esc(p.message||"")+'</textarea></div>'+
+      'placeholder="Empieza por el principio de la calle">'+esc(p.message||"")+'</textarea></div>'+
     '<button class="btn btn-s" id="hoMsgGo" style="width:100%;margin-bottom:12px">'+
-      'Save this message</button>';
+      'Guardar el mensaje</button>';
   var back='<button class="btn btn-d" id="hoBack" style="width:100%"'+
-      (offlineNow()?" disabled":"")+'>Take these numbers back</button>'+
+      (offlineNow()?" disabled":"")+'>Quitar estos números</button>'+
     '<div id="hoErr" style="color:var(--bad);font-size:13.5px;margin-top:10px"></div>';
 
   $("#pBody").innerHTML=guest
     ?'<div class="qr-wrap" id="qrHere"></div>'+
      '<p style="font-size:14px;text-align:center;margin-bottom:6px">'+
-       'They point their camera at this. No app or account needed.</p>'+
-     '<div class="lbl">Or they can type this code</div>'+
+       'Que apunte su cámara aquí. No necesita app ni cuenta.</p>'+
+     '<div class="lbl">O puede escribir este código</div>'+
      '<div class="code-box">'+esc(p.guestCode)+'</div>'+
-     '<button class="btn btn-s" id="qrShare" style="width:100%;margin-bottom:8px">Send the link instead</button>'+
+     '<button class="btn btn-s" id="qrShare" style="width:100%;margin-bottom:8px">Mejor manda el enlace</button>'+
      nums+
      '<p style="font-size:12.5px;color:var(--text-2);margin-bottom:12px">'+
-       'Their access ends tonight, or the moment you stop working this territory.</p>'+
+       'Su acceso termina hoy en la noche, o en cuanto pares este territorio.</p>'+
      back
     :'<div class="card"><div class="row">'+
        '<span class="who held">'+esc(initials(p.who))+'</span>'+
@@ -4543,9 +4543,9 @@ function showHandoff(p){
        '<span class="row-s">'+esc(p.territory)+(ends?' · '+esc(ends):'')+'</span></span></div></div>'+
      nums+
      '<p style="font-size:13px;color:var(--text-2);margin-bottom:12px">'+
-       esc(first)+' already has this territory in the app. Send them the list '+
-       'so they know which numbers are theirs.</p>'+
-     '<button class="btn btn-s" id="hoShare" style="width:100%;margin-bottom:8px">Send them the list</button>'+
+       esc(first)+' ya tiene este territorio en la app. Mándale la lista '+
+       'para que sepa cuáles números son suyos.</p>'+
+     '<button class="btn btn-s" id="hoShare" style="width:100%;margin-bottom:8px">Mandar la lista</button>'+
      back;
 
   if(guest){
@@ -4559,28 +4559,28 @@ function showHandoff(p){
       box.innerHTML=qr.createSvgTag({cellSize:6,margin:2,scalable:true});
     }catch(e){
       box.innerHTML='<p style="color:#333;font-size:13px;text-align:center">'+
-        'Could not draw the code here — send the link instead.</p>';
+        'No se pudo dibujar el código aquí — mejor manda el enlace.</p>';
     }
     $("#qrShare").addEventListener("click",function(){
-      var text=first+", here are your numbers for today: "+url;
-      if(navigator.share)navigator.share({title:"Territory numbers",text:text,url:url}).catch(function(){});
+      var text=first+", aquí están tus números de hoy: "+url;
+      if(navigator.share)navigator.share({title:"Números del territorio",text:text,url:url}).catch(function(){});
       else if(navigator.clipboard){
-        navigator.clipboard.writeText(url).then(function(){toast("Link copied ✓");})
-          .catch(function(){prompt("Copy this link:",url);});
-      }else prompt("Copy this link:",url);
+        navigator.clipboard.writeText(url).then(function(){toast("Enlace copiado ✓");})
+          .catch(function(){prompt("Copia este enlace:",url);});
+      }else prompt("Copia este enlace:",url);
     });
   }else{
     $("#hoShare").addEventListener("click",function(){
       // The list itself, never a credential: this one goes to somebody who
       // already has the app.
       var g=numbersByStreet(p.houseIds);
-      var text=first+", you have these numbers today: "+
-        g.groups.map(function(x){return x.labels.join(", ")+" on "+x.street;}).join("; ")+".";
-      if(navigator.share)navigator.share({title:"Territory numbers",text:text}).catch(function(){});
+      var text=first+", hoy tienes estos números: "+
+        g.groups.map(function(x){return x.labels.join(", ")+" en "+x.street;}).join("; ")+".";
+      if(navigator.share)navigator.share({title:"Números del territorio",text:text}).catch(function(){});
       else if(navigator.clipboard){
-        navigator.clipboard.writeText(text).then(function(){toast("List copied ✓");})
-          .catch(function(){prompt("Copy this:",text);});
-      }else prompt("Copy this:",text);
+        navigator.clipboard.writeText(text).then(function(){toast("Lista copiada ✓");})
+          .catch(function(){prompt("Copia esto:",text);});
+      }else prompt("Copia esto:",text);
     });
   }
   $("#hoBack").addEventListener("click",function(){takeBack(p,this);});
@@ -4590,7 +4590,7 @@ function showHandoff(p){
     mg.disabled=true;
     team("setPacketMessage",{id:p.id,text:text}).then(function(r){
       p.message=r.message||"";
-      toast(p.message?"Message saved ✓":"Message removed");
+      toast(p.message?"Mensaje guardado ✓":"Mensaje quitado");
     }).catch(function(e){
       var el=$("#hoErr");if(el)el.textContent=e.message;else toast(e.message,true);
     }).then(function(){mg.disabled=false;});
@@ -4659,42 +4659,42 @@ function drawGuestHead(){
     var app=document.getElementById("app")||document.body;
     app.insertBefore(head,app.firstChild);
   }
-  var from=(guestInfo&&guestInfo.from)||"the territory holder";
+  var from=(guestInfo&&guestInfo.from)||"el encargado del territorio";
   var count=((guestInfo&&guestInfo.houseIds)||[]).length;
   var msg=(guestInfo&&guestInfo.message)||"";
   head.innerHTML=
     /* Says plainly which kind of user this is, and offers the way out of it.
        Somebody helping for an afternoon may not know an account is possible. */
     '<div class="gh-bar">'+
-      '<span class="gh-badge">GUEST</span>'+
-      '<button class="gh-acct" id="ghAccount">Create account</button>'+
+      '<span class="gh-badge">INVITADO</span>'+
+      '<button class="gh-acct" id="ghAccount">Crear cuenta</button>'+
     '</div>'+
     '<div class="gh-top">'+
       '<span class="who">'+esc(initials(from))+'</span>'+
       '<span class="gh-txt">'+
         '<span class="gh-from">'+esc(from)+'</span>'+
-        '<span class="gh-sub">gave you '+count+' number'+(count===1?"":"s")+
-          ' in '+esc((guestInfo&&guestInfo.territory)||"this territory")+
-          ' · '+esc(endsWord(guestInfo&&guestInfo.expiresAt)||"today")+'</span>'+
+        '<span class="gh-sub">te dio '+count+' número'+(count===1?"":"s")+
+          ' en '+esc((guestInfo&&guestInfo.territory)||"este territorio")+
+          ' · '+esc(endsWord(guestInfo&&guestInfo.expiresAt)||"hoy")+'</span>'+
       '</span>'+
     '</div>'+
     (msg?'<div class="gh-msg">'+esc(msg)+'</div>':"")+
     (guestEnded?'<div class="gh-msg gh-over">'+esc(guestEnded)+
-      ' Anything you wrote is still here — send it when you have signal.</div>':"")+
+      ' Lo que escribiste sigue aquí — mándalo cuando tengas señal.</div>':"")+
     /* The sync pill lives in a bar this screen does not have, so say it here.
        Somebody who has walked a street with no signal needs to know their
        afternoon is still on the phone waiting, not lost. */
     (pendingCount()
       ?'<div class="gh-sub" style="margin-top:9px">'+pendingCount()+
-        ' visit'+(pendingCount()===1?"":"s")+' still on this phone — they send themselves '+
-        'when you have signal.</div>'
+        ' visita'+(pendingCount()===1?"":"s")+' todavía en este teléfono — se envían solas '+
+        'cuando tengas señal.</div>'
       :"")+
-    '<button class="gh-back" id="ghBack">Give the numbers back</button>';
+    '<button class="gh-back" id="ghBack">Devolver los números</button>';
   $("#ghAccount").addEventListener("click",showHowToJoin);
   $("#ghBack").addEventListener("click",function(){
     var n=pendingCount();
-    if(confirm(n?("You have "+n+" visit"+(n===1?"":"s")+" not sent yet.\n\nThey will be lost. Give the numbers back anyway?")
-                :"Give the numbers back?\n\nThey come off this phone."))leaveGuest();
+    if(confirm(n?("Tienes "+n+" visita"+(n===1?"":"s")+" sin enviar.\n\nSe van a perder. ¿Devolver los números de todos modos?")
+                :"¿Devolver los números?\n\nSe quitan de este teléfono."))leaveGuest();
   });
 }
 
@@ -4725,7 +4725,7 @@ function restoreGuest(){
     }else{
       // The server answered, and the answer was no. Say so and leave the work
       // on the phone rather than deleting it under them.
-      guestEnded=e.message||"These numbers have been returned.";
+      guestEnded=e.message||"Estos números ya se devolvieron.";
     }
     applyGuestChrome();
   });
@@ -4787,7 +4787,7 @@ function drawRoute(){
   if(!mapReady)return;
   clearRoute();
   routeOrder=planRoute();
-  if(!routeOrder.length){toast("No houses with a location yet",true);routeOn=false;
+  if(!routeOrder.length){toast("Todavía no hay casas con ubicación",true);routeOn=false;
     $("#routeBtn").setAttribute("aria-pressed","false");return;}
   var pts=[];
   routeOrder.forEach(function(h,i){
@@ -4821,16 +4821,16 @@ function showNext(){
   }).length;
   if(!h){
     card.classList.add("on");
-    $("#ncLabel").textContent="All done";
-    $("#ncAddr").textContent=routeOrder.length+" of "+routeOrder.length+" finished";
-    $("#ncMeta").textContent="Nothing left on this route.";
+    $("#ncLabel").textContent="Todo listo";
+    $("#ncAddr").textContent=routeOrder.length+" de "+routeOrder.length+" terminadas";
+    $("#ncMeta").textContent="Ya no queda nada en esta ruta.";
     $("#ncDir").style.display="none";$("#ncDone").style.display="none";
     return;
   }
   $("#ncDir").style.display="";$("#ncDone").style.display="";
   card.classList.add("on");
-  $("#ncLabel").textContent="Next stop · "+doneN+" of "+routeOrder.length+" done";
-  $("#ncAddr").textContent=h.HouseAddress||"No address";
+  $("#ncLabel").textContent="Siguiente parada · "+doneN+" de "+routeOrder.length+" listas";
+  $("#ncAddr").textContent=h.HouseAddress||"Sin dirección";
   $("#ncMeta").textContent=[h.HouseNotes,h.HouseLanguage].filter(Boolean).join(" · ")||
     [h.HouseCity,h.HouseState].filter(Boolean).join(", ");
   card.dataset.hid=h.id;
@@ -4882,11 +4882,11 @@ function boot(){
       mirror={};list.forEach(function(rec){mirror[rec.id]=rec;});
       records=buildRecords();
       renderHouses();renderRV();buildTerrSub();updateSyncUI();
-      toast("Offline saving unavailable on this browser — changes need signal",true);
+      toast("Este navegador no guarda sin conexión — los cambios necesitan señal",true);
     }).catch(function(){
       $("#houseList").innerHTML='<div class="empty"><span class="big">⚠️</span>'+
-        'Could not load your houses.<br><span style="font-size:13.5px">'+
-        'This browser is blocking offline storage, and there is no signal right now.</span></div>';
+        'No se pudieron cargar tus casas.<br><span style="font-size:13.5px">'+
+        'Este navegador bloquea el guardado sin conexión y ahora mismo no hay señal.</span></div>';
     });
   });
 
@@ -4949,7 +4949,7 @@ function writeDrafts(list){
 }
 function stashDrafts(){
   var out=[];
-  [["rvNew","return visit"],["cNote","visit note"]].forEach(function(p){
+  [["rvNew","revisita"],["cNote","nota de visita"]].forEach(function(p){
     var el=document.getElementById(p[0]);
     var owner=draftOwner[p[0]];
     // Only stash a composer that is actually open and owned. A stale value left
@@ -4965,16 +4965,16 @@ function isSheetOpen(sel){var s=$(sel);return !!(s&&s.classList.contains("open")
 function restoreDrafts(){
   var list=readDrafts().filter(function(d){return d&&d.id&&d.t&&byId(d.id);});
   if(!list.length){writeDrafts([]);return;}
-  $("#pTitle").textContent=list.length>1?"Unsaved notes recovered":"Unsaved note recovered";
-  $("#pSub").textContent=list.length>1?(list.length+" notes were still being typed"):"";
+  $("#pTitle").textContent=list.length>1?"Notas sin guardar recuperadas":"Nota sin guardar recuperada";
+  $("#pSub").textContent=list.length>1?(list.length+" notas se estaban escribiendo"):"";
   $("#pBody").innerHTML=list.map(function(d,i){
     var h=byId(d.id);
     return '<div style="margin-bottom:16px">'+
       '<div class="lbl" style="margin-top:0">'+esc(h.HouseAddress||"")+' · '+esc(d.kind)+'</div>'+
       '<div class="note-box" style="margin-bottom:9px">'+esc(d.t)+'</div>'+
       '<div style="display:flex;gap:9px">'+
-        '<button class="btn btn-s" data-dr="skip" data-i="'+i+'">Discard</button>'+
-        '<button class="btn btn-p" data-dr="keep" data-i="'+i+'">Save as return visit</button>'+
+        '<button class="btn btn-s" data-dr="skip" data-i="'+i+'">Descartar</button>'+
+        '<button class="btn btn-p" data-dr="keep" data-i="'+i+'">Guardar como revisita</button>'+
       '</div></div>';
   }).join("");
   $("#pBody").querySelectorAll("[data-dr]").forEach(function(b){
@@ -4991,7 +4991,7 @@ function restoreDrafts(){
       if(b.dataset.dr==="skip"){done();return;}
       var cur=parseLog(byId(d.id).HouseReturnVisits);
       cur.push({i:entryId(),d:todayStr(),n:d.t});
-      saveChanges(d.id,{HouseReturnVisits:JSON.stringify(cur)},"Note recovered ✓").then(done);
+      saveChanges(d.id,{HouseReturnVisits:JSON.stringify(cur)},"Nota recuperada ✓").then(done);
     });
   });
   openSheet("#sh-pick");
