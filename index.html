@@ -390,6 +390,12 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
 
 #guestHead{flex:0 0 auto;padding:calc(var(--safe-t) + 12px) 14px 12px;
   background:var(--surface);border-bottom:1px solid var(--border);}
+#guestHead .gh-bar{display:flex;align-items:center;justify-content:space-between;
+  gap:10px;margin-bottom:11px;}
+#guestHead .gh-badge{font-size:12px;font-weight:800;letter-spacing:.1em;
+  color:var(--text-3);}
+#guestHead .gh-acct{height:34px;padding:0 13px;border-radius:var(--r-full);
+  background:var(--brand);color:var(--brand-ink);font-size:13px;font-weight:750;flex:0 0 auto;}
 #guestHead .gh-top{display:flex;align-items:center;gap:11px;}
 #guestHead .gh-txt{flex:1;min-width:0;}
 #guestHead .gh-from{display:block;font-size:16px;font-weight:750;line-height:1.2;}
@@ -397,6 +403,7 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
 #guestHead .gh-msg{margin-top:11px;padding:11px 13px;border-radius:var(--r-md);
   background:var(--unit-soft);color:var(--unit);font-size:14.5px;font-weight:600;
   line-height:1.45;white-space:pre-wrap;word-break:break-word;}
+#guestHead .gh-over{background:var(--warn-soft);color:var(--warn);}
 #guestHead .gh-back{margin-top:11px;width:100%;height:44px;border-radius:var(--r-md);
   background:var(--surface-2);color:var(--text-2);font-size:14px;font-weight:700;}
 
@@ -909,7 +916,7 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
 
 /* ═══ CONFIG ═══ */
 var API="https://territory-manager-silk.vercel.app/api/territory";
-var APP_VERSION="2.11.0";
+var APP_VERSION="2.12.0";
 
 /* ═══════════════════════════════════════════════════════════════════════
    OFFLINE DATA LAYER
@@ -1344,6 +1351,13 @@ function findEntry(log,eid){
   return null;
 }
 function fmtDateOr(v,alt){return v?fmtDate(v):alt;}
+// "12 mar" — short enough for the observations column on the printed sheet.
+function fmtDayShort(v){
+  var d=parseDay(v);
+  if(!d)return String(v||"");
+  return d.getDate()+" "+["ene","feb","mar","abr","may","jun",
+    "jul","ago","sep","oct","nov","dic"][d.getMonth()];
+}
 
 /* Do Not Visit, derived from the log by the same rule the server uses — so a
    phone with no signal knows what it just did without waiting to be told. */
@@ -1440,7 +1454,11 @@ function extractApt(addr){
 
 function hasApt(addr){return!!extractApt(addr);}
 
-function generateTerritoryPDF(terrNum,houses){
+/* Two sheets come out of here: the blank one people write on, and the same
+   sheet already filled in. Keeping one generator means the filled copy is the
+   form the group already reads, in the same order, with the same boxes — not a
+   second thing to learn. `results` only decides what goes IN the boxes. */
+function generateTerritoryPDF(terrNum,houses,results){
   if(!window.jspdf||!window.jspdf.jsPDF){
     toast("PDF export needs to load once with a signal",true);return;
   }
@@ -1477,7 +1495,7 @@ function generateTerritoryPDF(terrNum,houses){
     doc.text(totalHouses+" Casas",ml,y);
     y+=5;
     doc.setFont("helvetica","bold");doc.setFontSize(10);
-    doc.text("REGISTRO DE CASA EN CASA",ml,y);
+    doc.text(results?"REGISTRO DE CASA EN CASA — RESULTADOS":"REGISTRO DE CASA EN CASA",ml,y);
     y+=6;
     doc.setFontSize(9);
     doc.setFont("helvetica","bold");
@@ -1552,6 +1570,19 @@ function generateTerritoryPDF(terrNum,houses){
     return y+streetHeaderH;
   }
 
+  /* What was actually recorded at a house, in the order it happened. */
+  function visitLines(h){
+    return visitEntries(h).map(function(e){
+      var k=kindOf(e);
+      return {
+        mark:markOf(e),
+        when:e.d?fmtDayShort(e.d):"",
+        note:noteOf(e),
+        label:labelFor(k)
+      };
+    });
+  }
+
   var fieldIdx=0;
   function addTextField(x,y,w,h,fontSize){
     var tf=new doc.AcroFormTextField();
@@ -1566,32 +1597,64 @@ function generateTerritoryPDF(terrNum,houses){
   var aptHeaderH=5.5;
 
   function calcRowH(h){
-    if(!h||!h.HouseNotes)return rowH;
+    var needed=0;
     doc.setFontSize(7);
-    var lines=doc.splitTextToSize(h.HouseNotes.replace(/[\r\n]+/g," "),notesW-3);
+    if(h&&h.HouseNotes)
+      needed+=doc.splitTextToSize(h.HouseNotes.replace(/[\r\n]+/g," "),notesW-3).length*3.2;
+    if(results&&h){
+      visitLines(h).forEach(function(v){
+        needed+=doc.splitTextToSize(v.when+" · "+v.label+(v.note?" — "+v.note:""),notesW-3).length*3.2;
+      });
+    }
     doc.setFontSize(8);
-    var needed=lines.length*3.2+2;
-    return Math.max(rowH,needed);
+    return Math.max(rowH,needed?needed+2:0);
   }
 
   function drawHouseRows(y,label,indent,h){
     var thisRowH=calcRowH(h);
     doc.setFontSize(8);
+    var vis=(results&&h)?visitLines(h):[];
     var x=ml;
     for(var c=0;c<6;c++){
       doc.setDrawColor(180);doc.setLineWidth(0.2);
       doc.rect(x,y,colWidths[c],thisRowH,"S");
-      if(c>=1&&c<=4){addTextField(x+0.3,y+0.3,colWidths[c]-0.6,thisRowH-0.6,5);}
+      // A filled sheet has nothing to type into.
+      if(!results&&c>=1&&c<=4){addTextField(x+0.3,y+0.3,colWidths[c]-0.6,thisRowH-0.6,5);}
       x+=colWidths[c];
     }
     doc.setTextColor(0,128,0);
     doc.text((indent?"      ":"  ")+label,ml,y+3.8);
     doc.setTextColor(0);
+
+    /* Every result in red, in the same four boxes the group already fills in
+       by hand, so the sheet reads exactly the way theirs does. */
+    if(vis.length){
+      doc.setTextColor(200,0,0);doc.setFont("helvetica","bold");doc.setFontSize(7);
+      vis.slice(-4).forEach(function(v,i){
+        var cx=ml+numW+i*tickW;
+        doc.text(v.mark,cx+tickW/2,y+3.6,{align:"center"});
+      });
+      doc.setFont("helvetica","normal");doc.setTextColor(0);doc.setFontSize(8);
+    }
+
+    var notesX=ml+numW+tickW*4;
+    var ny=y+3.5;
     if(h&&h.HouseNotes){
-      var notesX=ml+numW+tickW*4;
       doc.setFontSize(7);doc.setTextColor(80);
       var lines=doc.splitTextToSize(h.HouseNotes.replace(/[\r\n]+/g," "),notesW-3);
-      doc.text(lines,notesX+1.5,y+3.5);
+      doc.text(lines,notesX+1.5,ny);
+      ny+=lines.length*3.2;
+      doc.setFontSize(8);doc.setTextColor(0);
+    }
+    // The date and what was said, which is the part the four letters cannot say.
+    if(vis.length){
+      doc.setFontSize(7);doc.setTextColor(200,0,0);
+      vis.forEach(function(v){
+        var txt=v.when+" · "+v.label+(v.note?" — "+v.note:"");
+        var ls=doc.splitTextToSize(txt,notesW-3);
+        doc.text(ls,notesX+1.5,ny);
+        ny+=ls.length*3.2;
+      });
       doc.setFontSize(8);doc.setTextColor(0);
     }
     y+=thisRowH;
@@ -1676,9 +1739,10 @@ function generateTerritoryPDF(terrNum,houses){
     doc.text(pgText,ml+cw-doc.getTextWidth(pgText),ph-10);
   }
 
-  var filename="Territory_"+(terrNum==="Unassigned"?"Unassigned":terrNum)+".pdf";
+  var filename=(results?"Resultados_":"Territory_")+
+    (terrNum==="Unassigned"?"Unassigned":terrNum)+".pdf";
   doc.save(filename);
-  toast("PDF exported ✓");
+  toast(results?"Results PDF exported ✓":"PDF exported ✓");
 }
 
 
@@ -2302,7 +2366,7 @@ $("#rowTerr").addEventListener("click",openTerrPicker);
 $("#rowExport").addEventListener("click",function(){
   var m=terrMap(),keys=Object.keys(m).sort();
   if(!records.length){toast("No houses to export",true);return;}
-  if(keys.length===1){generateTerritoryPDF(keys[0],m[keys[0]]);return;}
+  if(keys.length===1){askSheetKind(keys[0],m[keys[0]]);return;}
   $("#pTitle").textContent="Export PDF";
   $("#pSub").textContent="Pick a territory";
   $("#pBody").innerHTML=pickerRow("All territories","One PDF per territory",'data-exp="__all__"')+
@@ -2319,7 +2383,7 @@ $("#pBody").addEventListener("click",function(e){
   }else{
     var m=terrMap();closeSheet("#sh-pick");
     if(b.dataset.exp==="__all__")Object.keys(m).sort().forEach(function(t){generateTerritoryPDF(t,m[t]);});
-    else generateTerritoryPDF(b.dataset.exp,m[b.dataset.exp]);
+    else askSheetKind(b.dataset.exp,m[b.dataset.exp]);
   }
 });
 
@@ -3092,6 +3156,75 @@ function drawDNVClear(){
   });
 }
 
+/* A blank sheet to write on, or the same sheet already filled in. The filled
+   one is what somebody hands to the overseer when the phone could not reach
+   the internet — everything the app knows, on paper, in the usual form. */
+function askSheetKind(terr,houses){
+  $("#pTitle").textContent="Print "+terr;
+  $("#pSub").textContent=houses.length+" house"+(houses.length===1?"":"s");
+  $("#pBody").innerHTML=
+    '<div class="card">'+
+      '<button class="row" data-sheet="blank">'+
+        '<span class="row-ico">📄</span>'+
+        '<span class="row-txt"><span class="row-t">Blank sheet</span>'+
+        '<span class="row-s">The usual form, with room to write</span></span>'+
+        '<span class="row-act">›</span></button>'+
+      '<button class="row" data-sheet="results">'+
+        '<span class="row-ico">🖊️</span>'+
+        '<span class="row-txt"><span class="row-t">With the results filled in</span>'+
+        '<span class="row-s">Every visit in red, with its date and note</span></span>'+
+        '<span class="row-act">›</span></button>'+
+    '</div>';
+  $("#pBody").querySelectorAll("[data-sheet]").forEach(function(b){
+    b.addEventListener("click",function(){
+      closeSheet("#sh-pick");
+      generateTerritoryPDF(terr,houses,b.dataset.sheet==="results");
+    });
+  });
+  openSheet("#sh-pick");
+}
+
+/* Accounts are not self-service, and saying so is the whole point of this
+   screen: somebody has to add you, and then you choose your own password. A
+   button that quietly did nothing would be worse than no button. */
+function showHowToJoin(){
+  var who=(guestInfo&&guestInfo.from)||"whoever gave you these numbers";
+  var phone=(guestInfo&&guestInfo.fromPhone)||"";
+  $("#pTitle").textContent="Create an account";
+  $("#pSub").textContent="It takes about a minute";
+  $("#pBody").innerHTML=
+    '<p style="font-size:14.5px;margin-bottom:14px">With an account the numbers '+
+      'stay on your phone between days, you keep your own return visits, and you '+
+      'can be given a whole territory.</p>'+
+    '<div class="lbl" style="margin-top:0">How it works</div>'+
+    '<div class="card">'+
+      '<div class="row"><span class="who">1</span><span class="row-txt">'+
+        '<span class="row-t">Ask '+esc(who)+'</span>'+
+        '<span class="row-s" style="white-space:normal">They add your name and give '+
+        'you a six-character code.</span></span></div>'+
+      '<div class="row"><span class="who">2</span><span class="row-txt">'+
+        '<span class="row-t">Scan the code they show you</span>'+
+        '<span class="row-s" style="white-space:normal">It opens this app with the '+
+        'code already filled in. They can also send you the link.</span></span></div>'+
+      '<div class="row"><span class="who">3</span><span class="row-txt">'+
+        '<span class="row-t">Choose your own password</span>'+
+        '<span class="row-s" style="white-space:normal">Nobody else sees it — not '+
+        'even them.</span></span></div>'+
+    '</div>'+
+    (phone?'<a class="btn btn-p" style="width:100%;display:flex;align-items:center;'+
+      'justify-content:center;text-decoration:none;margin-top:12px" href="tel:'+
+      esc(phone)+'">Call '+esc(String(who).split(" ")[0])+'</a>':"")+
+    '<button class="btn btn-s" id="joinHaveCode" style="width:100%;margin-top:8px">'+
+      'I already have a code</button>'+
+    '<p style="font-size:13px;color:var(--text-2);margin-top:12px">Your numbers stay '+
+      'on this phone while you do this. Nothing is lost.</p>';
+  $("#joinHaveCode").addEventListener("click",function(){
+    closeSheet("#sh-pick");
+    setTimeout(function(){teamHasUsers=true;openSheet("#sh-auth");drawAuth("code");},260);
+  });
+  openSheet("#sh-pick");
+}
+
 /* ── the territory record card ──────────────────────────────────────────
    Who has each territory now, since when, and everyone who has had it before.
    The congregation's paper card, kept by the app. */
@@ -3856,6 +3989,9 @@ function loadTeam(){
 
 var picking=false, picked={}, working=false;
 var guestMode=false, guestInfo=null;
+/* Why the numbers stopped working, when the server has told us. Empty means
+   either all is well or we simply have not been able to ask. */
+var guestEnded="";
 
 function pickedIds(){return Object.keys(picked).filter(function(k){return picked[k];});}
 function pickedCount(){return pickedIds().length;}
@@ -4527,6 +4663,12 @@ function drawGuestHead(){
   var count=((guestInfo&&guestInfo.houseIds)||[]).length;
   var msg=(guestInfo&&guestInfo.message)||"";
   head.innerHTML=
+    /* Says plainly which kind of user this is, and offers the way out of it.
+       Somebody helping for an afternoon may not know an account is possible. */
+    '<div class="gh-bar">'+
+      '<span class="gh-badge">GUEST</span>'+
+      '<button class="gh-acct" id="ghAccount">Create account</button>'+
+    '</div>'+
     '<div class="gh-top">'+
       '<span class="who">'+esc(initials(from))+'</span>'+
       '<span class="gh-txt">'+
@@ -4537,6 +4679,8 @@ function drawGuestHead(){
       '</span>'+
     '</div>'+
     (msg?'<div class="gh-msg">'+esc(msg)+'</div>':"")+
+    (guestEnded?'<div class="gh-msg gh-over">'+esc(guestEnded)+
+      ' Anything you wrote is still here — send it when you have signal.</div>':"")+
     /* The sync pill lives in a bar this screen does not have, so say it here.
        Somebody who has walked a street with no signal needs to know their
        afternoon is still on the phone waiting, not lost. */
@@ -4546,6 +4690,7 @@ function drawGuestHead(){
         'when you have signal.</div>'
       :"")+
     '<button class="gh-back" id="ghBack">Give the numbers back</button>';
+  $("#ghAccount").addEventListener("click",showHowToJoin);
   $("#ghBack").addEventListener("click",function(){
     var n=pendingCount();
     if(confirm(n?("You have "+n+" visit"+(n===1?"":"s")+" not sent yet.\n\nThey will be lost. Give the numbers back anyway?")
@@ -4559,12 +4704,30 @@ function restoreGuest(){
   if(!t||!i)return false;
   guestMode=true;guestInfo=i;authToken=t;
   applyGuestChrome();
-  // Confirm the packet is still live; if it was withdrawn, say so plainly.
+  /* Check whether the numbers are still theirs — but NEVER throw the session
+     away because the check failed. Somebody who closed the app in a driveway
+     with no signal must find their afternoon exactly where they left it; the
+     old code called leaveGuest() here, which wiped both the houses and every
+     visit not yet uploaded. Only the server actually saying the numbers are
+     gone ends the session, and even then the queue is kept. */
   team("guestStatus",{}).then(function(r){
-    guestInfo.houseIds=r.houseIds;applyGuestChrome();
+    guestInfo.houseIds=r.houseIds;
+    if(r.from!==undefined)guestInfo.from=r.from;
+    if(r.message!==undefined)guestInfo.message=r.message;
+    if(r.expiresAt)guestInfo.expiresAt=r.expiresAt;
+    guestEnded="";
+    try{localStorage.setItem("tm_guest_info",JSON.stringify(guestInfo));}catch(e){}
+    applyGuestChrome();
   }).catch(function(e){
-    toast(e.message,true);
-    leaveGuest();
+    if(netOffline(e)){
+      // No signal. Everything they have is on this phone and stays there.
+      guestEnded="";
+    }else{
+      // The server answered, and the answer was no. Say so and leave the work
+      // on the phone rather than deleting it under them.
+      guestEnded=e.message||"These numbers have been returned.";
+    }
+    applyGuestChrome();
   });
   return true;
 }
