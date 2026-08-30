@@ -679,7 +679,7 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
           <button id="searchClear" aria-label="Borrar búsqueda">✕</button>
         </div>
         <div class="tool-row" id="toolRow">
-          <button class="tool-btn" id="btnPick" aria-pressed="false">☑ Elegir</button>
+          <button class="tool-btn" id="btnPick" aria-pressed="false">☑ Seleccionar para Compartir</button>
           <button class="tool-btn" id="btnWorking" aria-pressed="false" style="display:none">▶ Empezar</button>
           <button class="tool-btn" id="btnHeld" style="display:none"></button>
         </div>
@@ -916,7 +916,7 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
 
 /* ═══ CONFIG ═══ */
 var API="https://territory-manager-silk.vercel.app/api/territory";
-var APP_VERSION="2.13.0";
+var APP_VERSION="2.14.0";
 
 /* ═══════════════════════════════════════════════════════════════════════
    OFFLINE DATA LAYER
@@ -1287,12 +1287,12 @@ function liveEntries(s){return parseLog(s).filter(function(e){return e&&!e.x;});
    The colour only repeats what the letter already says. */
 var KINDS=[
   {k:"NH",m:"NH",l:"No en casa",i:"\u{1F6AA}"},
-  {k:"M", m:"M", l:"Hombre",     i:"\u{1F464}"},
-  {k:"W", m:"W", l:"Mujer",   i:"\u{1F464}"},
-  {k:"BZ",m:"BZ",l:"Ocupado",    i:"\u{23F3}"},
-  {k:"CB",m:"CB",l:"Vuelva",i:"\u{21A9}\u{FE0F}"},
+  {k:"M", m:"H", l:"Hombre",     i:"\u{1F464}"},
+  {k:"W", m:"M", l:"Mujer",   i:"\u{1F464}"},
+  {k:"BZ",m:"O", l:"Ocupado",    i:"\u{23F3}"},
+  {k:"CB",m:"V", l:"Vuelva",i:"\u{21A9}\u{FE0F}"},
   {k:"RV",m:"RV",l:"Revisita",i:"\u{1F4D6}"},
-  {k:"DNV",m:"DNV",l:"No visitar",i:"\u{26D4}"},
+  {k:"DNV",m:"NV",l:"No visitar",i:"\u{26D4}"},
   {k:"DNVX",m:"—",l:"No visitar quitado",i:"\u{21A9}\u{FE0F}"},
   // Legacy shapes, shown but never offered.
   {k:"T", m:"T", l:"Hablamos",  i:"\u{1F4AC}"},
@@ -1668,7 +1668,7 @@ function generateTerritoryPDF(terrNum,houses,results){
     doc.setFillColor(245,245,243);
     doc.rect(ml+0.2,y+0.2,cw-0.4,aptHeaderH-0.4,"F");
     doc.setTextColor(0);
-    doc.text("  "+baseNum+" (Deptos)",ml,y+3.8);
+    doc.text("  "+baseNum+" (Apts)",ml,y+3.8);
     doc.setFont("helvetica","normal");
     return y+aptHeaderH;
   }
@@ -1858,7 +1858,7 @@ function renderHouses(){
     groups.forEach(function(gr){
       var multi=gr.items.length>1&&gr.items.some(function(h){return hasApt(h.HouseAddress);});
       if(multi)html+='<div class="apt-hd">'+BLDG_SVG+esc(gr.num)+
-        '<span class="apt-n">'+gr.items.length+' deptos</span></div>';
+        '<span class="apt-n">'+gr.items.length+' apts</span></div>';
       gr.items.forEach(function(h){
         var apt=extractApt(h.HouseAddress);
         var label=multi?(apt||gr.num):(extractNumber(h.HouseAddress)+(apt?" #"+apt:""));
@@ -2955,12 +2955,12 @@ function drawPicker(){
       (guestMode?"":tile("RV",true))+
       '<div class="pk-hr"></div>'+
     '</div>'+
-    '<div class="f" style="margin-top:10px"><label for="cNote">Nota (opcional)</label>'+
-      '<textarea id="cNote" rows="2" placeholder="Algo que valga la pena recordar">'+
+    '<div class="f" style="margin-top:10px"><label for="cNote">Notas y Observaciones:</label>'+
+      '<textarea id="cNote" rows="2" placeholder="Escriba aquí los detalles de la visita...">'+
       esc(old?noteOf(old):"")+'</textarea></div>'+
     (old?'<button class="btn btn-s" id="cDel" style="width:100%;margin-bottom:8px">Quitar esta visita</button>':"")+
     (guestMode?"":'<div class="cell-grid"><button class="pk danger wide" data-dnv="1">'+
-      '<span class="pk-b vc k-DNV">DNV</span><span class="pk-l">No visitar</span></button></div>')+
+      '<span class="pk-b vc k-DNV">NV</span><span class="pk-l">No visitar</span></button></div>')+
     '<div id="cErr" style="color:var(--bad);font-size:13.5px;margin-top:10px"></div>';
 
   $("#cBody").querySelectorAll("[data-k]").forEach(function(b){
@@ -3074,12 +3074,12 @@ function drawDNVSet(){
   $("#cTitle").textContent="No visitar";
   $("#cSub").textContent=shortLabel(h);
   $("#cBody").innerHTML=
-    '<p style="font-size:14.5px;margin-bottom:4px">¿Marcar este número como No visitar?</p>'+
+    '<p style="font-size:14.5px;margin-bottom:4px">¿Desea agregar este número a la lista de No Visitar?</p>'+
     '<p style="font-size:13px;color:var(--text-2);margin-bottom:12px">'+
-      'Nadie del grupo podrá visitar ni cambiar '+esc(shortLabel(h))+
-      ' — solo un administrador puede quitarlo.</p>'+
-    '<div class="f"><label for="dnvWhy">¿Por qué? (obligatorio)</label>'+
-      '<textarea id="dnvWhy" rows="3" placeholder="¿Qué dijeron?"></textarea></div>'+
+      'Una vez que se agregue solo el Siervo de Territorios '+
+      'puede quitarlo de la lista.</p>'+
+    '<div class="f"><label for="dnvWhy">¿Por qué? (Requerido)</label>'+
+      '<textarea id="dnvWhy" rows="3" placeholder="Escriba de forma detallada la razón"></textarea></div>'+
     '<p style="font-size:12.5px;color:var(--text-2);margin-bottom:12px">Registrado el '+
       esc(fmtDate(todayStr()))+(me?' por '+esc(String(me.name||"").split(" ")[0]):"")+'</p>'+
     '<button class="btn btn-d" id="dnvGo" style="width:100%" disabled>Marcar No visitar</button>'+
@@ -4353,7 +4353,7 @@ function drawHeld(){
   if(!list.length){
     html+='<div class="empty"><span class="big">\u{1F465}</span>'+
       'Todavía no has entregado números.<br>'+
-      '<span style="font-size:13.5px">Toca Elegir en la pestaña Casas, escoge algunas y luego Asignar.</span></div>';
+      '<span style="font-size:13.5px">Toca Seleccionar para Compartir en la pestaña Casas, escoge algunas y luego Asignar.</span></div>';
   }else{
     list.forEach(function(p){
       var ended=!!(p.expiresAt&&p.expiresAt<=Date.now());
