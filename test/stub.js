@@ -41,7 +41,9 @@
     return {
       id: r[0], HouseAddress: r[1], HouseCity: 'Atascadero', HouseState: 'CA',
       HouseZIP: '93422', HouseTerritoryNumber: 'Atascadero 3',
-      HouseNotes: '', HouseLanguage: '', HouseLastVisitDate: '',
+      // Una nota real del grupo: es lo que hay que poder leer en la banqueta.
+      HouseNotes: r[0] === 'h7' ? 'Traila de atras (trailer behind the house)' : '',
+      HouseLanguage: '', HouseLastVisitDate: '',
       HouseVisitLog: SEED[r[0]] || '', HouseReturnVisits: RVS[r[0]] || '',
       HouseUpdatedAt: '2026-08-20T10:00:00.000Z',
       // A row written before the visit log existed: history in the old column only.

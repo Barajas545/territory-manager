@@ -199,7 +199,8 @@ input,textarea,select{-webkit-appearance:none;appearance:none;}
 .house-num{display:block;flex:0 0 auto;font-size:19px;font-weight:750;letter-spacing:-.02em;line-height:1.15;}
 .house-num .warn-mark{color:var(--bad);font-size:12px;vertical-align:super;margin-left:2px;}
 .house-sub{display:block;flex:1;min-width:0;font-size:12.5px;color:var(--text-2);
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:0;}
+  overflow:hidden;margin-top:0;}
+.house-sub .h-line{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .house-sub .rv-tag{color:var(--rv);font-weight:700;}
 .house-sub .pend{color:var(--warn);font-weight:700;}
 /* Who is holding this one. Darker and heavier than the rest of the subtitle so
@@ -207,6 +208,12 @@ input,textarea,select{-webkit-appearance:none;appearance:none;}
    is tinted while picking. */
 .house-sub .held-tag{color:var(--text);font-weight:750;}
 .house-sub .vcount{color:var(--text);font-weight:750;}
+/* La nota de la direccion es lo que de verdad se necesita leer en la banqueta
+   ("la traila de atras"), y estaba en el mismo gris chico que las etiquetas.
+   Del tamaño que ya usa .note-box en la pantalla de detalle. */
+.house-sub .h-note{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+  overflow:hidden;white-space:normal;font-size:14.5px;color:var(--text);font-weight:600;
+  line-height:1.35;margin-top:3px;}
 .house-sub .blocked{color:var(--bad);font-weight:700;}
 
 /* ── recording a visit from the list ──
@@ -504,7 +511,8 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
   align-items:center;justify-content:center;gap:2px;color:var(--text-3);position:relative;
 }
 .tab .ti{font-size:20px;line-height:1;}
-.tab .tl{font-size:10.5px;font-weight:700;letter-spacing:.01em;}
+.tab .tl{font-size:10.5px;font-weight:700;letter-spacing:.01em;
+  max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 2px;}
 .tab[aria-selected="true"]{color:var(--brand);}
 .tab .tbadge{
   position:absolute;top:5px;left:50%;margin-left:5px;min-width:16px;height:16px;padding:0 4px;
@@ -810,10 +818,10 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
   </div>
 
   <nav id="tabbar" role="tablist">
-    <button class="tab" role="tab" data-view="houses" aria-selected="true"><span class="ti">🏠</span><span class="tl">Casas</span></button>
+    <button class="tab" role="tab" data-view="houses" aria-selected="true"><span class="ti">🏠</span><span class="tl">Territorio</span></button>
     <button class="tab" role="tab" data-view="map" aria-selected="false"><span class="ti">🗺️</span><span class="tl">Mapa</span></button>
-    <button class="tab" role="tab" data-view="rv" aria-selected="false"><span class="ti">📖</span><span class="tl">Revisitas</span><span class="tbadge" id="rvBadge" style="display:none">0</span></button>
-    <button class="tab" role="tab" data-view="more" aria-selected="false"><span class="ti">⚙️</span><span class="tl">Más</span></button>
+    <button class="tab" role="tab" data-view="rv" aria-selected="false"><span class="ti">📖</span><span class="tl">Mis Revisitas</span><span class="tbadge" id="rvBadge" style="display:none">0</span></button>
+    <button class="tab" role="tab" data-view="more" aria-selected="false"><span class="ti">⚙️</span><span class="tl">Opciones</span></button>
   </nav>
 </div>
 
@@ -937,7 +945,7 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
 
 /* ═══ CONFIG ═══ */
 var API="https://territory-manager-silk.vercel.app/api/territory";
-var APP_VERSION="2.15.0";
+var APP_VERSION="2.16.0";
 
 /* ═══════════════════════════════════════════════════════════════════════
    OFFLINE DATA LAYER
@@ -1307,7 +1315,7 @@ function liveEntries(s){return parseLog(s).filter(function(e){return e&&!e.x;});
    look different on every phone, and are unreadable in sunlight at this size.
    The colour only repeats what the letter already says. */
 var KINDS=[
-  {k:"NH",m:"NH",l:"No en casa",i:"\u{1F6AA}"},
+  {k:"NH",m:"NC",l:"No en casa",i:"\u{1F6AA}"},
   {k:"M", m:"H", l:"Hombre",     i:"\u{1F464}"},
   {k:"W", m:"M", l:"Mujer",   i:"\u{1F464}"},
   {k:"BZ",m:"O", l:"Ocupado",    i:"\u{23F3}"},
@@ -1814,11 +1822,13 @@ function houseSubtitle(h){
   var ht=heldTagFor(h.id);if(ht)bits.push(ht);
   if(isRV(h))bits.push('<span class="rv-tag">Revisita</span>');
   bits.push(esc(visitLabel(h.HouseLastVisitDate)));
-  if(h.HouseNotes)bits.push(esc(h.HouseNotes));
-  else if(h.HouseLanguage)bits.push(esc(h.HouseLanguage));
+  if(!h.HouseNotes&&h.HouseLanguage)bits.push(esc(h.HouseLanguage));
   // A helper is told this once, plainly, at the top of their screen.
   if(pending[h.id]&&!guestMode)bits.push('<span class="pend">• sin sincronizar</span>');
-  return bits.join(" · ");
+  /* La nota va debajo, no dentro de la linea: es lo que de verdad se necesita
+     leer en la banqueta, y ahi no compite con las etiquetas por el espacio. */
+  return '<span class="h-line">'+bits.join(" · ")+'</span>'+
+    (h.HouseNotes?'<span class="h-note">'+esc(h.HouseNotes)+'</span>':"");
 }
 
 var BLDG_SVG='<svg class="apt-ico" viewBox="0 0 24 24" fill="currentColor" fill-rule="evenodd" aria-hidden="true">'+
@@ -1961,7 +1971,7 @@ function dnvSubtitle(h,d){
   var bits=['<span class="dnv-tag">NO VISITAR</span>'];
   if(d.reason)bits.push(esc(d.reason));
   if(d.since)bits.push(esc(fmtDate(d.since)));
-  return bits.join(" · ");
+  return '<span class="h-line">'+bits.join(" · ")+'</span>';
 }
 
 /* ═══ RENDER: RETURN VISITS ═══ */
@@ -2640,7 +2650,7 @@ function initMap(){
     // Leaflet never loaded (first run with no signal, or a blocked CDN).
     document.getElementById("map").innerHTML='<div class="empty"><span class="big">\u{1F5FA}\u{FE0F}</span>'+
       'El mapa necesita señal la primera vez.<br><span style="font-size:13.5px">'+
-      'Tus casas y tus notas siguen funcionando sin conexión \u2014 usa la pestaña Casas.</span></div>';
+      'Tus casas y tus notas siguen funcionando sin conexión \u2014 usa la pestaña Territorio.</span></div>';
     return;
   }
   map=L.map("map",{zoomControl:false,attributionControl:false}).setView([35.4873,-120.6700],14);
@@ -3954,7 +3964,7 @@ function userActions(id){
       // or the code already written down somewhere would quietly stop working.
       if(a==="qr"){
         showCode("Dale este código",u.name,
-          esc(u.name)+" también puede abrir la app y tocar <b>Más → Iniciar sesión → Tengo un código</b>.",
+          esc(u.name)+" también puede abrir la app y tocar <b>Opciones → Iniciar sesión → Tengo un código</b>.",
           u.setupCode);
         return;
       }
@@ -3996,7 +4006,7 @@ $("#adAdd").addEventListener("click",function(){
     team("createUser",{name:name,phone:$("#nuPhone").value.trim()}).then(function(r){
       drawAdmin();
       showCode("Dale este código",name,
-        esc(name)+" también puede abrir la app y tocar <b>Más → Entrar → Tengo un código</b>.",
+        esc(name)+" también puede abrir la app y tocar <b>Opciones → Entrar → Tengo un código</b>.",
         r.setupCode);
     }).catch(function(e){$("#nuErr").textContent=e.message;b.disabled=false;});
   });
@@ -4032,7 +4042,7 @@ function drawAssign(pick){
           ?esc(sinceWords(t.assignedOn))
           :"Nadie está a cargo")+'</span></span></div></div>'+
       (canEdit?'<p style="font-size:13px;color:var(--text-2);margin-bottom:8px">'+
-        'Pásalo a otra persona en <b>Más → Territorios</b>.</p>':"")+
+        'Pásalo a otra persona en <b>Opciones → Territorios</b>.</p>':"")+
       '<div class="lbl">Ayudantes</div>'+
       (canEdit?"":'<p style="font-size:13px;color:var(--text-2);margin-bottom:8px">'+
         'Un administrador decide de quién es un territorio.</p>')+
@@ -4634,7 +4644,7 @@ function drawHeld(){
   if(!list.length){
     html+='<div class="empty"><span class="big">\u{1F465}</span>'+
       'Todavía no has entregado números.<br>'+
-      '<span style="font-size:13.5px">Toca Seleccionar para Compartir en la pestaña Casas, escoge algunas y luego Asignar.</span></div>';
+      '<span style="font-size:13.5px">Toca Seleccionar para Compartir en la pestaña Territorio, escoge algunas y luego Asignar.</span></div>';
   }else{
     list.forEach(function(p){
       var ended=!!(p.expiresAt&&p.expiresAt<=Date.now());
