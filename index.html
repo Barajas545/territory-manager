@@ -295,6 +295,22 @@ body:not(.admin) .house.dnv .vrow{pointer-events:none;opacity:.4;}
 .rv-note{font-size:13.5px;color:var(--text-2);margin-top:6px;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
 .rv-count{display:block;font-size:11.5px;color:var(--rv);font-weight:700;margin-top:6px;}
+/* La cita es lo primero que se busca en esta pantalla, asi que se lee antes
+   que la nota. En naranja cuando ya paso: no es un error, es un pendiente. */
+.rv-next{display:block;margin-top:7px;font-size:13px;font-weight:700;color:var(--rv);}
+.rv-next.past{color:var(--warn);}
+.rv-plan{display:block;font-size:12.5px;color:var(--text-3);margin-top:4px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.rv-appt{padding:11px 13px;border-radius:var(--r-md);background:var(--rv-soft);
+  color:var(--rv);font-size:14.5px;font-weight:750;margin-bottom:14px;}
+.rv-appt.past{background:var(--warn-soft);color:var(--warn);}
+.rv-appt span{display:block;font-weight:600;font-size:13px;margin-top:4px;opacity:.9;}
+/* Cada cosa del hilo con su nombre: dentro de dos semanas "hablamos de la
+   familia" y "va a leer Mateo 6" son dos cosas distintas. */
+.rvh{margin-top:4px;font-size:14px;line-height:1.5;white-space:pre-wrap;
+  word-break:break-word;}
+.rvh b{color:var(--text-3);font-weight:750;}
+.rvh-who{font-size:11.5px;color:var(--text-3);font-weight:700;}
 
 /* ═══ MORE ════════════════════════════════════════════════════════════ */
 .sec{margin:16px 12px 0;}
@@ -758,6 +774,11 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
               <span class="row-txt"><span class="row-t">Exportar PDF</span><span class="row-s">Hoja del territorio para imprimir</span></span>
               <span class="row-act">›</span>
             </button>
+            <button class="row" id="rowMyRV">
+              <span class="row-ico">📖</span>
+              <span class="row-txt"><span class="row-t">Mis revisitas</span><span class="row-s">Todas tus notas en PDF, para guardarlas</span></span>
+              <span class="row-act">›</span>
+            </button>
             <button class="row" id="rowTerr">
               <span class="row-ico">🗂️</span>
               <span class="row-txt"><span class="row-t">Territorios</span><span class="row-s" id="terrSub">—</span></span>
@@ -916,7 +937,7 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
 
 /* ═══ CONFIG ═══ */
 var API="https://territory-manager-silk.vercel.app/api/territory";
-var APP_VERSION="2.14.0";
+var APP_VERSION="2.15.0";
 
 /* ═══════════════════════════════════════════════════════════════════════
    OFFLINE DATA LAYER
@@ -1944,12 +1965,132 @@ function dnvSubtitle(h,d){
 }
 
 /* ═══ RENDER: RETURN VISITS ═══ */
+/* ── revisitas ─────────────────────────────────────────────────────────
+   Una revisita guarda cuatro cosas: de que hablaron, cuando quedaron de
+   volver, de que piensa hablar la proxima vez, y lo demas que valga la pena
+   recordar. Las notas viejas solo tienen n, y se siguen leyendo. */
+function rvNoteOf(e){return String((e&&e.n)||"");}
+function rvSpokeOf(e){return String((e&&e.s)||"");}
+function rvPlanOf(e){return String((e&&e.p)||"");}
+// Una nota escrita antes de que existieran los campos guarda todo junto en n.
+function rvHeadline(e){return rvSpokeOf(e)||rvNoteOf(e);}
+
+// "18:30" -> "6:30 PM", como lo lee el grupo en el reloj de su telefono.
+function fmtHM(v){
+  var m=/^(\d{1,2}):(\d{2})$/.exec(String(v||""));
+  if(!m)return String(v||"");
+  var h=+m[1],ap=h<12?"AM":"PM",hh=h%12;if(!hh)hh=12;
+  return hh+":"+m[2]+" "+ap;
+}
+function rvWhenText(e){
+  if(!e||!e.rd)return"";
+  return fmtDate(e.rd)+(e.rt?" · "+fmtHM(e.rt):"");
+}
+
+/* La cita que todavia no llega, la mas cercana. Si todas ya pasaron, la
+   ultima que se acordo: seguir viendola es lo que recuerda que quedo algo
+   pendiente en esa puerta. */
+function rvNext(list){
+  var t=todayStr(),fut=null,past=null,i,e;
+  for(i=0;i<list.length;i++){
+    e=list[i];
+    if(!e||!e.rd)continue;
+    if(e.rd>=t){
+      if(!fut||e.rd<fut.rd||(e.rd===fut.rd&&String(e.rt||"")<String(fut.rt||"")))fut=e;
+    }else if(!past||e.rd>past.rd)past=e;
+  }
+  return fut||past;
+}
+
+/* El territorio personal es de quien lo levanto. Las entradas sin autor son
+   de antes de que se guardara el autor: se muestran igual, porque esconder lo
+   que ya se veia es peor que mostrar de mas. */
+function myRVs(h){
+  var all=getRVs(h);
+  if(!me||!me.id)return all;
+  return all.filter(function(e){
+    var u=String((e&&e.u)||"");
+    return !u||u===me.id;
+  });
+}
+
+/* El mismo formulario en los dos lugares donde se anota una revisita: al
+   empezarla desde la puerta y al volver. Preguntar lo mismo las dos veces es
+   lo que deja leer el historial de corrido.
+
+   El id del primer campo se recibe de afuera porque el sistema de borradores
+   vigila ids fijos (rvNew en la hoja, cNote en el cuadro). Asi lo que se
+   estaba escribiendo se sigue rescatando si el telefono se apaga. */
+function rvFormHTML(pre,mainId){
+  pre=pre||{};
+  return '<div class="f"><label for="'+mainId+'">¿De qué hablaron?</label>'+
+      '<textarea id="'+mainId+'" rows="2" placeholder="El tema, el texto, con quién habló">'+
+      esc(pre.s||"")+'</textarea></div>'+
+    '<div class="f"><label for="rvBack">¿Cuándo va a volver?</label>'+
+      '<div style="display:flex;gap:8px">'+
+        '<input id="rvBack" type="date" style="flex:1.35" value="'+esc(pre.rd||"")+'">'+
+        '<input id="rvTime" type="time" style="flex:1" value="'+esc(pre.rt||"")+'">'+
+      '</div></div>'+
+    '<div class="f"><label for="rvPlan">¿De qué piensa hablar la próxima vez?</label>'+
+      '<textarea id="rvPlan" rows="2" placeholder="Lo que quiere llevar preparado">'+
+      esc(pre.p||"")+'</textarea></div>'+
+    '<div class="f"><label for="rvExtra">Notas y observaciones adicionales</label>'+
+      '<textarea id="rvExtra" rows="2" placeholder="Cualquier otro detalle">'+
+      esc(pre.n||"")+'</textarea></div>';
+}
+function readRVForm(mainId){
+  var g=function(id){var el=$("#"+id);return el?el.value.trim():"";};
+  return {s:g(mainId),rd:g("rvBack"),rt:g("rvTime"),p:g("rvPlan"),n:g("rvExtra")};
+}
+/* Solo se guarda lo que se escribio. Una entrada llena de cadenas vacias pesa
+   en una columna de texto que se sincroniza entera, muchas veces al dia. */
+function rvTrim(o){
+  var out={},k;
+  for(k in o)if(o[k])out[k]=o[k];
+  return out;
+}
+/* Los tres campos que el rescate no vigila por id, leidos dentro de la hoja
+   que se pide: los dos formularios usan los mismos ids. Devuelve un objeto
+   (aunque este vacio) cuando el formulario esta abierto, y null cuando no —
+   asi quien llama sabe si lo que se estaba escribiendo era una revisita. */
+function rvExtraDraft(root){
+  var b=root?root.querySelector("#rvBack"):null;
+  if(!b)return null;
+  var q=function(id){var el=root.querySelector("#"+id);return el?el.value:"";};
+  return rvTrim({rd:b.value,rt:q("rvTime"),
+    p:q("rvPlan").trim(),n:q("rvExtra").trim()});
+}
+function rvHistHTML(x){
+  var out="",who=String(x.u||"")&&me&&String(x.u)!==String(me.id)?whoName(x.u):"";
+  if(who)out+='<div class="rvh-who">'+esc(who)+'</div>';
+  if(rvSpokeOf(x))out+='<div class="rvh"><b>Hablaron de:</b> '+esc(rvSpokeOf(x))+'</div>';
+  if(x.rd)out+='<div class="rvh"><b>Quedó de volver:</b> '+esc(rvWhenText(x))+'</div>';
+  if(rvPlanOf(x))out+='<div class="rvh"><b>Va a hablar de:</b> '+esc(rvPlanOf(x))+'</div>';
+  if(rvNoteOf(x))out+='<div class="rvh">'+esc(rvNoteOf(x))+'</div>';
+  return out;
+}
+
 function renderRV(){
-  var list=records.filter(isRV).map(function(h){
-    var rv=getRVs(h);
+  /* Solo las mias: esta pantalla es el territorio personal, no el de la
+     congregacion. El hilo de cada casa si muestra las de todos. */
+  var t=todayStr();
+  var list=records.map(function(h){
+    var rv=myRVs(h);
+    if(!rv.length)return null;
     var last=rv.map(function(x){return x.d||"";}).sort().slice(-1)[0]||"";
-    return {h:h,rv:rv,last:last};
-  }).sort(function(a,b){return b.last.localeCompare(a.last);});
+    return {h:h,rv:rv,last:last,next:rvNext(rv)};
+  }).filter(Boolean);
+  /* Ordenadas por la cita mas proxima, porque la pregunta de esta pantalla no
+     es "que hice" sino "a quien le toca". Primero lo que viene, despues lo
+     que se paso, y al final las que no quedaron en nada. */
+  list.sort(function(a,b){
+    var ra=(a.next&&a.next.rd)||"", rb=(b.next&&b.next.rd)||"";
+    var pa=ra?(ra>=t?0:1):2, pb=rb?(rb>=t?0:1):2;
+    if(pa!==pb)return pa-pb;
+    if(pa===0)return ra.localeCompare(rb);
+    if(pa===1)return rb.localeCompare(ra);
+    return b.last.localeCompare(a.last);
+  });
 
   var el=$("#rvList");
   if(!list.length){
@@ -1960,12 +2101,16 @@ function renderRV(){
   }
   el.innerHTML=list.map(function(x){
     var newest=x.rv.slice().sort(function(a,b){return String(a.d).localeCompare(String(b.d));}).slice(-1)[0]||{};
+    var nx=x.next,when=nx?rvWhenText(nx):"",late=!!(nx&&nx.rd&&nx.rd<t);
     return '<button class="rv-card" data-act="rv" data-id="'+esc(x.h.id)+'">'+
       '<span class="rv-top"><span class="rv-badge"></span>'+
         '<span class="rv-addr">'+esc(x.h.HouseAddress||"Sin domicilio")+'</span>'+
         '<span class="rv-when">'+esc(x.last?fmtDate(x.last):"")+'</span></span>'+
-      (newest.n?'<span class="rv-note">'+esc(newest.n)+'</span>':'')+
-      '<span class="rv-count">'+x.rv.length+(x.rv.length===1?" nota":" notas")+'</span>'+
+      (when?'<span class="rv-next'+(late?" past":"")+'">'+
+        (late?"Quedó de volver "+esc(when):"Volver "+esc(when))+'</span>':"")+
+      (rvHeadline(newest)?'<span class="rv-note">'+esc(rvHeadline(newest))+'</span>':'')+
+      (nx&&rvPlanOf(nx)?'<span class="rv-plan">Va a hablar de: '+esc(rvPlanOf(nx))+'</span>':'')+
+      '<span class="rv-count">'+x.rv.length+(x.rv.length===1?" visita":" visitas")+'</span>'+
     '</button>';
   }).join("");
 }
@@ -2084,14 +2229,17 @@ function openRV(id){
 function drawRV(){
   var h=byId(curId);if(!h)return;
   var rv=getRVs(h).slice().sort(function(a,b){return String(b.d).localeCompare(String(a.d));});
+  var nx=rvNext(rv),lateN=!!(nx&&nx.rd&&nx.rd<todayStr());
   $("#rBody").innerHTML=
-    '<div class="rv-add">'+
-      '<textarea id="rvNew" placeholder="¿De qué hablaron? ¿Con quién hablaste?"></textarea>'+
-    '</div>'+
-    '<button class="btn btn-p" id="rvAdd" style="width:100%">＋ Agregar nota de revisita</button>'+
+    (nx&&nx.rd?'<div class="rv-appt'+(lateN?" past":"")+'">'+
+      (lateN?"Quedó de volver ":"Volver ")+esc(rvWhenText(nx))+
+      (rvPlanOf(nx)?'<span>Va a hablar de: '+esc(rvPlanOf(nx))+'</span>':'')+'</div>':"")+
+    '<div class="lbl" style="margin-top:0">Anotar esta visita</div>'+
+    rvFormHTML({},"rvNew")+
+    '<button class="btn btn-p" id="rvAdd" style="width:100%">＋ Guardar esta visita</button>'+
     (rv.length?'<div class="lbl">Historial</div><div class="tl">'+rv.map(function(x){
       return '<div class="tl-item"><div class="tl-d">'+esc(fmtDate(x.d))+'</div>'+
-        '<div class="tl-n">'+esc(x.n||"")+'</div>'+
+        rvHistHTML(x)+
         '<button class="tl-del" data-act="rvdel" data-eid="'+esc(x.i||"")+'">Borrar</button></div>';
     }).join("")+'</div>'
     :'<div class="empty" style="padding:30px 10px"><span class="big">📖</span>Todavía no hay notas.</div>');
@@ -2104,11 +2252,16 @@ function drawRV(){
   var addBtn=$("#rvAdd");
   addBtn.addEventListener("click",function(){
     var box=$("#rvNew"), t=box.value.trim();
-    if(!t){toast("Escribe una nota primero",true);return;}
+    if(!t){toast("Escribe de qué hablaron primero",true);return;}
     if(addBtn.disabled)return;
     addBtn.disabled=true;box.disabled=true;
     var cur=parseLog(byId(curId).HouseReturnVisits);
-    cur.push({i:entryId(),d:todayStr(),n:t});
+    /* Una entrada nueva, nunca una edicion: el servidor une por id y se queda
+       con la primera version, y ademas asi queda el historial de regresos. */
+    var ent=rvTrim(readRVForm("rvNew"));
+    ent.i=entryId();ent.d=todayStr();
+    if(me&&me.id&&!guestMode)ent.u=me.id;
+    cur.push(ent);
     saveChanges(curId,{HouseReturnVisits:JSON.stringify(cur),HouseLastVisitDate:todayStr()},"Revisita guardada ✓")
       .then(function(ok){
         clearDraft();          // it is committed now; do not offer it back later
@@ -2363,6 +2516,91 @@ function openTerrPicker(){
 }
 $("#scopeBtn").addEventListener("click",openTerrPicker);
 $("#rowTerr").addEventListener("click",openTerrPicker);
+/* Todas las notas de una persona, en papel. Existe por una razon concreta:
+   quien va a dejar de tener cuenta no deberia tener que escoger entre irse y
+   conservar lo que anoto en dos años de puertas. */
+function generateNotesPDF(){
+  if(!window.jspdf||!window.jspdf.jsPDF){
+    toast("La primera vez, el PDF necesita señal",true);return;
+  }
+  var list=records.filter(function(h){
+    return myRVs(h).length>0||String(h.HousePersonalNotes||"").trim();
+  }).sort(function(a,b){
+    return String(a.HouseAddress||"").localeCompare(String(b.HouseAddress||""));
+  });
+  if(!list.length){toast("Todavía no tienes notas que guardar",true);return;}
+
+  var jsPDF=window.jspdf.jsPDF;
+  var doc=new jsPDF({unit:"mm",format:"letter"});
+  var pw=215.9,ph=279.4,ml=16,mr=16,w=pw-ml-mr;
+  var y=0,pageNum=1;
+
+  function foot(){
+    doc.setFontSize(8);doc.setTextColor(130);
+    doc.text("Página "+pageNum,pw-mr,ph-10,{align:"right"});
+    doc.setTextColor(0);
+  }
+  function header(){
+    doc.setFontSize(15);doc.setFont("helvetica","bold");
+    doc.text("MIS REVISITAS Y NOTAS",ml,18);
+    doc.setFont("helvetica","normal");doc.setFontSize(9);doc.setTextColor(110);
+    doc.text((me&&me.name?me.name+" · ":"")+
+      new Date().toLocaleDateString("es-MX",{year:"numeric",month:"long",day:"numeric"}),ml,24);
+    doc.setTextColor(0);doc.setDrawColor(200);doc.line(ml,27,pw-mr,27);
+    y=34;
+  }
+  function room(need){
+    if(y+need<=ph-16)return;
+    foot();doc.addPage();pageNum++;header();
+  }
+  // Etiqueta en gris y el texto seguido, con sangria francesa si da vuelta.
+  function block(label,text,indent){
+    if(!text)return;
+    var x=ml+(indent||0);
+    doc.setFontSize(9.5);doc.setFont("helvetica","bold");
+    var lw=label?doc.getTextWidth(label+" "):0;
+    var lines=doc.splitTextToSize(String(text).replace(/[\r\n]+/g," "),w-(indent||0)-lw);
+    room(lines.length*4.4+2);
+    if(label){doc.setTextColor(95);doc.text(label,x,y);doc.setTextColor(0);}
+    doc.setFont("helvetica","normal");
+    doc.text(lines,x+lw,y);
+    y+=lines.length*4.4+1.5;
+  }
+
+  header();
+  list.forEach(function(h){
+    var mine=myRVs(h).slice().sort(cmpEntry);
+    room(18);
+    doc.setFontSize(12);doc.setFont("helvetica","bold");
+    doc.text(String(h.HouseAddress||"Sin dirección"),ml,y);
+    doc.setFont("helvetica","normal");y+=5;
+    if(h.HouseTerritoryNumber){
+      doc.setFontSize(8.5);doc.setTextColor(120);
+      doc.text("Territorio "+h.HouseTerritoryNumber,ml,y);
+      doc.setTextColor(0);y+=4.6;
+    }
+    if(String(h.HousePersonalNotes||"").trim())
+      block("Notas personales:",h.HousePersonalNotes,0);
+    mine.forEach(function(e){
+      room(11);
+      doc.setFontSize(9);doc.setFont("helvetica","bold");doc.setTextColor(105,65,198);
+      doc.text(fmtDate(e.d),ml+4,y);
+      doc.setTextColor(0);doc.setFont("helvetica","normal");y+=4.3;
+      block("Hablaron de:",rvSpokeOf(e),7);
+      if(e.rd)block("Quedó de volver:",rvWhenText(e),7);
+      block("Va a hablar de:",rvPlanOf(e),7);
+      block("",rvNoteOf(e),7);
+      y+=1.6;
+    });
+    y+=3;
+    doc.setDrawColor(228);doc.line(ml,y,pw-mr,y);y+=7;
+  });
+  foot();
+  doc.save("Mis_revisitas.pdf");
+  toast("PDF guardado ✓");
+}
+$("#rowMyRV").addEventListener("click",generateNotesPDF);
+
 $("#rowExport").addEventListener("click",function(){
   var m=terrMap(),keys=Object.keys(m).sort();
   if(!records.length){toast("No hay casas para exportar",true);return;}
@@ -2671,6 +2909,8 @@ function refreshChrome(){
   show("#scopeBtn",guestMode||scope.kind!=="numbers");
   var ex=$("#rowExport");
   if(ex)ex.style.display=(!guestMode&&(scope.kind==="admin"||scope.territories.length))?"":"none";
+  // Las revisitas son de la persona, no del territorio: no dependen de tener uno.
+  show("#rowMyRV",!guestMode);
 }
 var pendingSetupCode=null;   // carried in from a scanned QR or a shared link
 
@@ -2964,7 +3204,12 @@ function drawPicker(){
     '<div id="cErr" style="color:var(--bad);font-size:13.5px;margin-top:10px"></div>';
 
   $("#cBody").querySelectorAll("[data-k]").forEach(function(b){
-    b.addEventListener("click",function(){commitVisit(curCell.id,b.dataset.k);});
+    b.addEventListener("click",function(){
+      /* Una revisita pregunta cuatro cosas antes de guardarse. El resto de los
+         resultados se anotan de un toque, que es como debe seguir siendo. */
+      if(b.dataset.k==="RV"&&!guestMode){drawRVSet();return;}
+      commitVisit(curCell.id,b.dataset.k);
+    });
   });
   var dn=$("#cBody").querySelector("[data-dnv]");
   if(dn)dn.addEventListener("click",drawDNVSet);
@@ -2982,13 +3227,15 @@ function noteOf(e){
   return i===-1?"":t.slice(i+3);
 }
 
-function commitVisit(id,k){
+function commitVisit(id,k,rvx){
   var h=byId(id);if(!h)return;
   /* Rebuilt from the record at the moment of the write, never from a snapshot
      taken when the sheet opened: a second tap built from a stale array is how
      the first note gets destroyed for real. */
   var log=seedLogLocal(h);
-  var note=$("#cNote")?$("#cNote").value.trim():"";
+  /* En una revisita, de que hablaron ES la nota de la visita: es lo que se
+     lee en el cuadro de la casa y lo que sale en la hoja impresa. */
+  var note=(rvx&&(rvx.s||rvx.n))||($("#cNote")?$("#cNote").value.trim():"");
   var old=curCell.eid?findEntry(log,curCell.eid):null;
   var ent={i:entryId(),d:(old&&old.d)||todayStr(),t:textFor(k,note),k:k};
   if(me&&me.id&&!guestMode)ent.u=me.id;
@@ -3007,14 +3254,19 @@ function commitVisit(id,k){
   if(k==="RV"){
     var rv=parseLog(h.HouseReturnVisits);
     rvId=entryId();
-    var e={i:rvId,d:todayStr(),n:note||"Se empezó una revisita"};
+    var e={i:rvId,d:todayStr()},kk;
+    if(rvx)for(kk in rvx)if(rvx[kk])e[kk]=rvx[kk];
+    if(!e.s&&!e.n)e.n=note||"Se empezó una revisita";
     if(me&&me.id&&!guestMode)e.u=me.id;
     rv.push(e);
     changes.HouseReturnVisits=JSON.stringify(rv);
   }
   lastWrite={id:id,eid:ent.i,rv:rvId};
   closeSheet("#sh-cell");
-  saveChanges(id,changes,null).then(function(ok){if(ok)toastUndo(labelFor(k)+" ✓");});
+  saveChanges(id,changes,null).then(function(ok){
+    // Ya quedo guardado; no se vuelve a ofrecer como nota sin guardar.
+    if(ok){clearDraft("cNote");toastUndo(labelFor(k)+" ✓");}
+  });
 }
 
 /* Undo writes a tombstone rather than removing the entry: it may already be on
@@ -3069,6 +3321,35 @@ function removeVisit(id,eid){
    Somebody stood at their own door and asked not to be called on again. The
    app's job is to make that stick — on every phone, past a territory changing
    hands, past a resync — and to make it hard to do by accident. */
+/* Presionar Revisita ya no guarda y cierra: abre esto. Lo que se pregunta
+   aqui es lo que hace que una revisita sirva dentro de dos semanas, cuando
+   ya nadie se acuerda de que se hablo. */
+function drawRVSet(){
+  var h=byId(curCell.id);if(!h)return;
+  // Lo que ya se habia escrito en el cuadro de la visita no se tira.
+  var pre=$("#cNote")?{s:$("#cNote").value.trim()}:{};
+  $("#cTitle").textContent="Revisita";
+  $("#cSub").textContent=shortLabel(h);
+  $("#cBody").innerHTML=
+    rvFormHTML(pre,"cNote")+
+    '<p style="font-size:12.5px;color:var(--text-2);margin-bottom:12px">Se anota hoy, '+
+      esc(fmtDate(todayStr()))+'. Queda en tus revisitas aunque este número deje '+
+      'de estar asignado a ti.</p>'+
+    '<button class="btn btn-p" id="rvGo" style="width:100%" disabled>Guardar la revisita</button>'+
+    '<div id="cErr" style="color:var(--bad);font-size:13.5px;margin-top:10px"></div>';
+  ownDraft("cNote",curCell.id);
+  var spoke=$("#cNote"),go=$("#rvGo");
+  var check=function(){go.disabled=spoke.value.trim().length<3;};
+  spoke.addEventListener("input",check);check();
+  spoke.focus();
+  go.addEventListener("click",function(){
+    if(go.disabled)return;
+    go.disabled=true;
+    commitVisit(curCell.id,"RV",rvTrim(readRVForm("cNote")));
+  });
+  openSheet("#sh-cell");
+}
+
 function drawDNVSet(){
   var h=byId(curCell.id);if(!h)return;
   $("#cTitle").textContent="No visitar";
@@ -4931,11 +5212,12 @@ document.addEventListener("visibilitychange",function(){
 var DRAFT_KEY="tm_drafts";
 var draftOwner={};                    // composer element id -> house id
 function ownDraft(el,id){draftOwner[el]=id;}
-function clearDraft(){
-  var box=document.getElementById("rvNew");
+function clearDraft(el){
+  el=el||"rvNew";
+  var box=document.getElementById(el);
   if(box)box.value="";
-  delete draftOwner.rvNew;
-  writeDrafts(readDrafts().filter(function(d){return d.el!=="rvNew";}));
+  delete draftOwner[el];
+  writeDrafts(readDrafts().filter(function(d){return d.el!==el;}));
 }
 function readDrafts(){
   try{var a=JSON.parse(localStorage.getItem(DRAFT_KEY)||"[]");return Array.isArray(a)?a:[];}
@@ -4955,8 +5237,11 @@ function stashDrafts(){
     // Only stash a composer that is actually open and owned. A stale value left
     // in a hidden sheet has already been saved or abandoned.
     if(!el||!owner||!el.value.trim())return;
-    if(!isSheetOpen(p[0]==="rvNew"?"#sh-rv":"#sh-cell"))return;
-    out.push({el:p[0],id:owner,t:el.value,kind:p[1]});
+    var sel=p[0]==="rvNew"?"#sh-rv":"#sh-cell";
+    if(!isSheetOpen(sel))return;
+    // La cita y el plan se rescatan junto con el texto, o se perderian.
+    var extra=rvExtraDraft($(sel));
+    out.push({el:p[0],id:owner,t:el.value,kind:extra?"revisita":p[1],rv:extra});
   });
   writeDrafts(out);
 }
@@ -4990,7 +5275,13 @@ function restoreDrafts(){
       };
       if(b.dataset.dr==="skip"){done();return;}
       var cur=parseLog(byId(d.id).HouseReturnVisits);
-      cur.push({i:entryId(),d:todayStr(),n:d.t});
+      var ent={i:entryId(),d:todayStr()},kk;
+      // Con cita rescatada se reconstruye la revisita entera; sin ella, el
+      // texto entra como nota suelta, que es como se recuperaba antes.
+      if(d.rv){for(kk in d.rv)if(d.rv[kk])ent[kk]=d.rv[kk];ent.s=d.t;}
+      else ent.n=d.t;
+      if(me&&me.id&&!guestMode)ent.u=me.id;
+      cur.push(ent);
       saveChanges(d.id,{HouseReturnVisits:JSON.stringify(cur)},"Nota recuperada ✓").then(done);
     });
   });

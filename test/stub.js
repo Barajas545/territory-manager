@@ -22,6 +22,15 @@
       { i: 'd1', d: '2023-01-15', t: 'Do not visit — asked us not to call again',
         k: 'DNV', r: 'asked us not to call again', u: 'u1' }]),
   };
+  /* Dos revisitas que el codigo nuevo tiene que saber leer: una escrita antes
+     de que existieran los campos (solo n), y una cuya cita ya se paso. */
+  var RVS = {
+    h8: JSON.stringify([
+      { i: 'old1', d: '2026-07-14', n: 'Se quedo con la revista, hablar de la familia', u: 'u1' }]),
+    h9: JSON.stringify([
+      { i: 'late1', d: '2026-08-02', s: 'Le interesa por que hay tanta maldad',
+        rd: '2026-08-16', rt: '09:00', p: 'Leer Salmo 37:10, 11', u: 'u1' }]),
+  };
   var HOUSES = [
     ['h1', '6440 Ardilla Rd #1'], ['h2', '6440 Ardilla Rd #2'],
     ['h3', '6900 Atascadero Ave'], ['h4', '6940 Atascadero Ave'],
@@ -33,7 +42,8 @@
       id: r[0], HouseAddress: r[1], HouseCity: 'Atascadero', HouseState: 'CA',
       HouseZIP: '93422', HouseTerritoryNumber: 'Atascadero 3',
       HouseNotes: '', HouseLanguage: '', HouseLastVisitDate: '',
-      HouseVisitLog: SEED[r[0]] || '', HouseReturnVisits: '', HouseUpdatedAt: '2026-08-20T10:00:00.000Z',
+      HouseVisitLog: SEED[r[0]] || '', HouseReturnVisits: RVS[r[0]] || '',
+      HouseUpdatedAt: '2026-08-20T10:00:00.000Z',
       // A row written before the visit log existed: history in the old column only.
       HouseResutsOnVisit1: r[0] === 'h4' ? 'Nc' : '',
     };
