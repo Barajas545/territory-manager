@@ -14,9 +14,9 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-<script src="https://unpkg.com/qrcode-generator@1.4.4/qrcode.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/qrcode-generator@1.4.4/qrcode.js" crossorigin="anonymous"></script>
 <style>
 /* ═══ DESIGN TOKENS ═══════════════════════════════════════════════════ */
 :root{
@@ -354,6 +354,37 @@ body:not(.admin) .house.dnv .vrow{pointer-events:none;opacity:.4;}
 #drawBar .db-t{font-size:14px;font-weight:750;margin-bottom:2px;}
 #drawBar .db-s{font-size:12.5px;color:var(--text-2);margin-bottom:9px;line-height:1.4;}
 #drawBar .db-row{display:flex;gap:7px;}
+/* Mientras se edita, la barra deja libre la esquina del zoom: acercarse es
+   parte de colocar un vertice con precision. */
+#drawBar{right:64px;}
+/* En una computadora el puntero dice que un toque pone un punto. */
+#map.drawing{cursor:crosshair;}
+#map.drawing .leaflet-marker-icon{cursor:pointer;}
+/* La cruz fija: el mapa se mueve por debajo y el vertice cae exactamente aqui.
+   El dedo nunca tapa el punto, que es el problema de tocar la pantalla. */
+#xhair{position:absolute;left:50%;top:50%;width:44px;height:44px;margin:-22px 0 0 -22px;
+  z-index:450;display:none;pointer-events:none;}
+#xhair.on{display:block;}
+#xhair::before,#xhair::after{content:"";position:absolute;background:#1565C0;
+  box-shadow:0 0 0 1px rgba(255,255,255,.9);}
+#xhair::before{left:21px;top:0;width:2px;height:44px;}
+#xhair::after{top:21px;left:0;height:2px;width:44px;}
+#xhair span{position:absolute;left:14px;top:14px;width:16px;height:16px;border-radius:50%;
+  border:2px solid #1565C0;box-shadow:0 0 0 1px rgba(255,255,255,.9);}
+#xhairAdd{position:absolute;left:50%;top:50%;transform:translateX(-50%);margin-top:30px;
+  z-index:451;display:none;height:40px;padding:0 18px;border-radius:var(--r-full);
+  background:var(--brand);color:var(--brand-ink);font-size:14px;font-weight:750;
+  box-shadow:var(--shadow-2);white-space:nowrap;}
+#xhairAdd.on{display:block;}
+/* Los tiradores. El vertice es grande a proposito: se arrastra con el dedo. */
+.bv-h{width:24px;height:24px;border-radius:50%;background:#1565C0;
+  border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);}
+.bv-h.first{background:#12805C;}
+/* El de en medio es mas chico y translucido: no es un vertice todavia. */
+.bm-h{width:16px;height:16px;border-radius:50%;background:rgba(21,101,192,.55);
+  border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.3);}
+/* El radio estorba justo encima del mapa mientras se marca. */
+body.drawing #pttWrap,body.drawing #nextCard{display:none !important;}
 #drawBar button{flex:1;height:36px;border-radius:var(--r-sm);font-size:13px;font-weight:700;
   background:var(--surface-2);color:var(--text);}
 #drawBar button.p{background:var(--brand);color:var(--brand-ink);}
@@ -768,6 +799,8 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
           <button id="dbSave" class="p">Guardar</button>
         </div>
       </div>
+      <div id="xhair"><span></span></div>
+      <button id="xhairAdd">＋ Poner punto aquí</button>
       <button id="coverChip"></button>
       <div class="map-fabs">
         <button class="map-fab" id="boundsBtn" title="Marcar límites" aria-pressed="false" style="display:none">✏️</button>
@@ -980,7 +1013,7 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
 
 /* ═══ CONFIG ═══ */
 var API="https://territory-manager-silk.vercel.app/api/territory";
-var APP_VERSION="2.18.0";
+var APP_VERSION="2.19.0";
 
 /* ═══════════════════════════════════════════════════════════════════════
    OFFLINE DATA LAYER
@@ -2716,8 +2749,7 @@ function initMap(){
   map.on("click",function(e){
     // Fuera del modo de marcar, un toque en el mapa no hace nada, como antes.
     if(!drawing)return;
-    drawing.points.push([e.latlng.lat,e.latlng.lng]);
-    paintDraw();
+    addBoundPoint(e.latlng.lat,e.latlng.lng);
   });
   mapReady=true;
   refreshMapPins();drawBounds();fitPins();refreshCoverage();
@@ -2758,7 +2790,8 @@ function refreshMapPins(){
    Un contorno por territorio, para poder ver de un golpe si toda la ciudad
    esta repartida. El dibujo es el medio; el fin es el aviso de abajo, que
    cuenta las casas que no caen dentro de ningun limite. */
-var boundLayers={}, drawing=null, drawLayer=null, drawDots=[];
+var boundLayers={}, drawing=null, drawLayer=null;
+var vertexMarkers=[], midMarkers=[];
 
 // Colores estables por nombre: el mismo territorio se ve igual cada vez que se
 // abre el mapa, sin guardar nada.
@@ -2806,10 +2839,19 @@ function housesOutside(){
 function drawBounds(){
   if(!mapReady)return;
   Object.keys(boundLayers).forEach(function(k){
-    map.removeLayer(boundLayers[k]);delete boundLayers[k];
+    var g=boundLayers[k];
+    /* La etiqueta permanente se desprende ANTES de quitar la figura. Leaflet
+       sigue tocando el globo despues de remover la capa, y al encontrarlo ya
+       desprendido revienta — el error se comia el resto de la funcion, que es
+       justo donde se pintan los tiradores. */
+    if(g.getTooltip&&g.getTooltip())g.unbindTooltip();
+    map.removeLayer(g);delete boundLayers[k];
   });
   teamTerritories.forEach(function(t){
     if(!Array.isArray(t.bounds)||t.bounds.length<3)return;
+    /* El que se esta editando no se dibuja dos veces: el contorno guardado
+       quedaria debajo como un fantasma en cuanto se mueva el primer vertice. */
+    if(drawing&&drawing.terr===t.name)return;
     // El territorio que se esta viendo se marca; los demas quedan de contexto.
     var active=terrFilter===t.name||terrFilter==="all";
     var g=L.polygon(t.bounds,{
@@ -2840,44 +2882,176 @@ function refreshCoverage(){
 }
 
 /* ── marcar un limite ── */
-function paintDraw(){
-  if(drawLayer){map.removeLayer(drawLayer);drawLayer=null;}
-  drawDots.forEach(function(d){map.removeLayer(d);});
-  drawDots=[];
+/* Deshacer guarda estados completos, no "quita el ultimo". Ahora que un toque
+   sobre un vertice lo borra, cualquier movimiento en falso tiene que poder
+   revertirse — no solo el ultimo punto agregado. */
+function histPush(){
+  if(!drawing)return;
+  drawing.hist.push(drawing.points.map(function(pt){return [pt[0],pt[1]];}));
+  if(drawing.hist.length>60)drawing.hist.shift();
+}
+function histUndo(){
+  if(!drawing||!drawing.hist.length)return;
+  drawing.points=drawing.hist.pop();
+  paintDraw();
+}
+
+/* Quitar un marcador ARRASTRABLE hace que Leaflet cierre su propio arrastre, y
+   ese cierre puede reventar si el estado del puntero quedo raro (toca en un
+   elemento, suelta en otro). Que Leaflet tropiece es cosa suya; lo que no
+   puede pasar es que el tropiezo se coma el resto del repintado y deje el
+   editor a medias, con tiradores viejos sobre una figura nueva. */
+function dropMarker(m){
+  try{ if(m.dragging&&m.dragging.disable)m.dragging.disable(); }catch(e){}
+  try{ map.removeLayer(m); }catch(e){}
+}
+function clearMids(){
+  midMarkers.forEach(dropMarker);midMarkers=[];
+}
+function clearHandles(){
+  vertexMarkers.forEach(dropMarker);vertexMarkers=[];
+  clearMids();
+}
+/* Un repintado pedido DESDE un manejador de marcador se aplaza un ciclo:
+   Leaflet sigue usando ese marcador cuando el manejador regresa, y quitarlo
+   antes lo hace reventar sobre un elemento que ya no existe. */
+function repaintSoon(){
+  setTimeout(function(){if(drawing)paintDraw();},0);
+}
+
+// Solo la figura. Se repinta en cada cuadro del arrastre, y volver a construir
+// los tiradores ahi destruiria el que se esta arrastrando.
+function paintShape(){
+  var pts=drawing?drawing.points:[];
+  var quitar=function(){if(drawLayer){map.removeLayer(drawLayer);drawLayer=null;}};
+  if(!drawing||pts.length<2){quitar();return;}
+  /* Mover los puntos de la figura que ya existe, en vez de quitarla y volver a
+     ponerla. Esto corre en cada cuadro del arrastre, y reconstruir el trazo
+     sesenta veces por segundo hacia que Leaflet siguiera trabajando sobre un
+     elemento que acababa de desaparecer — de ahi salia el error "baseVal". */
+  var quiereArea=pts.length>2;
+  if(drawLayer&&(drawLayer instanceof L.Polygon)===quiereArea){
+    drawLayer.setLatLngs(pts);return;
+  }
+  quitar();
+  drawLayer=(quiereArea
+    ?L.polygon(pts,{color:"#1565C0",weight:2.5,fillColor:"#1565C0",fillOpacity:.10,interactive:false})
+    :L.polyline(pts,{color:"#1565C0",weight:2.5,interactive:false})).addTo(map);
+}
+
+function paintVertices(){
+  vertexMarkers.forEach(dropMarker);vertexMarkers=[];
   if(!drawing)return;
   var pts=drawing.points;
-  if(pts.length>1){
-    drawLayer=(pts.length>2?L.polygon(pts,{color:"#1565C0",weight:2.5,
-      fillColor:"#1565C0",fillOpacity:.10}):L.polyline(pts,{color:"#1565C0",weight:2.5}))
-      .addTo(map);
-  }
-  pts.forEach(function(pt){
-    drawDots.push(L.circleMarker(pt,{radius:5,color:"#fff",weight:2,
-      fillColor:"#1565C0",fillOpacity:1,interactive:false}).addTo(map));
+  pts.forEach(function(pt,i){
+    var m=L.marker(pt,{
+      draggable:true,zIndexOffset:1200,keyboard:false,
+      icon:L.divIcon({className:"",html:'<div class="bv-h'+(i===0?" first":"")+'"></div>',
+        iconSize:[24,24],iconAnchor:[12,12]}),
+    }).addTo(map);
+    var moved=false;
+    /* Los puntos de en medio se esconden durante el arrastre: quedarian en su
+       posicion vieja, y volver a construirlos en cada cuadro es trabajo tirado. */
+    m.on("dragstart",function(){moved=false;histPush();clearMids();});
+    m.on("drag",function(e){
+      moved=true;
+      var ll=e.target.getLatLng();
+      drawing.points[i]=[ll.lat,ll.lng];
+      paintShape();updateDrawBar();
+    });
+    // El vertice ya quedo donde debia; solo hay que rehacer los de en medio.
+    m.on("dragend",function(){paintShape();paintMids();updateDrawBar();});
+    /* Un toque quita el vertice. Es directo a proposito: con la pila de
+       deshacer detras, equivocarse cuesta un boton, y el camino de dos pasos
+       (seleccionar y luego confirmar) se siente pesado con el brazo estirado
+       frente a una casa. */
+    m.on("click",function(){
+      if(moved){moved=false;return;}
+      histPush();
+      drawing.points.splice(i,1);
+      repaintSoon();
+    });
+    vertexMarkers.push(m);
   });
+}
+
+/* Los puntos de en medio: tocar uno mete un vertice nuevo justo ahi, que es
+   como se corrige un limite sin volver a dibujarlo entero. */
+function paintMids(){
+  clearMids();
+  if(!drawing)return;
+  var pts=drawing.points;
+  if(pts.length>=2){
+    var edges=pts.length>2?pts.length:1;   // con 3+ tambien se cierra el ultimo con el primero
+    for(var e2=0;e2<edges;e2++){
+      (function(i){
+        var a=pts[i],b=pts[(i+1)%pts.length];
+        var mid=[(a[0]+b[0])/2,(a[1]+b[1])/2];
+        var mm=L.marker(mid,{
+          zIndexOffset:1100,keyboard:false,
+          icon:L.divIcon({className:"",html:'<div class="bm-h"></div>',
+            iconSize:[16,16],iconAnchor:[8,8]}),
+        }).addTo(map);
+        mm.on("click",function(){
+          histPush();
+          drawing.points.splice(i+1,0,mid);
+          repaintSoon();
+        });
+        midMarkers.push(mm);
+      })(e2);
+    }
+  }
+}
+
+function updateDrawBar(){
+  if(!drawing)return;
+  var k=drawing.points.length;
   $("#dbTitle").textContent="Marcando "+drawing.terr;
-  $("#dbSub").textContent=pts.length<3
-    ? "Toca el mapa en cada esquina del territorio. Faltan "+(3-pts.length)+" para cerrar la figura."
-    : pts.length+" puntos · toca para seguir marcando";
-  $("#dbUndo").disabled=!pts.length;
-  $("#dbSave").disabled=pts.length>0&&pts.length<3;
+  $("#dbSub").textContent=
+    k===0?"Centra la cruz en una esquina y toca ＋. También puedes tocar el mapa."
+    :k<3?"Faltan "+(3-k)+" para cerrar la figura."
+    :k+" puntos · arrastra para mover · toca uno para quitarlo · toca un punto chico para insertar";
+  $("#dbUndo").disabled=!drawing.hist.length;
+  $("#dbSave").disabled=k>0&&k<3;
+}
+
+function paintDraw(){
+  if(!drawing){
+    if(drawLayer){map.removeLayer(drawLayer);drawLayer=null;}
+    clearHandles();return;
+  }
+  paintShape();paintVertices();paintMids();updateDrawBar();
+}
+
+function addBoundPoint(lat,lng){
+  if(!drawing)return;
+  histPush();
+  drawing.points.push([lat,lng]);
+  paintDraw();
 }
 
 function startDrawBounds(){
   if(terrFilter==="all"||terrFilter===RV_TERR){
     toast("Primero elige el territorio que vas a marcar",true);return;
   }
-  drawing={terr:terrFilter,points:boundsFor(terrFilter).slice()};
+  drawing={terr:terrFilter,points:boundsFor(terrFilter).slice(),hist:[]};
   $("#drawBar").classList.add("on");
+  $("#xhair").classList.add("on");
+  $("#xhairAdd").classList.add("on");
+  $("#map").classList.add("drawing");
+  document.body.classList.add("drawing");
   $("#boundsBtn").setAttribute("aria-pressed","true");
-  refreshCoverage();
+  drawBounds();refreshCoverage();
   paintDraw();
 }
 function endDrawBounds(){
   drawing=null;
-  if(drawLayer){map.removeLayer(drawLayer);drawLayer=null;}
-  drawDots.forEach(function(d){map.removeLayer(d);});drawDots=[];
+  paintDraw();                       // sin `drawing`, esto limpia todo
   $("#drawBar").classList.remove("on");
+  $("#xhair").classList.remove("on");
+  $("#xhairAdd").classList.remove("on");
+  $("#map").classList.remove("drawing");
+  document.body.classList.remove("drawing");
   $("#boundsBtn").setAttribute("aria-pressed","false");
   drawBounds();refreshCoverage();
 }
@@ -2933,13 +3107,16 @@ $("#fitBtn").addEventListener("click",fitPins);
 $("#boundsBtn").addEventListener("click",function(){
   if(drawing)endDrawBounds();else startDrawBounds();
 });
-$("#dbUndo").addEventListener("click",function(){
-  if(!drawing||!drawing.points.length)return;
-  drawing.points.pop();paintDraw();
+$("#dbUndo").addEventListener("click",histUndo);
+$("#xhairAdd").addEventListener("click",function(){
+  if(!drawing)return;
+  var c=map.getCenter();
+  addBoundPoint(c.lat,c.lng);
 });
 $("#dbClear").addEventListener("click",function(){
   if(!drawing)return;
   if(drawing.points.length&&!confirm("¿Borrar todos los puntos de este límite?"))return;
+  histPush();
   drawing.points=[];paintDraw();
 });
 $("#dbCancel").addEventListener("click",endDrawBounds);
