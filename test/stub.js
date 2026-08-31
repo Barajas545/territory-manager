@@ -75,6 +75,7 @@
     failTeam: false,          // every /api/team call rejects like a dead network
     calls: [],                // every action the app asked for, in order
     colors: { colorAssigned: '#1565C0', colorDnv: '#B42318', colorTalked: '#12805C' },
+    bounds: { 'Atascadero 3': [[35.4930,-120.6720],[35.4930,-120.6650],[35.4875,-120.6650],[35.4875,-120.6720]] },
     packets: [
       packet({ id: 'p1', who: 'Ilmy Barajas', houseIds: ['h1', 'h2', 'h3', 'h4', 'h5'] }),
       packet({ id: 'p2', who: 'Hermano Lopez', guestCode: 'K7RQ2M', houseIds: ['h5', 'h6', 'zz-not-on-this-phone'] }),
@@ -197,9 +198,18 @@
         return json({
           ok: true, me: USER, users: qs.get('solo') ? [USER] : [USER, MATE], scope: SCOPES[AS],
           colors: TM.colors,
-          territories: [{ name: 'Atascadero 3', ownerId: 'u1', owner: USER, assigneeIds: ['u2'], working: TM.working },
-                        { name: 'Atascadero 7', ownerId: 'u1', owner: USER, assigneeIds: [], working: TM.working }],
+          territories: [{ name: 'Atascadero 3', ownerId: 'u1', owner: USER, assigneeIds: ['u2'], working: TM.working, bounds: TM.bounds['Atascadero 3'] || [] },
+                        { name: 'Atascadero 7', ownerId: 'u1', owner: USER, assigneeIds: [], working: TM.working, bounds: TM.bounds['Atascadero 7'] || [] }],
         });
+      case 'setTerritoryBounds': {
+        var pts = (body.points || []).filter(function (q) {
+          return q && typeof q === 'object' && isFinite(Number(q[0])) && isFinite(Number(q[1]));
+        }).map(function (q) { return [Number(q[0]), Number(q[1])]; });
+        if (pts.length && pts.length < 3)
+          return json({ error: 'Un límite necesita al menos 3 puntos' }, 400);
+        TM.bounds[body.territory] = pts;
+        return json({ ok: true, territory: body.territory, bounds: pts });
+      }
       case 'listUsers':
         return json({ ok: true, users: [USER, MATE],
           policy: { nights: TM.nights || 0, tz: 'America/Los_Angeles', options: [0,1,2,6],

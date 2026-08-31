@@ -344,6 +344,29 @@ body:not(.admin) .house.dnv .vrow{pointer-events:none;opacity:.4;}
 /* ═══ MAP ═════════════════════════════════════════════════════════════ */
 #map{flex:1;background:var(--surface-2);}
 .map-fabs{position:absolute;right:12px;bottom:14px;display:flex;flex-direction:column;gap:8px;z-index:400;}
+.map-fab[aria-pressed="true"]{background:var(--brand);color:var(--brand-ink);}
+/* La barra de dibujo tapa el mapa a proposito: mientras se marca un limite,
+   tocar el mapa pone un punto, y conviene que se vea que se esta en ese modo. */
+#drawBar{position:absolute;left:10px;right:10px;top:10px;z-index:500;display:none;
+  background:var(--surface);border-radius:var(--r-md);box-shadow:var(--shadow-2);
+  padding:10px 12px;}
+#drawBar.on{display:block;}
+#drawBar .db-t{font-size:14px;font-weight:750;margin-bottom:2px;}
+#drawBar .db-s{font-size:12.5px;color:var(--text-2);margin-bottom:9px;line-height:1.4;}
+#drawBar .db-row{display:flex;gap:7px;}
+#drawBar button{flex:1;height:36px;border-radius:var(--r-sm);font-size:13px;font-weight:700;
+  background:var(--surface-2);color:var(--text);}
+#drawBar button.p{background:var(--brand);color:var(--brand-ink);}
+#drawBar button.d{color:var(--bad);}
+#drawBar button:disabled{opacity:.45;}
+/* El aviso de cobertura: lo unico de esta pantalla que hay que atender. */
+#coverChip{position:absolute;left:10px;bottom:14px;z-index:400;display:none;
+  align-items:center;gap:7px;height:38px;padding:0 14px;border-radius:var(--r-full);
+  background:var(--warn-soft);color:var(--warn);font-size:13px;font-weight:750;
+  box-shadow:var(--shadow-2);max-width:calc(100% - 80px);}
+#coverChip.on{display:flex;}
+.terr-label{background:transparent;border:0;box-shadow:none;font-size:11.5px;
+  font-weight:800;letter-spacing:.03em;text-shadow:0 1px 2px rgba(255,255,255,.85);}
 
 /* ── selecting houses to hand out ── */
 .tool-row{display:flex;align-items:center;gap:8px;margin-top:8px;overflow-x:auto;scrollbar-width:none;}
@@ -735,7 +758,19 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
       </div>
       <div id="pttWrap"><div id="pttHint">Mantén para hablar</div>
         <button id="ptt"><span class="pi">🎤</span><span>HABLAR</span></button></div>
+      <div id="drawBar">
+        <div class="db-t" id="dbTitle"></div>
+        <div class="db-s" id="dbSub"></div>
+        <div class="db-row">
+          <button id="dbUndo">Deshacer</button>
+          <button id="dbClear" class="d">Borrar</button>
+          <button id="dbCancel">Cancelar</button>
+          <button id="dbSave" class="p">Guardar</button>
+        </div>
+      </div>
+      <button id="coverChip"></button>
       <div class="map-fabs">
+        <button class="map-fab" id="boundsBtn" title="Marcar límites" aria-pressed="false" style="display:none">✏️</button>
         <button class="map-fab" id="locateBtn" title="Mi ubicación">📍</button>
         <button class="map-fab" id="fitBtn" title="Ver todas">⤢</button>
         <button class="map-fab" id="routeBtn" title="Planear ruta" aria-pressed="false">🧭</button>
@@ -945,7 +980,7 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
 
 /* ═══ CONFIG ═══ */
 var API="https://territory-manager-silk.vercel.app/api/territory";
-var APP_VERSION="2.17.0";
+var APP_VERSION="2.18.0";
 
 /* ═══════════════════════════════════════════════════════════════════════
    OFFLINE DATA LAYER
@@ -2646,7 +2681,7 @@ $("#pBody").addEventListener("click",function(e){
   if(b.dataset.terr!==undefined){
     // Los pines tambien cambian con el territorio, no solo el encuadre.
     terrFilter=b.dataset.terr;closeSheet("#sh-pick");
-    renderHouses();refreshMapPins();fitPins();
+    renderHouses();refreshMapPins();drawBounds();fitPins();refreshCoverage();
     stopPresence();updatePttVisibility();loadHeld();
     if(routeOn)drawRoute();
     if($("#view-map").classList.contains("active"))startPresence();
@@ -2678,8 +2713,14 @@ function initMap(){
   map=L.map("map",{zoomControl:false,attributionControl:false}).setView([35.4873,-120.6700],14);
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19}).addTo(map);
   L.control.zoom({position:"topright"}).addTo(map);
+  map.on("click",function(e){
+    // Fuera del modo de marcar, un toque en el mapa no hace nada, como antes.
+    if(!drawing)return;
+    drawing.points.push([e.latlng.lat,e.latlng.lng]);
+    paintDraw();
+  });
   mapReady=true;
-  refreshMapPins();fitPins();
+  refreshMapPins();drawBounds();fitPins();refreshCoverage();
 }
 function refreshMapPins(){
   if(!mapReady)return;
@@ -2713,6 +2754,149 @@ function refreshMapPins(){
     markerMap[h.id]=m;
   });
 }
+/* ── los limites del territorio ────────────────────────────────────────
+   Un contorno por territorio, para poder ver de un golpe si toda la ciudad
+   esta repartida. El dibujo es el medio; el fin es el aviso de abajo, que
+   cuenta las casas que no caen dentro de ningun limite. */
+var boundLayers={}, drawing=null, drawLayer=null, drawDots=[];
+
+// Colores estables por nombre: el mismo territorio se ve igual cada vez que se
+// abre el mapa, sin guardar nada.
+var TERR_COLORS=["#1565C0","#12805C","#B54708","#6941C6","#B42318","#0E7490"];
+function terrColor(name){
+  var h=0,sx=String(name||"");
+  for(var i=0;i<sx.length;i++)h=(h*31+sx.charCodeAt(i))>>>0;
+  return TERR_COLORS[h%TERR_COLORS.length];
+}
+function boundsFor(name){
+  var t=teamTerritories.find(function(x){return x.name===name;});
+  return (t&&Array.isArray(t.bounds))?t.bounds:[];
+}
+function terrsWithBounds(){
+  return teamTerritories.filter(function(t){
+    return Array.isArray(t.bounds)&&t.bounds.length>2;
+  });
+}
+
+/* Punto dentro de un poligono, por conteo de cruces. Suficiente para un
+   territorio urbano: a esta escala la curvatura de la tierra no cambia de que
+   lado de la calle cae una casa. */
+function inPoly(lat,lng,poly){
+  var inside=false,i,j,xi,yi,xj,yj;
+  for(i=0,j=poly.length-1;i<poly.length;j=i++){
+    yi=poly[i][0];xi=poly[i][1];yj=poly[j][0];xj=poly[j][1];
+    if(((yi>lat)!==(yj>lat))&&(lng<(xj-xi)*(lat-yi)/(yj-yi)+xi))inside=!inside;
+  }
+  return inside;
+}
+
+/* Las casas con coordenadas que no caen dentro de ningun limite. Es la
+   respuesta a "¿esta todo cubierto?" — y solo se puede contestar cuando ya hay
+   al menos un limite dibujado. */
+function housesOutside(){
+  var polys=terrsWithBounds().map(function(t){return t.bounds;});
+  if(!polys.length)return[];
+  return records.filter(function(h){
+    var g=parseGPS(h.HouseGPSCoordinates);
+    if(!g)return false;
+    return !polys.some(function(pl){return inPoly(g.lat,g.lng,pl);});
+  });
+}
+
+function drawBounds(){
+  if(!mapReady)return;
+  Object.keys(boundLayers).forEach(function(k){
+    map.removeLayer(boundLayers[k]);delete boundLayers[k];
+  });
+  teamTerritories.forEach(function(t){
+    if(!Array.isArray(t.bounds)||t.bounds.length<3)return;
+    // El territorio que se esta viendo se marca; los demas quedan de contexto.
+    var active=terrFilter===t.name||terrFilter==="all";
+    var g=L.polygon(t.bounds,{
+      color:terrColor(t.name),weight:active?2.5:1.5,opacity:active?.9:.45,
+      fillColor:terrColor(t.name),fillOpacity:active?.08:.03,interactive:false,
+    }).addTo(map);
+    g.bindTooltip(t.name,{permanent:true,direction:"center",className:"terr-label"});
+    boundLayers[t.name]=g;
+  });
+}
+
+function refreshCoverage(){
+  var chip=$("#coverChip");if(!chip)return;
+  /* Solo al administrador. Quien no lo es ve unicamente los limites de SUS
+     territorios, asi que una casa que en realidad cae dentro del territorio de
+     al lado le apareceria como descubierta — una alarma falsa sobre algo que
+     ademas no puede arreglar. */
+  var out=(drawing||scope.kind!=="admin")?[]:housesOutside();
+  if(!out.length){chip.classList.remove("on");return;}
+  chip.textContent="⚠ "+out.length+(out.length===1?" casa fuera de los límites":" casas fuera de los límites");
+  chip.classList.add("on");
+  chip.onclick=function(){
+    var pts=[];
+    out.forEach(function(h){var g=parseGPS(h.HouseGPSCoordinates);if(g)pts.push([g.lat,g.lng]);});
+    if(pts.length)map.fitBounds(pts,{padding:[60,60],maxZoom:17});
+    toast(out.length+" casa(s) no caen dentro de ningún límite");
+  };
+}
+
+/* ── marcar un limite ── */
+function paintDraw(){
+  if(drawLayer){map.removeLayer(drawLayer);drawLayer=null;}
+  drawDots.forEach(function(d){map.removeLayer(d);});
+  drawDots=[];
+  if(!drawing)return;
+  var pts=drawing.points;
+  if(pts.length>1){
+    drawLayer=(pts.length>2?L.polygon(pts,{color:"#1565C0",weight:2.5,
+      fillColor:"#1565C0",fillOpacity:.10}):L.polyline(pts,{color:"#1565C0",weight:2.5}))
+      .addTo(map);
+  }
+  pts.forEach(function(pt){
+    drawDots.push(L.circleMarker(pt,{radius:5,color:"#fff",weight:2,
+      fillColor:"#1565C0",fillOpacity:1,interactive:false}).addTo(map));
+  });
+  $("#dbTitle").textContent="Marcando "+drawing.terr;
+  $("#dbSub").textContent=pts.length<3
+    ? "Toca el mapa en cada esquina del territorio. Faltan "+(3-pts.length)+" para cerrar la figura."
+    : pts.length+" puntos · toca para seguir marcando";
+  $("#dbUndo").disabled=!pts.length;
+  $("#dbSave").disabled=pts.length>0&&pts.length<3;
+}
+
+function startDrawBounds(){
+  if(terrFilter==="all"||terrFilter===RV_TERR){
+    toast("Primero elige el territorio que vas a marcar",true);return;
+  }
+  drawing={terr:terrFilter,points:boundsFor(terrFilter).slice()};
+  $("#drawBar").classList.add("on");
+  $("#boundsBtn").setAttribute("aria-pressed","true");
+  refreshCoverage();
+  paintDraw();
+}
+function endDrawBounds(){
+  drawing=null;
+  if(drawLayer){map.removeLayer(drawLayer);drawLayer=null;}
+  drawDots.forEach(function(d){map.removeLayer(d);});drawDots=[];
+  $("#drawBar").classList.remove("on");
+  $("#boundsBtn").setAttribute("aria-pressed","false");
+  drawBounds();refreshCoverage();
+}
+function saveBounds(){
+  if(!drawing)return;
+  var terr=drawing.terr,pts=drawing.points.slice();
+  if(pts.length&&pts.length<3){toast("Un límite necesita al menos 3 puntos",true);return;}
+  $("#dbSave").disabled=true;
+  team("setTerritoryBounds",{territory:terr,points:pts}).then(function(r){
+    var t=teamTerritories.find(function(x){return x.name===terr;});
+    if(t)t.bounds=r.bounds||[];
+    endDrawBounds();
+    toast(pts.length?"Límite guardado ✓":"Límite borrado");
+  }).catch(function(e){
+    toast(e.message,true);
+    $("#dbSave").disabled=false;
+  });
+}
+
 /* Own position, live. watchPosition only runs while the Map tab is showing —
    a GPS watch left running in the background is the fastest way to flatten a
    phone battery mid-territory. */
@@ -2746,6 +2930,20 @@ function fitPins(){
   if(pts.length)map.fitBounds(pts,{padding:[50,50],maxZoom:17});
 }
 $("#fitBtn").addEventListener("click",fitPins);
+$("#boundsBtn").addEventListener("click",function(){
+  if(drawing)endDrawBounds();else startDrawBounds();
+});
+$("#dbUndo").addEventListener("click",function(){
+  if(!drawing||!drawing.points.length)return;
+  drawing.points.pop();paintDraw();
+});
+$("#dbClear").addEventListener("click",function(){
+  if(!drawing)return;
+  if(drawing.points.length&&!confirm("¿Borrar todos los puntos de este límite?"))return;
+  drawing.points=[];paintDraw();
+});
+$("#dbCancel").addEventListener("click",endDrawBounds);
+$("#dbSave").addEventListener("click",saveBounds);
 $("#locateBtn").addEventListener("click",function(){
   if(!navigator.geolocation){toast("GPS no disponible",true);return;}
   var b=this;b.style.opacity=".5";
@@ -2946,6 +3144,8 @@ function refreshChrome(){
   show("#fab",!guestMode&&scope.canCreate);
   show("#btnPick",!guestMode&&scope.canHandOut);
   show("#scopeBtn",guestMode||scope.kind!=="numbers");
+  // Donde termina un territorio lo decide la congregacion, no quien lo trabaja.
+  show("#boundsBtn",!guestMode&&scope.kind==="admin");
   var ex=$("#rowExport");
   if(ex)ex.style.display=(!guestMode&&(scope.kind==="admin"||scope.territories.length))?"":"none";
   // Las revisitas son de la persona, no del territorio: no dependen de tener uno.
@@ -4300,6 +4500,8 @@ function loadTeam(){
     if(scope.kind==="numbers"&&terrFilter==="all"&&teamTerritories.length===1)
       terrFilter=teamTerritories[0].name;
     refreshChrome();refreshWorkingBtn();renderTeamCard();updateCounts();
+    // Los contornos llegan pegados a los territorios: hasta aqui no se sabian.
+    drawBounds();refreshCoverage();
   }).catch(function(){});
 }
 

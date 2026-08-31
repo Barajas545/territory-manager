@@ -14,6 +14,7 @@ const SC = require('./_scope');
 const ST = require('./_settings');
 const TL = require('./_terrlog');
 const NT = require('./_notes');
+const BD = require('./_bounds');
 const { makeStore } = require('./_store');
 // Session tokens are signed and verified in _auth.js, so the territory
 // endpoint validates them with exactly the code that issues them here.
@@ -30,6 +31,7 @@ const TABS = {
   settings: ST.SETTINGS_TAB,
   terrlog: TL.TERRLOG_TAB,
   notes: NT.NOTES_TAB,
+  bounds: BD.BOUNDS_TAB,
   presence: {
     name: 'Presence',
     cols: ['userId','territory','lat','lng','acc','ts'],
@@ -501,6 +503,7 @@ module.exports = async (req, res) => {
       const isAdmin = grant.kind === 'admin';
       const policy = await ST.readSettings(store);
       const logRows = await TL.readLog(store);
+      const boundRows = await BD.readBounds(store);
       const mine = t => isAdmin || grant.territories.has(SC.norm(t.name)) ||
         grant.packets.some(a => SC.norm(a.territory) === SC.norm(t.name));
       const display = set => terrs.filter(t => set.has(SC.norm(t.name))).map(t => t.name);
@@ -524,6 +527,10 @@ module.exports = async (req, res) => {
         users: roster,
         territories: terrs.filter(mine).map(t => ({
           name: t.name,
+          /* El contorno viaja con el territorio en vez de tener su propia
+             peticion: el telefono ya pide esto al arrancar, y una llamada mas
+             seria una llamada mas que falla sin señal. */
+          bounds: BD.parsePoints((BD.forTerritory(boundRows, t.name) || {}).points),
           ownerId: t.ownerId,
           owner: byId[t.ownerId] || null,
           assignedOn: (TL.openFor(logRows, t.name) || {}).assignedOn || '',
@@ -531,6 +538,25 @@ module.exports = async (req, res) => {
           assignees: String(t.assigneeIds || '').split(',').filter(Boolean).map(id => byId[id]).filter(Boolean),
         })),
       });
+    }
+
+    /* Donde termina un territorio es una decision de la congregacion, no de
+       quien lo esta trabajando esta semana: si cada quien pudiera mover la
+       linea, dos territorios se encimarian y una calle quedaria sin dueño sin
+       que nadie lo notara. */
+    if (action === 'setTerritoryBounds') {
+      const admin = await requireAdmin();
+      const name = String(body.territory || '').trim();
+      if (!name) return res.status(400).json({ error: 'Falta el territorio' });
+      const terrs = await rd(TABS.territories);
+      if (!terrs.some(x => SC.norm(x.name) === SC.norm(name)))
+        return res.status(404).json({ error: 'No existe ese territorio' });
+      const clean = BD.cleanPoints(body.points);
+      // Cero puntos borra el contorno. Uno o dos no cierran una figura.
+      if (clean.length && clean.length < 3)
+        return res.status(400).json({ error: 'Un límite necesita al menos 3 puntos' });
+      const saved = await BD.setBounds(store, name, clean, admin.id, nowIso);
+      return res.json({ ok: true, territory: name, bounds: saved });
     }
 
     /* Only the territory's owner or an admin may change who works it. An
