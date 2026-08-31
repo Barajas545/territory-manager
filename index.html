@@ -945,7 +945,7 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
 
 /* ═══ CONFIG ═══ */
 var API="https://territory-manager-silk.vercel.app/api/territory";
-var APP_VERSION="2.16.0";
+var APP_VERSION="2.17.0";
 
 /* ═══════════════════════════════════════════════════════════════════════
    OFFLINE DATA LAYER
@@ -1775,10 +1775,24 @@ function generateTerritoryPDF(terrNum,houses,results){
 }
 
 
+/* "Mis Revisitas" se elige en el mismo lugar que un territorio, pero no sale
+   de los datos: son las casas donde uno mismo levanto una revisita. Un solo
+   predicado para que la lista, el mapa, los contadores y la etiqueta no puedan
+   discrepar sobre que se esta viendo. */
+var RV_TERR="__rv__";
+function inTerrFilter(h){
+  if(terrFilter==="all")return true;
+  if(terrFilter===RV_TERR)return myRVs(h).length>0;
+  return (h.HouseTerritoryNumber||"Unassigned")===terrFilter;
+}
+function terrFilterLabel(){
+  return terrFilter==="all"?scopeLabel():
+    terrFilter===RV_TERR?"Mis Revisitas":terrFilter;
+}
+
 /* ═══ RENDER: HOUSE LIST ═══ */
 function applyFilters(){
-  var r=records.slice();
-  if(terrFilter!=="all")r=r.filter(function(h){return(h.HouseTerritoryNumber||"Unassigned")===terrFilter;});
+  var r=records.filter(inTerrFilter);
   if(filter!=="all")r=r.filter(function(h){return visitStatus(h.HouseLastVisitDate)===filter;});
   if(searchTerm){
     var q=searchTerm.toLowerCase();
@@ -1795,7 +1809,7 @@ function applyFilters(){
 }
 
 function updateCounts(){
-  var scoped=terrFilter==="all"?records:records.filter(function(h){return(h.HouseTerritoryNumber||"Unassigned")===terrFilter;});
+  var scoped=records.filter(inTerrFilter);
   var c={all:scoped.length,never:0,recent:0,due:0,overdue:0};
   scoped.forEach(function(h){c[visitStatus(h.HouseLastVisitDate)]++;});
   ["all","never","recent","due","overdue"].forEach(function(k){
@@ -1804,7 +1818,7 @@ function updateCounts(){
   $("#scopeCount").textContent=scoped.length;
   // "All Territories" is only true for an admin; everyone else is looking at
   // their own, and saying otherwise over a seven-house list is a small lie.
-  if(!guestMode)$("#scopeName").textContent=terrFilter==="all"?scopeLabel():terrFilter;
+  if(!guestMode)$("#scopeName").textContent=terrFilterLabel();
   var ds=$("#tmDNVSub");
   if(ds)ds.textContent=dnvSub();
   var rvN=records.filter(isRV).length;
@@ -2330,7 +2344,8 @@ function openForm(h){
   if(!h){
     $("#fState").value="CA";
     // Prefill from what they are already looking at — most houses come in batches.
-    if(terrFilter!=="all")$("#fTerr").value=terrFilter;
+    // Una casa nueva no puede nacer en "Mis Revisitas": no es un territorio.
+    if(terrFilter!=="all"&&terrFilter!==RV_TERR)$("#fTerr").value=terrFilter;
     var sample=records[0];
     if(sample){$("#fCity").value=sample.HouseCity||"";$("#fZip").value=sample.HouseZIP||"";}
   }
@@ -2520,7 +2535,12 @@ function openTerrPicker(){
   var m=terrMap(),keys=Object.keys(m).sort();
   $("#pTitle").textContent="Territorios";
   $("#pSub").textContent=records.length+" casas en total";
+  /* Solo aparece si hay alguna: una opcion vacia no enseña nada y estorba
+     arriba de los territorios de verdad. */
+  var rvN=guestMode?0:records.filter(function(h){return myRVs(h).length>0;}).length;
   $("#pBody").innerHTML=pickerRow("Todos los territorios",records.length+" casas",'data-terr="all"')+
+    (rvN?pickerRow("Mis Revisitas",rvN+(rvN===1?" casa":" casas"),
+      'data-terr="'+RV_TERR+'"'):"")+
     keys.map(function(t){return pickerRow(t,m[t].length+" casas",'data-terr="'+esc(t)+'"');}).join("");
   openSheet("#sh-pick");
 }
@@ -2624,7 +2644,9 @@ $("#rowExport").addEventListener("click",function(){
 $("#pBody").addEventListener("click",function(e){
   var b=e.target.closest("[data-terr],[data-exp]");if(!b)return;
   if(b.dataset.terr!==undefined){
-    terrFilter=b.dataset.terr;closeSheet("#sh-pick");renderHouses();fitPins();
+    // Los pines tambien cambian con el territorio, no solo el encuadre.
+    terrFilter=b.dataset.terr;closeSheet("#sh-pick");
+    renderHouses();refreshMapPins();fitPins();
     stopPresence();updatePttVisibility();loadHeld();
     if(routeOn)drawRoute();
     if($("#view-map").classList.contains("active"))startPresence();
@@ -2661,10 +2683,17 @@ function initMap(){
 }
 function refreshMapPins(){
   if(!mapReady)return;
+  /* Antes se dibujaban todas las casas y el territorio solo cambiaba el
+     encuadre. Elegir un territorio ahora muestra ese territorio, que es lo
+     que la palabra promete — y es lo unico que hace util elegir "Mis
+     Revisitas" aqui. */
+  var shown={};
+  records.forEach(function(h){if(inTerrFilter(h))shown[h.id]=1;});
   Object.keys(markerMap).forEach(function(id){
-    if(!byId(id)){map.removeLayer(markerMap[id]);delete markerMap[id];}
+    if(!byId(id)||!shown[id]){map.removeLayer(markerMap[id]);delete markerMap[id];}
   });
   records.forEach(function(h){
+    if(!shown[h.id])return;
     var g=parseGPS(h.HouseGPSCoordinates);if(!g)return;
     var m=markerMap[h.id];
     if(m){m.setLatLng([g.lat,g.lng]);m.setIcon(pinIcon(h));return;}
@@ -2712,7 +2741,7 @@ function stopMeWatch(){
 function fitPins(){
   if(!mapReady)return;
   var pts=[];
-  (terrFilter==="all"?records:records.filter(function(h){return(h.HouseTerritoryNumber||"Unassigned")===terrFilter;}))
+  records.filter(inTerrFilter)
     .forEach(function(h){var g=parseGPS(h.HouseGPSCoordinates);if(g)pts.push([g.lat,g.lng]);});
   if(pts.length)map.fitBounds(pts,{padding:[50,50],maxZoom:17});
 }
@@ -4082,7 +4111,12 @@ function drawAssign(pick){
    territory is selected. A background position feed is both a battery
    drain and a privacy problem. */
 var presTimer=null, mateMarkers={};
-function activeTerritory(){return terrFilter!=="all"?terrFilter:null;}
+/* Compartir ubicacion y el radio cuelgan de un territorio DE VERDAD: son un
+   canal del grupo, y el servidor los rechazaria con un nombre inventado. Las
+   revisitas de uno no son un canal. */
+function activeTerritory(){
+  return (terrFilter!=="all"&&terrFilter!==RV_TERR)?terrFilter:null;
+}
 
 function startPresence(){
   if(presTimer||(!me&&!guestMode)||!activeTerritory())return;
@@ -4310,7 +4344,7 @@ function refreshWorkingBtn(){
   var b=$("#btnWorking");
   var mine=scope.kind==="admin"||scope.kind==="unknown"||
     scope.owned.indexOf(terrFilter)!==-1;
-  var can=me&&!guestMode&&terrFilter!=="all"&&mine;
+  var can=me&&!guestMode&&terrFilter!=="all"&&terrFilter!==RV_TERR&&mine;
   b.style.display=can?"block":"none";
   b.setAttribute("aria-pressed",working?"true":"false");
   b.textContent=working?"■ Parar":"▶ Trabajar";
@@ -4503,7 +4537,7 @@ function loadHeld(){
     // sign-out — which would wipe their packet and any unsynced visits.
     heldClear();working=false;refreshWorkingBtn();refreshHeldBtn();return;
   }
-  var scope=terrFilter==="all"?"":terrFilter;
+  var scope=(terrFilter==="all"||terrFilter===RV_TERR)?"":terrFilter;
   // Only a duplicate of the SAME question is worth skipping. Skipping a
   // different one would leave the new territory waiting on an answer about the
   // old one, which nothing would ever correct.
@@ -4713,7 +4747,8 @@ $("#pbAssign").addEventListener("click",function(){
   var ids=pickedIds();
   if(!ids.length)return;
   if(!me){toast("Entra primero para entregar números",true);openAuth();return;}
-  var terr=terrFilter!=="all"?terrFilter:(byId(ids[0])||{}).HouseTerritoryNumber||"";
+  var terr=(terrFilter!=="all"&&terrFilter!==RV_TERR)
+    ? terrFilter : ((byId(ids[0])||{}).HouseTerritoryNumber||"");
   if(!terr){toast("Estas casas no tienen territorio",true);return;}
   drawAssignPicker(ids,terr);
   openSheet("#sh-pick");
@@ -5045,9 +5080,8 @@ function leaveGuest(){
 var routeOn=false, routeOrder=[], routeLine=null, routeMarkers={};
 
 function planRoute(){
-  var pool=(terrFilter==="all"?records:records.filter(function(h){
-    return (h.HouseTerritoryNumber||"Unassigned")===terrFilter;
-  })).filter(function(h){return parseGPS(h.HouseGPSCoordinates);});
+  var pool=records.filter(inTerrFilter)
+    .filter(function(h){return parseGPS(h.HouseGPSCoordinates);});
   if(!pool.length)return[];
   var start=null;
   if(meMarker){var ll=meMarker.getLatLng();start={lat:ll.lat,lng:ll.lng};}

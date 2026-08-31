@@ -31,6 +31,11 @@
       { i: 'late1', d: '2026-08-02', s: 'Le interesa por que hay tanta maldad',
         rd: '2026-08-16', rt: '09:00', p: 'Leer Salmo 37:10, 11', u: 'u1' }]),
   };
+  var GPS = {
+    h1: '35.4890,-120.6700', h2: '35.4891,-120.6701', h3: '35.4900,-120.6690',
+    h4: '35.4905,-120.6685', h5: '35.4910,-120.6680', h6: '35.4915,-120.6675',
+    h7: '35.4916,-120.6674', h8: '35.4860,-120.6730', h9: '35.4850,-120.6740',
+  };
   var HOUSES = [
     ['h1', '6440 Ardilla Rd #1'], ['h2', '6440 Ardilla Rd #2'],
     ['h3', '6900 Atascadero Ave'], ['h4', '6940 Atascadero Ave'],
@@ -44,6 +49,8 @@
       // Una nota real del grupo: es lo que hay que poder leer en la banqueta.
       HouseNotes: r[0] === 'h7' ? 'Traila de atras (trailer behind the house)' : '',
       HouseLanguage: '', HouseLastVisitDate: '',
+      // Coordenadas de Atascadero, para poder probar el mapa por territorio.
+      HouseGPSCoordinates: GPS[r[0]] || '',
       HouseVisitLog: SEED[r[0]] || '', HouseReturnVisits: RVS[r[0]] || '',
       HouseUpdatedAt: '2026-08-20T10:00:00.000Z',
       // A row written before the visit log existed: history in the old column only.
