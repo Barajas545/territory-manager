@@ -2,10 +2,13 @@
    Lives at the GitHub Pages project subpath, so its scope is /territory-manager/.
    Bump CACHE_VERSION on every deploy that changes the shell. */
 
-const CACHE_VERSION = 'v35';
+const CACHE_VERSION = 'v36';
 const SHELL_CACHE = `tm-shell-${CACHE_VERSION}`;
 const VENDOR_CACHE = `tm-vendor-${CACHE_VERSION}`;
 const TILE_CACHE = 'tm-tiles-v1'; // survives shell upgrades; tiles never go stale
+/* El mapa que alguien descargo a proposito para salir sin señal. Sin recorte y
+   sin version: nada lo borra salvo quien lo guardo. */
+const SAVED_TILES = 'tm-map-saved';
 const TILE_LIMIT = 800;
 
 const SHELL = ['./', './index.html', './manifest.webmanifest'];
@@ -44,7 +47,7 @@ self.addEventListener('activate', event => {
     const shell = await caches.open(SHELL_CACHE);
     const ok = await shell.match(CRITICAL);
     if (ok) {
-      const keep = new Set([SHELL_CACHE, VENDOR_CACHE, TILE_CACHE]);
+      const keep = new Set([SHELL_CACHE, VENDOR_CACHE, TILE_CACHE, SAVED_TILES]);
       const names = await caches.keys();
       await Promise.all(names.map(n => (keep.has(n) ? null : caches.delete(n))));
     }
@@ -94,12 +97,23 @@ self.addEventListener('fetch', event => {
   // silently shadow them.
   if (url.pathname.includes('/api/territory')) return;
 
-  // Map tiles: cache-first, so previously walked areas stay visible offline.
+  /* Los pedazos del mapa. Primero el descargado a proposito, luego lo que se
+     fue guardando de andar mirando, y solo entonces la red. El orden importa:
+     al reves, el recorte del segundo podria tirar algo que el primero tiene
+     guardado para hoy en la tarde. */
   if (/tile\.openstreetmap\.org/.test(url.hostname)) {
-    event.respondWith(
-      cacheFirst(req, TILE_CACHE).then(r => { trimTiles(); return r; })
-        .catch(() => new Response('', { status: 504 }))
-    );
+    event.respondWith((async () => {
+      const guardado = await caches.open(SAVED_TILES);
+      const mio = await guardado.match(req);
+      if (mio) return mio;
+      try {
+        const r = await cacheFirst(req, TILE_CACHE);
+        trimTiles();
+        return r;
+      } catch (e) {
+        return new Response('', { status: 504 });
+      }
+    })());
     return;
   }
 

@@ -930,6 +930,12 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
         <div class="sec">
           <div class="sec-t">Aplicación</div>
           <div class="card">
+            <button class="row" id="rowMapDl">
+              <span class="row-ico">🗺️</span>
+              <span class="row-txt"><span class="row-t">Mapa sin internet</span>
+              <span class="row-s" id="mapDlSub">Revisando…</span></span>
+              <span class="row-act">›</span>
+            </button>
             <button class="row" id="rowSimple">
               <span class="row-ico">🙂</span>
               <span class="row-txt"><span class="row-t">Versión sencilla</span>
@@ -1084,7 +1090,7 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
 
 /* ═══ CONFIG ═══ */
 var API="https://territory-manager-silk.vercel.app/api/territory";
-var APP_VERSION="2.22.0";
+var APP_VERSION="2.23.0";
 
 /* ═══════════════════════════════════════════════════════════════════════
    OFFLINE DATA LAYER
@@ -2770,6 +2776,7 @@ function generateNotesPDF(){
 }
 $("#rowMyRV").addEventListener("click",generateNotesPDF);
 $("#rowSimple").addEventListener("click",toggleSimple);
+$("#rowMapDl").addEventListener("click",mapDlMenu);
 $("#wIn").addEventListener("click",function(){openAuth();});
 $("#wCode").addEventListener("click",function(){
   // Quien llega por aqui trae un codigo en la mano: se le abre donde escribirlo.
@@ -2824,7 +2831,10 @@ function initMap(){
     return;
   }
   map=L.map("map",{zoomControl:false,attributionControl:false}).setView([35.4873,-120.6700],14);
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19}).addTo(map);
+  /* Sin las tres letras (a./b./c.): repartian cada pedazo al azar entre tres
+     servidores, asi que un mapa guardado desde uno fallaba cuando Leaflet
+     pedia otro. OSM desaconseja esos nombres desde hace años. */
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19}).addTo(map);
   L.control.zoom({position:"topright"}).addTo(map);
   map.on("click",function(e){
     // Fuera del modo de marcar, un toque en el mapa no hace nada, como antes.
@@ -2866,6 +2876,185 @@ function refreshMapPins(){
     markerMap[h.id]=m;
   });
 }
+/* ── el mapa para andar sin señal ──────────────────────────────────────
+   El mapa se arma de pedazos cuadrados. Estas son las cuentas de siempre para
+   saber cual pedazo le toca a un punto en cada nivel de acercamiento. */
+var MAP_CACHE="tm-map-saved";
+function tileX(lng,z){return Math.floor((lng+180)/360*Math.pow(2,z));}
+function tileY(lat,z){
+  var r=lat*Math.PI/180;
+  return Math.floor((1-Math.log(Math.tan(r)+1/Math.cos(r))/Math.PI)/2*Math.pow(2,z));
+}
+function tileUrl(z,x,y){return "https://tile.openstreetmap.org/"+z+"/"+x+"/"+y+".png";}
+
+/* Un tope duro. No es por el telefono — es por respeto a quien regala los
+   mapas: OSM pide no bajar a lo bruto, y un territorio de pueblo cabe de
+   sobra aqui. Si algun dia no cupiera, lo que toca es pagar un proveedor de
+   mapas, no subir el numero. */
+var MAP_MAX=2500;
+
+/* Los niveles: de lejos se llena el rectangulo completo, que sale barato y da
+   continuidad para moverse. De cerca solo alrededor de las casas, que es por
+   donde se camina — llenar el rectangulo a ese detalle multiplicaria todo por
+   diez para pintar cerros y campos por los que nadie va a tocar. */
+function tilesNeeded(houses){
+  var pts=[],i,j,z,g;
+  for(i=0;i<houses.length;i++){
+    g=parseGPS(houses[i].HouseGPSCoordinates);
+    if(g)pts.push(g);
+  }
+  if(!pts.length)return null;
+  var minLat=pts[0].lat,maxLat=pts[0].lat,minLng=pts[0].lng,maxLng=pts[0].lng;
+  pts.forEach(function(q){
+    if(q.lat<minLat)minLat=q.lat; if(q.lat>maxLat)maxLat=q.lat;
+    if(q.lng<minLng)minLng=q.lng; if(q.lng>maxLng)maxLng=q.lng;
+  });
+  // Un respiro alrededor: la calle de enfrente tambien se ve.
+  var pad=0.004;
+  minLat-=pad;maxLat+=pad;minLng-=pad;maxLng+=pad;
+
+  var set={};
+  var add=function(z,x,y){
+    if(x<0||y<0)return;
+    var m=Math.pow(2,z);
+    if(x>=m||y>=m)return;
+    set[z+"/"+x+"/"+y]=[z,x,y];
+  };
+  /* De lejos: el rectangulo entero, mas un pedazo de margen POR CADA LADO.
+     El margen tiene que medirse en pedazos y no en grados: a nivel alejado un
+     pedazo mide mas de un kilometro, asi que un margen de grados chico no
+     alcanza ni al vecino y la pantalla acaba pidiendo pedazos que nunca se
+     bajaron — justo en los bordes, que es donde uno mira para orientarse. */
+  for(z=13;z<=17;z++){
+    var x0=tileX(minLng,z)-1,x1=tileX(maxLng,z)+1;
+    var y0=tileY(maxLat,z)-1,y1=tileY(minLat,z)+1;
+    for(i=x0;i<=x1;i++)for(j=y0;j<=y1;j++)add(z,i,j);
+  }
+  /* El ultimo nivel, solo por donde se camina: llenar el rectangulo a este
+     detalle multiplicaria todo por cuatro para pintar cerros por los que nadie
+     va a tocar. Y donde falte, Leaflet estira el nivel anterior — que si esta
+     completo — asi que se ve algo borroso, nunca un hueco en blanco. */
+  for(z=18;z<=18;z++){
+    pts.forEach(function(q){
+      var cx=tileX(q.lng,z),cy=tileY(q.lat,z);
+      for(i=-1;i<=1;i++)for(j=-1;j<=1;j++)add(z,cx+i,cy+j);
+    });
+  }
+  var list=[];
+  for(var k in set)list.push(set[k]);
+  return list;
+}
+
+/* Cuanto hay guardado. Se mide de verdad, no se estima: el numero sirve para
+   decidir si borrarlo, y una estimacion no sirve para eso. */
+function savedMapCount(){
+  if(!window.caches)return Promise.resolve(0);
+  return caches.open(MAP_CACHE).then(function(c){return c.keys();})
+    .then(function(k){return k.length;}).catch(function(){return 0;});
+}
+
+var mapDl=null;          // {cancel:false} mientras se baja
+function downloadMap(){
+  if(!window.caches){toast("Este teléfono no puede guardar el mapa",true);return;}
+  var houses=records.filter(inTerrFilter);
+  var list=tilesNeeded(houses);
+  if(!list){
+    toast("Estas casas todavía no tienen ubicación en el mapa",true);return;
+  }
+  if(list.length>MAP_MAX){
+    toast("El área es demasiado grande ("+list.length+" pedazos)",true);return;
+  }
+  var mb=(list.length*14/1024).toFixed(1);   // ~14 KB por pedazo
+  if(!confirm("¿Descargar el mapa de "+terrFilterLabel()+"?\n\n"+
+    list.length+" pedazos, como "+mb+" MB.\n\n"+
+    "Hazlo con wifi. Después el mapa se ve sin internet."))return;
+
+  mapDl={cancel:false};
+  var done=0,fallidos=0;
+  var row=$("#mapDlSub");
+  var pinta=function(){
+    if(row)row.textContent="Descargando… "+done+" de "+list.length;
+  };
+  pinta();
+
+  caches.open(MAP_CACHE).then(function(cache){
+    /* De dos en dos y con una pausa. El mapa lo regala OpenStreetMap: bajarlo
+       a toda velocidad es justo lo que piden que no se haga, y tampoco hace
+       falta — esto corre una vez, con wifi, mientras uno desayuna. */
+    var i=0;
+    var siguiente=function(){
+      if(mapDl&&mapDl.cancel)return Promise.resolve();
+      if(i>=list.length)return Promise.resolve();
+      var t=list[i++];
+      var url=tileUrl(t[0],t[1],t[2]);
+      return cache.match(url).then(function(hit){
+        if(hit)return null;                       // ya estaba
+        return fetch(url,{mode:"cors"}).then(function(r){
+          if(r&&r.ok)return cache.put(url,r);
+          fallidos++;
+        }).catch(function(){fallidos++;});
+      }).then(function(){
+        done++;
+        if(done%10===0||done===list.length)pinta();
+        return new Promise(function(res){setTimeout(res,60);}).then(siguiente);
+      });
+    };
+    return Promise.all([siguiente(),siguiente()]);
+  }).then(function(){
+    var cancelado=mapDl&&mapDl.cancel;
+    mapDl=null;
+    refreshMapRow();
+    if(cancelado)toast("Descarga cancelada");
+    else if(fallidos)toast("Mapa guardado, "+fallidos+" pedazos no bajaron",true);
+    else toast("Mapa guardado ✓ Ya se ve sin internet");
+  }).catch(function(e){
+    mapDl=null;refreshMapRow();
+    toast("No se pudo guardar el mapa",true);
+  });
+}
+
+function deleteSavedMap(){
+  if(!window.caches)return;
+  if(!confirm("¿Borrar el mapa guardado?\n\nSe libera espacio, pero sin "+
+    "internet el mapa se verá en blanco."))return;
+  caches.delete(MAP_CACHE).then(function(){
+    refreshMapRow();toast("Mapa borrado");
+  });
+}
+
+function refreshMapRow(){
+  var row=$("#rowMapDl"),sub=$("#mapDlSub");
+  if(!row||!sub)return;
+  row.style.display=(guestMode||simpleMode)?"none":"";
+  if(mapDl)return;                       // el progreso manda mientras baja
+  savedMapCount().then(function(k){
+    sub.textContent=k
+      ? Math.round(k*14/1024*10)/10+" MB guardados · toca para actualizar o borrar"
+      : "Descárgalo con wifi y el mapa se verá sin internet";
+  });
+}
+
+function mapDlMenu(){
+  if(mapDl){
+    if(confirm("¿Cancelar la descarga?"))mapDl.cancel=true;
+    return;
+  }
+  savedMapCount().then(function(k){
+    if(!k){downloadMap();return;}
+    $("#pTitle").textContent="Mapa sin internet";
+    $("#pSub").textContent=Math.round(k*14/1024*10)/10+" MB guardados";
+    $("#pBody").innerHTML=
+      '<p style="font-size:14.5px;margin-bottom:14px">El mapa guardado se ve '+
+        'aunque no haya señal. Actualízalo si agregaste domicilios en otra zona.</p>'+
+      '<button class="btn btn-p" id="mapAgain" style="width:100%;margin-bottom:8px">'+
+        'Actualizar el mapa</button>'+
+      '<button class="btn btn-d" id="mapDel" style="width:100%">Borrar el mapa guardado</button>';
+    $("#mapAgain").addEventListener("click",function(){closeSheet("#sh-pick");downloadMap();});
+    $("#mapDel").addEventListener("click",function(){closeSheet("#sh-pick");deleteSavedMap();});
+    openSheet("#sh-pick");
+  });
+}
+
 /* ── los limites del territorio ────────────────────────────────────────
    Un contorno por territorio, para poder ver de un golpe si toda la ciudad
    esta repartida. El dibujo es el medio; el fin es el aviso de abajo, que
@@ -3221,7 +3410,7 @@ function showView(name){
     setTimeout(function(){if(map)map.invalidateSize();},60);
   }else{stopMeWatch();stopPresence();stopVoicePoll();}
   if(name==="rv")renderRV();
-  if(name==="more"){buildTerrSub();updateSyncUI();showStorage();}
+  if(name==="more"){buildTerrSub();updateSyncUI();showStorage();refreshMapRow();}
 }
 document.querySelectorAll(".tab").forEach(function(t){
   t.addEventListener("click",function(){showView(t.dataset.view);haptic(5);});
