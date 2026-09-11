@@ -110,6 +110,15 @@ const tok = uid => sign({ uid, exp: now + 3600e3 });
     r.status === 200 && !!r.body.setupCode, JSON.stringify(r.body).slice(0, 60));
   const code = r.body.setupCode;
 
+  // ══ el código ya sabe de quién es ══════════════════════════════════════
+  r = await T('', 'lookupSetup', { setupCode: code });
+  check('el código devuelve lo que el administrador registró',
+    r.status === 200 && r.body.name === 'Nuevo Uno', JSON.stringify(r.body));
+  r = await T('', 'lookupSetup', { setupCode: 'XXXXXX' });
+  check('un código inventado no devuelve nada', r.status === 400, JSON.stringify(r.body));
+  r = await T('', 'lookupSetup', {});
+  check('y sin código, tampoco', r.status === 400, JSON.stringify(r.body));
+
   r = await T('', 'redeemSetup', { setupCode: code, name: 'Nuevo Uno', password: 'contra123' });
   check('estrenar el código SIN correo se rechaza', r.status === 400, JSON.stringify(r.body));
   r = await T('', 'redeemSetup', { setupCode: code, name: 'Nuevo Uno',
@@ -119,6 +128,9 @@ const tok = uid => sign({ uid, exp: now + 3600e3 });
     email: 'nuevo@ejemplo.com', password: 'contra123' });
   check('con un correo propio, la cuenta queda lista', r.status === 200 && !!r.body.token,
     JSON.stringify(r.body).slice(0, 60));
+  r = await T('', 'lookupSetup', { setupCode: code });
+  check('un código YA estrenado deja de contestar', r.status === 400, JSON.stringify(r.body));
+
   r = await T('', 'login', { login: 'nuevo@ejemplo.com', password: 'contra123' });
   check('y esa persona entra con su correo', r.status === 200 && !!r.body.token, r.status);
   const NUEVO = r.body.token;

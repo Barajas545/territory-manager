@@ -211,6 +211,12 @@
         TM.bounds[body.territory] = pts;
         return json({ ok: true, territory: body.territory, bounds: pts });
       }
+      case 'lookupSetup':
+        // Como el servidor: el codigo trae lo que el administrador registro.
+        if (String(body.setupCode || '').toUpperCase() !== 'K7RQ2M')
+          return json({ error: 'Ese código no es válido' }, 400);
+        return json({ ok: true, name: 'Hermano Lopez', phone: '8055551234',
+          email: 'hermano.lopez@ejemplo.com' });
       case 'setMyMode':
         TM.simple = !!body.simple;
         return json({ ok: true, simple: TM.simple, locked: false });

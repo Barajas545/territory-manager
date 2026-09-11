@@ -1084,7 +1084,7 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
 
 /* ═══ CONFIG ═══ */
 var API="https://territory-manager-silk.vercel.app/api/territory";
-var APP_VERSION="2.21.0";
+var APP_VERSION="2.22.0";
 
 /* ═══════════════════════════════════════════════════════════════════════
    OFFLINE DATA LAYER
@@ -3427,6 +3427,27 @@ function refreshChrome(){
 }
 var pendingSetupCode=null;   // carried in from a scanned QR or a shared link
 
+/* Lo que el administrador ya escribio para este codigo. Se rellena solo lo
+   que este VACIO: si la persona ya empezo a escribir, lo suyo manda. */
+var lastLookup="";
+function prefillFromCode(code){
+  code=String(code||"").trim().toUpperCase();
+  if(code.length<6||code===lastLookup)return;
+  lastLookup=code;
+  team("lookupSetup",{setupCode:code}).then(function(r){
+    // Puede haber cambiado de codigo mientras viajaba la respuesta.
+    var cur=$("#auCode");
+    if(!cur||cur.value.trim().toUpperCase()!==code)return;
+    var put=function(id,v){var el=$("#"+id);if(el&&!el.value.trim()&&v)el.value=v;};
+    put("auName",r.name);put("auPhone",r.phone);put("auEmail",r.email);
+    var nota=$("#auPre");
+    if(nota&&r.email)nota.style.display="";
+    // Con todo lo demas puesto, lo unico que falta es la contraseña.
+    var pw=$("#auPw");if(pw&&r.email&&!pw.value)pw.focus();
+  }).catch(function(){
+    // Un codigo malo se dice al intentar crear la cuenta, no mientras se escribe.
+  });
+}
 function looksLikeEmail(v){return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(v||"").trim());}
 function refreshSimpleRow(){
   var st=$("#simpleState"),sub=$("#simpleSub"),row=$("#rowSimple");
@@ -3502,13 +3523,12 @@ function refreshMe(){
   }).catch(function(){renderTeamCard();refreshWelcome();});
 }
 
-/* Se muestra solo cuando de verdad no hay por donde entrar. Si llego un codigo
-   por QR, el formulario ya esta abierto encima y taparlo con esto seria
-   devolver a la persona al principio del camino que acaba de andar. */
+/* Mientras no haya sesion, esta pantalla es el fondo. Cuando el codigo llega
+   por QR el formulario abre ENCIMA (capa 101 contra 94), asi que no estorba —
+   y si la persona lo cierra sin terminar, cae aqui y no en la app apagada. */
 function refreshWelcome(){
   var w=$("#welcome");if(!w)return;
-  var mostrar=!me&&!guestMode&&!pendingSetupCode;
-  w.classList.toggle("on",mostrar);
+  w.classList.toggle("on",!me&&!guestMode);
 }
 
 /* ── More tab card ── */
@@ -3658,7 +3678,9 @@ function drawAuth(mode){
       '<div class="f"><label for="auPhone">Teléfono</label><input id="auPhone" type="tel" autocomplete="tel"></div>'+
       '<div class="f"><label for="auEmail">Correo electrónico</label>'+
         '<input id="auEmail" type="email" autocomplete="email" autocapitalize="off" '+
-        'spellcheck="false" placeholder="tucorreo@ejemplo.com"></div>'+
+        'spellcheck="false" placeholder="tucorreo@ejemplo.com">'+
+        '<div id="auPre" style="font-size:12.5px;color:var(--text-2);margin-top:6px;display:none">'+
+        'Ya lo tiene tu grupo. Si está mal, corrígelo aquí.</div></div>'+
       '<div class="f"><label for="auPw">Escoge una contraseña</label><input id="auPw" type="password" autocomplete="new-password"></div>'+
       '<button class="btn btn-p" id="auGo" style="width:100%">Crear mi cuenta</button>';
   }else{
@@ -3673,6 +3695,15 @@ function drawAuth(mode){
   $("#auBody").querySelectorAll("[data-am]").forEach(function(b){
     b.addEventListener("click",function(){drawAuth(b.dataset.am);});
   });
+
+  /* Los dos caminos llegan aqui: el codigo escaneado ya viene escrito, y el
+     escrito a mano se consulta al terminarlo. */
+  var codeEl=$("#auCode");
+  if(codeEl){
+    codeEl.addEventListener("input",function(){prefillFromCode(codeEl.value);});
+    codeEl.addEventListener("blur",function(){prefillFromCode(codeEl.value);});
+    if(codeEl.value.trim())prefillFromCode(codeEl.value);
+  }
 
   $("#auGo").addEventListener("click",function(){
     var btn=this,err=$("#auErr");err.textContent="";

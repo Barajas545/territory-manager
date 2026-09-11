@@ -227,6 +227,24 @@ module.exports = async (req, res) => {
       });
     }
 
+    /* Lo que el administrador ya dejo escrito para este codigo, para no pedirlo
+       dos veces. Se devuelve solo con el codigo en la mano, y quien lo tiene ya
+       puede estrenar la cuenta completa: esto no abre ninguna puerta nueva.
+
+       El mismo mensaje para un codigo malo y para uno ya usado — decir cual de
+       los dos es le diria a quien adivina codigos cuando le atino. */
+    if (action === 'lookupSetup') {
+      const users = await rd(TABS.users);
+      const code = String(body.setupCode || '').trim().toUpperCase();
+      const u = code && users.find(x => x.setupCode && x.setupCode === code &&
+        x.mustSetup === '1' && x.active !== '0');
+      if (!u) return res.status(400).json({ error: 'Ese código no es válido' });
+      return res.json({
+        ok: true,
+        name: u.name || '', phone: u.phone || '', email: u.email || '',
+      });
+    }
+
     /* First run for an invited person: they present the code the admin gave
        them, fill in their own contact details, and choose their password. */
     if (action === 'redeemSetup') {
