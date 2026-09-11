@@ -349,6 +349,32 @@ body:not(.admin) .house.dnv .vrow{pointer-events:none;opacity:.4;}
 /* ═══ MAP ═════════════════════════════════════════════════════════════ */
 #map{flex:1;background:var(--surface-2);}
 .map-fabs{position:absolute;right:12px;bottom:14px;display:flex;flex-direction:column;gap:8px;z-index:400;}
+/* ── la bienvenida ────────────────────────────────────────────────────
+   Tapa la app entera, pestañas incluidas: mientras no haya sesion, todo lo
+   que hay debajo esta apagado, y dejarlo a la vista solo es ruido. */
+/* Debajo del velo (100) y de las hojas (101): iniciar sesion abre una hoja
+   ENCIMA de esta pantalla, y con un z-index mas alto la hoja quedaba detras y
+   el boton parecia no hacer nada. Debajo tambien del aviso de version nueva
+   (95), que si conviene ver. Encima de todo lo demas de la app. */
+#welcome{position:fixed;inset:0;z-index:94;background:var(--bg);
+  display:none;flex-direction:column;align-items:center;justify-content:center;
+  padding:26px 22px calc(26px + env(safe-area-inset-bottom));overflow-y:auto;}
+#welcome.on{display:flex;}
+#welcome .w-ico{font-size:54px;line-height:1;margin-bottom:14px;}
+#welcome h1{font-size:25px;font-weight:800;letter-spacing:-.02em;text-align:center;
+  margin-bottom:7px;}
+#welcome .w-sub{font-size:15px;color:var(--text-2);text-align:center;
+  line-height:1.45;margin-bottom:28px;max-width:300px;}
+#welcome .w-btns{width:100%;max-width:320px;display:flex;flex-direction:column;gap:10px;}
+#welcome .w-btns button{height:52px;border-radius:var(--r-md);font-size:16.5px;font-weight:750;}
+#welcome .w-p{background:var(--brand);color:var(--brand-ink);}
+#welcome .w-s{background:var(--surface-2);color:var(--text);border:1px solid var(--border);}
+#welcome .w-tip{max-width:320px;margin-top:26px;padding:14px 16px;border-radius:var(--r-md);
+  background:var(--surface-2);font-size:14px;color:var(--text-2);line-height:1.5;}
+#welcome .w-tip b{color:var(--text);font-weight:750;}
+#welcome .w-help{margin-top:18px;font-size:15px;font-weight:700;color:var(--brand);
+  text-decoration:underline;text-underline-offset:3px;}
+
 /* ── la version sencilla ──────────────────────────────────────────────
    Se esconde con CSS lo que es solo presencia en pantalla; lo que cambia de
    COMPORTAMIENTO se decide en el codigo, donde se puede leer el porque. */
@@ -837,6 +863,23 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
       <div class="scroller" id="rvList"></div>
     </section>
 
+    <!-- ══ BIENVENIDA ══ -->
+    <div id="welcome">
+      <div class="w-ico">🏠</div>
+      <h1>Administrador de Territorios</h1>
+      <div class="w-sub">El registro de casa en casa de tu grupo, en tu teléfono.</div>
+      <div class="w-btns">
+        <button class="w-p" id="wIn">Iniciar sesión</button>
+        <button class="w-s" id="wCode">Tengo un código</button>
+      </div>
+      <div class="w-tip">
+        <b>¿Te dieron un código QR?</b><br>
+        Apúntale la cámara de tu teléfono. La app se abre sola con el código
+        ya escrito y solo eliges tu contraseña.
+      </div>
+      <button class="w-help" id="wHelp">¿Cómo consigo una cuenta?</button>
+    </div>
+
     <!-- ══ MORE ══ -->
     <section class="view" id="view-more">
       <div class="scroller">
@@ -1041,7 +1084,7 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
 
 /* ═══ CONFIG ═══ */
 var API="https://territory-manager-silk.vercel.app/api/territory";
-var APP_VERSION="2.20.0";
+var APP_VERSION="2.21.0";
 
 /* ═══════════════════════════════════════════════════════════════════════
    OFFLINE DATA LAYER
@@ -2727,6 +2770,14 @@ function generateNotesPDF(){
 }
 $("#rowMyRV").addEventListener("click",generateNotesPDF);
 $("#rowSimple").addEventListener("click",toggleSimple);
+$("#wIn").addEventListener("click",function(){openAuth();});
+$("#wCode").addEventListener("click",function(){
+  // Quien llega por aqui trae un codigo en la mano: se le abre donde escribirlo.
+  teamHasUsers=true;
+  openSheet("#sh-auth");drawAuth("code");
+  var c=$("#auCode");if(c)c.focus();
+});
+$("#wHelp").addEventListener("click",showHowToJoin);
 
 $("#rowExport").addEventListener("click",function(){
   var m=terrMap(),keys=Object.keys(m).sort();
@@ -3446,9 +3497,18 @@ function refreshMe(){
     teamHasUsers=!!r.hasUsers;
     me=(r.me&&r.me.id)?r.me:null;
     if(!me)authToken="";
-    renderTeamCard();
+    renderTeamCard();refreshWelcome();
     return r;
-  }).catch(function(){renderTeamCard();});
+  }).catch(function(){renderTeamCard();refreshWelcome();});
+}
+
+/* Se muestra solo cuando de verdad no hay por donde entrar. Si llego un codigo
+   por QR, el formulario ya esta abierto encima y taparlo con esto seria
+   devolver a la persona al principio del camino que acaba de andar. */
+function refreshWelcome(){
+  var w=$("#welcome");if(!w)return;
+  var mostrar=!me&&!guestMode&&!pendingSetupCode;
+  w.classList.toggle("on",mostrar);
 }
 
 /* ── More tab card ── */
@@ -3646,6 +3706,7 @@ function drawAuth(mode){
       // next sync tick, which looks exactly like the sign-in having failed.
       needsAuth=false;
       pendingSetupCode=null;
+      refreshWelcome();
       loadTeam();
       loadMine();
       loadHeld();
@@ -3992,14 +4053,16 @@ function askSheetKind(terr,houses){
    screen: somebody has to add you, and then you choose your own password. A
    button that quietly did nothing would be worse than no button. */
 function showHowToJoin(){
-  var who=(guestInfo&&guestInfo.from)||"quien te dio estos domicilios";
+  var who=(guestInfo&&guestInfo.from)||"quien lleva los territorios de tu grupo";
   var phone=(guestInfo&&guestInfo.fromPhone)||"";
   $("#pTitle").textContent="Crear una cuenta";
   $("#pSub").textContent="Toma como un minuto";
   $("#pBody").innerHTML=
     '<p style="font-size:14.5px;margin-bottom:14px">Con una cuenta los domicilios '+
       'se quedan en tu teléfono de un día para otro, guardas tus propias revisitas y '+
-      'te pueden dar un territorio entero.</p>'+
+      'te pueden dar un territorio entero.'+
+      (guestMode?"":' Las cuentas no se crean solas: alguien de tu grupo te agrega.')+
+      '</p>'+
     '<div class="lbl" style="margin-top:0">Cómo funciona</div>'+
     '<div class="card">'+
       '<div class="row"><span class="who">1</span><span class="row-txt">'+
@@ -5533,7 +5596,7 @@ function restoreGuest(){
   try{t=localStorage.getItem("tm_guest");i=JSON.parse(localStorage.getItem("tm_guest_info")||"null");}catch(e){}
   if(!t||!i)return false;
   guestMode=true;guestInfo=i;authToken=t;
-  applyGuestChrome();
+  applyGuestChrome();refreshWelcome();
   /* Check whether the numbers are still theirs — but NEVER throw the session
      away because the check failed. Somebody who closed the app in a driveway
      with no signal must find their afternoon exactly where they left it; the
