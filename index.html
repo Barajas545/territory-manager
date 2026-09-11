@@ -37,6 +37,8 @@
   --held:#7C3AED; --held-ink:#FFFFFF;
   --ok:#12805C; --ok-soft:#E4F5EE;
   --warn:#B54708; --warn-soft:#FDF0E6;
+  /* "Nadie salio": ni logro ni problema. Amarillo, aparte del naranja. */
+  --wait:#8A6400; --wait-soft:#FBF2D9;
   --bad:#B42318; --bad-soft:#FDECEA;
   --none:#6B7488; --none-soft:#EDEFF3;
   --shadow-1:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.08);
@@ -60,6 +62,7 @@
     --held:#A78BFA; --held-ink:#140C24;
     --ok:#3FB68B; --ok-soft:#12301F;
     --warn:#E8944A; --warn-soft:#33210F;
+    --wait:#E3BC4F; --wait-soft:#302711;
     --bad:#F27267; --bad-soft:#331815;
     --none:#8A93A6; --none-soft:#22272F;
     --shadow-1:0 1px 2px rgba(0,0,0,.4);
@@ -227,11 +230,13 @@ input,textarea,select{-webkit-appearance:none;appearance:none;}
   font-size:15px;font-weight:800;letter-spacing:.02em;color:var(--text-3);
   -webkit-user-select:none;user-select:none;}
 .vc:active{transform:scale(.95);}
-.vc.next{color:var(--brand);border-color:var(--brand);background:var(--brand-soft);font-size:19px;font-weight:600;}
 .vc.on{border-style:solid;}
-.vc.k-NH{background:var(--none-soft);color:var(--text-2);border-color:var(--border-strong);}
+/* Amarillo: se toco y no salio nadie, o pidieron que se vuelva. */
+.vc.k-NH,.vc.k-CB{background:var(--wait-soft);color:var(--wait);border-color:var(--wait);}
+/* Verde: salio alguien y se hablo. */
 .vc.k-M,.vc.k-W,.vc.k-T{background:var(--ok-soft);color:var(--ok);border-color:var(--ok);}
-.vc.k-BZ,.vc.k-CB{background:var(--warn-soft);color:var(--warn);border-color:var(--warn);}
+/* Ocupado se queda aparte: si salieron, pero no hubo conversacion. */
+.vc.k-BZ{background:var(--warn-soft);color:var(--warn);border-color:var(--warn);}
 .vc.k-RV{background:var(--rv-soft);color:var(--rv);border-color:var(--rv);}
 .vc.k-NI,.vc.k-X{background:var(--surface-3);color:var(--text-2);border-color:var(--border-strong);}
 
@@ -344,6 +349,23 @@ body:not(.admin) .house.dnv .vrow{pointer-events:none;opacity:.4;}
 /* ═══ MAP ═════════════════════════════════════════════════════════════ */
 #map{flex:1;background:var(--surface-2);}
 .map-fabs{position:absolute;right:12px;bottom:14px;display:flex;flex-direction:column;gap:8px;z-index:400;}
+/* ── la version sencilla ──────────────────────────────────────────────
+   Se esconde con CSS lo que es solo presencia en pantalla; lo que cambia de
+   COMPORTAMIENTO se decide en el codigo, donde se puede leer el porque. */
+body.simple .search-wrap,
+body.simple #toolRow,
+body.simple #filterChips,
+body.simple #fab,
+body.simple #secTerr,
+body.simple .tab[data-view="map"],
+body.simple .tab[data-view="rv"]{display:none !important;}
+/* Con dos pestañas, cada una es el doble de grande — que es justo lo que
+   necesita quien no le atina a los botones chicos. */
+body.simple .tab .ti{font-size:23px;}
+body.simple .tab .tl{font-size:12px;}
+/* Los renglones y las casillas, mas grandes y mas separados. */
+body.simple .house-num{font-size:21px;}
+body.simple .vc{height:52px;font-size:17px;}
 .map-fab[aria-pressed="true"]{background:var(--brand);color:var(--brand-ink);}
 /* La barra de dibujo tapa el mapa a proposito: mientras se marca un limite,
    tocar el mapa pone un punto, y conviene que se vea que se esta en ese modo. */
@@ -842,7 +864,7 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
             </button>
           </div>
         </div>
-        <div class="sec">
+        <div class="sec" id="secTerr">
           <div class="sec-t">Territorio</div>
           <div class="card">
             <button class="row" id="rowExport">
@@ -865,6 +887,12 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
         <div class="sec">
           <div class="sec-t">Aplicación</div>
           <div class="card">
+            <button class="row" id="rowSimple">
+              <span class="row-ico">🙂</span>
+              <span class="row-txt"><span class="row-t">Versión sencilla</span>
+              <span class="row-s" id="simpleSub">Solo la lista y anotar las visitas</span></span>
+              <span class="row-act" id="simpleState"></span>
+            </button>
             <button class="row" id="rowInstall" style="display:none">
               <span class="row-ico">⬇️</span>
               <span class="row-txt"><span class="row-t">Instalar en el teléfono</span><span class="row-s">Agrega un ícono en tu pantalla de inicio</span></span>
@@ -1013,7 +1041,7 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
 
 /* ═══ CONFIG ═══ */
 var API="https://territory-manager-silk.vercel.app/api/territory";
-var APP_VERSION="2.19.0";
+var APP_VERSION="2.20.0";
 
 /* ═══════════════════════════════════════════════════════════════════════
    OFFLINE DATA LAYER
@@ -1996,7 +2024,7 @@ function houseRow(h,label,isUnit){
   var d=dnvState(h);
   return '<div class="house'+(isUnit?' unit':'')+(picked[h.id]?' on':'')+rowTint(h,d)+
       '" data-hid="'+esc(h.id)+'">'+
-    '<button class="house-main" data-act="detail" data-id="'+esc(h.id)+'">'+
+    '<button class="house-main" data-act="'+(plainUI()?"cell":"detail")+'" data-id="'+esc(h.id)+'">'+
       '<span class="pick">✓</span>'+
       '<span class="house-dot '+(d.on?'dot-dnv':'dot-'+visitStatus(h.HouseLastVisitDate))+'"></span>'+
       '<span class="house-txt">'+
@@ -2034,7 +2062,7 @@ function visitCells(h){
         esc(markOf(e))+'</button>';
     }else{
       out+='<button class="vc'+(i===shown.length?' next':'')+'" data-act="cell" data-id="'+esc(h.id)+'"'+
-        ' aria-label="Registrar una visita">'+(i===shown.length?"＋":"")+'</button>';
+        ' aria-label="Registrar una visita"></button>';
     }
   }
   return out+'</div>';
@@ -2284,7 +2312,7 @@ function openDetail(id){
       '<button class="btn btn-s" id="dRV">📖 Revisitas</button>'+
     '</div>'+
     (h.HouseNotes?'<div class="lbl">Notas de la casa</div><div class="note-box">'+esc(h.HouseNotes)+'</div>':'')+
-    (h.HousePersonalNotes?'<div class="lbl">Notas personales</div><div class="note-box">'+esc(h.HousePersonalNotes)+'</div>':'')+
+    (!plainUI()&&h.HousePersonalNotes?'<div class="lbl">Notas personales</div><div class="note-box">'+esc(h.HousePersonalNotes)+'</div>':'')+
     '<div class="lbl">Todas las visitas</div>'+
     (visits.length
       ?'<div class="card">'+visits.map(function(e){
@@ -2698,6 +2726,7 @@ function generateNotesPDF(){
   toast("PDF guardado ✓");
 }
 $("#rowMyRV").addEventListener("click",generateNotesPDF);
+$("#rowSimple").addEventListener("click",toggleSimple);
 
 $("#rowExport").addEventListener("click",function(){
   var m=terrMap(),keys=Object.keys(m).sort();
@@ -3133,6 +3162,7 @@ $("#locateBtn").addEventListener("click",function(){
 
 /* ═══ NAV ═══ */
 function showView(name){
+  if(simpleMode&&!guestMode&&(name==="map"||name==="rv"))name="houses";
   document.querySelectorAll(".view").forEach(function(v){v.classList.toggle("active",v.id==="view-"+name);});
   document.querySelectorAll(".tab").forEach(function(t){t.setAttribute("aria-selected",t.dataset.view===name?"true":"false");});
   if(name==="map"){
@@ -3268,6 +3298,20 @@ var TEAM_API=API.replace(/\/territory$/,"/team");
 var me=null, authToken="";
 try{authToken=localStorage.getItem("tm_token")||"";}catch(e){}
 var teamUsers=[], teamTerritories=[], teamHasUsers=true;
+/* La version sencilla. `simpleLocked` la dejo fija un administrador, para que
+   no se salga de ella sin querer y se quede otra vez sin poder trabajar. */
+var simpleMode=false, simpleLocked=false;
+/* Quien ayuda sin cuenta ya veia una app recortada; ahora las dos recortan
+   por el mismo lado, asi nadie tiene que aprender dos apps distintas. */
+function plainUI(){return guestMode||simpleMode;}
+function applySimpleChrome(){
+  document.body.classList.toggle("simple",simpleMode&&!guestMode);
+  if(simpleMode&&!guestMode){
+    var v=document.querySelector(".view.active");
+    // Si se quedo parado en una pestaña que ya no existe, se le regresa.
+    if(v&&(v.id==="view-map"||v.id==="view-rv"))showView("houses");
+  }
+}
 
 /* What this account may see and do, as the server describes it.
 
@@ -3323,6 +3367,8 @@ function refreshChrome(){
   show("#scopeBtn",guestMode||scope.kind!=="numbers");
   // Donde termina un territorio lo decide la congregacion, no quien lo trabaja.
   show("#boundsBtn",!guestMode&&scope.kind==="admin");
+  // El interruptor se mantiene al dia en cada cambio de estado, no solo al arrancar.
+  refreshSimpleRow();
   var ex=$("#rowExport");
   if(ex)ex.style.display=(!guestMode&&(scope.kind==="admin"||scope.territories.length))?"":"none";
   // Las revisitas son de la persona, no del territorio: no dependen de tener uno.
@@ -3330,6 +3376,27 @@ function refreshChrome(){
 }
 var pendingSetupCode=null;   // carried in from a scanned QR or a shared link
 
+function looksLikeEmail(v){return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(v||"").trim());}
+function refreshSimpleRow(){
+  var st=$("#simpleState"),sub=$("#simpleSub"),row=$("#rowSimple");
+  if(!st||!row)return;
+  row.style.display=(me&&!guestMode)?"":"none";
+  st.textContent=simpleMode?"Encendida":"Apagada";
+  st.style.color=simpleMode?"var(--brand)":"var(--text-3)";
+  sub.textContent=simpleLocked
+    ? "Un administrador la dejó fija"
+    : (simpleMode?"Toca para ver la versión completa":"Solo la lista y anotar las visitas");
+}
+function toggleSimple(){
+  if(!me)return;
+  if(simpleLocked){toast("Un administrador dejó fija tu versión",true);return;}
+  var next=!simpleMode;
+  team("setMyMode",{simple:next}).then(function(r){
+    simpleMode=!!r.simple;simpleLocked=!!r.locked;
+    applySimpleChrome();refreshSimpleRow();renderTeamCard();renderHouses();
+    toast(simpleMode?"Versión sencilla encendida ✓":"Versión completa ✓");
+  }).catch(function(e){toast(e.message,true);});
+}
 function initials(name){
   var p=String(name||"?").trim().split(/\s+/);
   return ((p[0]||"?")[0]+(p.length>1?p[p.length-1][0]:"")).toUpperCase();
@@ -3415,10 +3482,40 @@ function renderTeamCard(){
     updatePttVisibility();
     return;
   }
+  /* En la version sencilla queda lo que una persona necesita de si misma:
+     quien es, su contraseña, y como salir. Repartir territorios, ver quien
+     tiene que, y la lista de No visitar son tareas de organizar, no de tocar
+     puertas. */
+  if(simpleMode){
+    el.innerHTML=
+      '<div class="row"><span class="who">'+esc(initials(me.name))+'</span>'+
+        '<span class="row-txt"><span class="row-t">'+esc(me.name)+'</span>'+
+        '<span class="row-s">'+esc(me.email||me.phone||"Sesión iniciada")+'</span></span></div>'+
+      '<button class="row" id="tmPw"><span class="row-ico">\u{1F511}</span>'+
+        '<span class="row-txt"><span class="row-t">Cambiar mi contraseña</span></span>'+
+        '<span class="row-act">›</span></button>'+
+      '<button class="row" id="tmOut"><span class="row-ico">\u{1F6AA}</span>'+
+        '<span class="row-txt"><span class="row-t">Cerrar sesión</span></span>'+
+        '<span class="row-act">›</span></button>';
+    $("#tmPw").addEventListener("click",openChangePassword);
+    /* El mismo aviso que en la version completa. Aqui importa MAS, no menos:
+       quien usa la version sencilla es quien menos va a sospechar que cerrar
+       sesion se lleva lo que todavia no se ha subido. */
+    $("#tmOut").addEventListener("click",function(){
+      var n=pendingCount();
+      var warn=n
+        ?("Tienes "+n+" cambio"+(n===1?"":"s")+" sin subir.\n\n"+
+          "Al cerrar sesión se quita la copia de este teléfono y se va a perder todo eso.\n\n¿Cerrar sesión de todos modos?")
+        :"¿Cerrar sesión?\n\nEl territorio se quita de este teléfono hasta que vuelvas a entrar.";
+      if(confirm(warn))signOut();
+    });
+    updatePttVisibility();
+    return;
+  }
   el.innerHTML=
     '<div class="row"><span class="who">'+esc(initials(me.name))+'</span>'+
       '<span class="row-txt"><span class="row-t">'+esc(me.name)+'</span>'+
-      '<span class="row-s">'+esc(me.phone||me.email||"Sesión iniciada")+
+      '<span class="row-s">'+esc(me.email||me.phone||"Sesión iniciada")+
       (me.role==="admin"?" · Admin":"")+'</span></span></div>'+
     myNumbersRow()+
     '<button class="row" id="tmAssign"><span class="row-ico">\u{1F465}</span>'+
@@ -3479,7 +3576,7 @@ function drawAuth(mode){
   $("#auTitle").textContent=mode==="first"?"Crear la primera cuenta":mode==="code"?"Usar un código":"Iniciar sesión";
   $("#auSub").textContent=mode==="first"
     ?"Esta será la cuenta de administrador que agrega a los demás"
-    :mode==="code"?"Escribe el código que te dio el administrador":"Para que tu grupo vea dónde estás";
+    :mode==="code"?"Tu correo será tu usuario para entrar":"Entra con tu correo electrónico";
 
   var seg=teamHasUsers
     ? '<div class="seg"><button data-am="in" aria-selected="'+(mode==="in")+'">Entrar</button>'+
@@ -3489,6 +3586,9 @@ function drawAuth(mode){
   var form;
   if(mode==="first"){
     form='<div class="f"><label for="auName">Tu nombre</label><input id="auName" autocomplete="name"></div>'+
+      '<div class="f"><label for="auEmail">Correo electrónico</label>'+
+        '<input id="auEmail" type="email" autocomplete="email" autocapitalize="off" '+
+        'spellcheck="false" placeholder="tucorreo@ejemplo.com"></div>'+
       '<div class="f"><label for="auPhone">Teléfono</label><input id="auPhone" type="tel" autocomplete="tel"></div>'+
       '<div class="f"><label for="auPw">Escoge una contraseña</label><input id="auPw" type="password" autocomplete="new-password"></div>'+
       '<button class="btn btn-p" id="auGo" style="width:100%">Crear cuenta de administrador</button>';
@@ -3496,11 +3596,15 @@ function drawAuth(mode){
     form='<div class="f"><label for="auCode">Código de acceso</label><input id="auCode" autocapitalize="characters" placeholder="ABC123" value="'+esc(pendingSetupCode||"")+'"></div>'+
       '<div class="f"><label for="auName">Tu nombre</label><input id="auName" autocomplete="name"></div>'+
       '<div class="f"><label for="auPhone">Teléfono</label><input id="auPhone" type="tel" autocomplete="tel"></div>'+
-      '<div class="f"><label for="auEmail">Correo (opcional)</label><input id="auEmail" type="email" autocomplete="email"></div>'+
+      '<div class="f"><label for="auEmail">Correo electrónico</label>'+
+        '<input id="auEmail" type="email" autocomplete="email" autocapitalize="off" '+
+        'spellcheck="false" placeholder="tucorreo@ejemplo.com"></div>'+
       '<div class="f"><label for="auPw">Escoge una contraseña</label><input id="auPw" type="password" autocomplete="new-password"></div>'+
       '<button class="btn btn-p" id="auGo" style="width:100%">Crear mi cuenta</button>';
   }else{
-    form='<div class="f"><label for="auLogin">Tu nombre o teléfono</label><input id="auLogin" autocomplete="username"></div>'+
+    form='<div class="f"><label for="auLogin">Correo electrónico</label>'+
+      '<input id="auLogin" type="email" autocomplete="username" autocapitalize="off" '+
+      'spellcheck="false" placeholder="tucorreo@ejemplo.com"></div>'+
       '<div class="f"><label for="auPw">Contraseña</label><input id="auPw" type="password" autocomplete="current-password"></div>'+
       '<button class="btn btn-p" id="auGo" style="width:100%">Iniciar sesión</button>';
   }
@@ -3516,17 +3620,20 @@ function drawAuth(mode){
     var payload,act,label=btn.textContent;
     if(mode==="first"){
       act="bootstrapAdmin";
-      payload={name:$("#auName").value.trim(),phone:$("#auPhone").value.trim(),password:pw};
+      payload={name:$("#auName").value.trim(),phone:$("#auPhone").value.trim(),
+        email:$("#auEmail")?$("#auEmail").value.trim():"",password:pw};
       if(!payload.name){err.textContent="Escribe tu nombre";return;}
+      if(!looksLikeEmail(payload.email)){err.textContent="Escribe un correo válido: será tu usuario";return;}
     }else if(mode==="code"){
       act="redeemSetup";
       payload={setupCode:$("#auCode").value.trim().toUpperCase(),name:$("#auName").value.trim(),
         phone:$("#auPhone").value.trim(),email:$("#auEmail").value.trim(),password:pw};
       if(!payload.setupCode){err.textContent="Escribe el código que te dio el administrador";return;}
+      if(!looksLikeEmail(payload.email)){err.textContent="Escribe un correo válido: será tu usuario";return;}
     }else{
       act="login";
       payload={login:$("#auLogin").value.trim(),password:pw};
-      if(!payload.login){err.textContent="Escribe tu nombre o teléfono";return;}
+      if(!payload.login){err.textContent="Escribe tu correo electrónico";return;}
     }
     if(act!=="login"&&pw.length<6){err.textContent="La contraseña debe tener al menos 6 caracteres";return;}
     btn.disabled=true;btn.textContent="Espera…";
@@ -3608,14 +3715,14 @@ function drawPicker(){
   $("#cBody").innerHTML=
     '<div class="cell-grid">'+
       tile("NH",true)+tile("M")+tile("W")+tile("BZ")+tile("CB")+
-      (guestMode?"":tile("RV",true))+
+      (plainUI()?"":tile("RV",true))+
       '<div class="pk-hr"></div>'+
     '</div>'+
     '<div class="f" style="margin-top:10px"><label for="cNote">Notas y Observaciones:</label>'+
       '<textarea id="cNote" rows="2" placeholder="Escriba aquí los detalles de la visita...">'+
       esc(old?noteOf(old):"")+'</textarea></div>'+
     (old?'<button class="btn btn-s" id="cDel" style="width:100%;margin-bottom:8px">Quitar esta visita</button>':"")+
-    (guestMode?"":'<div class="cell-grid"><button class="pk danger wide" data-dnv="1">'+
+    (plainUI()?"":'<div class="cell-grid"><button class="pk danger wide" data-dnv="1">'+
       '<span class="pk-b vc k-DNV">NV</span><span class="pk-l">No visitar</span></button></div>')+
     '<div id="cErr" style="color:var(--bad);font-size:13.5px;margin-top:10px"></div>';
 
@@ -3623,7 +3730,7 @@ function drawPicker(){
     b.addEventListener("click",function(){
       /* Una revisita pregunta cuatro cosas antes de guardarse. El resto de los
          resultados se anotan de un toque, que es como debe seguir siendo. */
-      if(b.dataset.k==="RV"&&!guestMode){drawRVSet();return;}
+      if(b.dataset.k==="RV"&&!plainUI()){drawRVSet();return;}
       commitVisit(curCell.id,b.dataset.k);
     });
   });
@@ -4357,6 +4464,10 @@ function userActions(id){
       '<div class="code-box">'+esc(u.setupCode)+'</div>'+
       '<button class="btn" data-ua="qr" style="width:100%;margin-bottom:8px">Mostrar el código para escanear</button>':"")+
     '<button class="btn btn-s" data-ua="reset" style="width:100%;margin-bottom:8px">Restablecer contraseña</button>'+
+    /* La pieza que hace util todo esto: quien no se maneja con el telefono
+       no va a entrar a Opciones a buscar un interruptor. */
+    '<button class="btn btn-s" data-ua="simple" style="width:100%;margin-bottom:8px">'+
+      (u.locked?"Dejar que escoja su versión":"Dejarle fija la versión sencilla")+'</button>'+
     '<button class="btn btn-s" data-ua="role" style="width:100%;margin-bottom:8px">'+
       (u.role==="admin"?"Quitar admin":"Hacer admin")+'</button>'+
     '<button class="btn btn-s" data-ua="active" style="width:100%;margin-bottom:8px">'+
@@ -4374,7 +4485,12 @@ function userActions(id){
           u.setupCode);
         return;
       }
-      if(a==="reset"){run=team("resetPassword",{id:id});msg="Contraseña restablecida";}
+      if(a==="simple"){
+        // Fijarsela es encenderla y trabarla a la vez; soltarla la deja libre.
+        run=team("setUserMode",{userId:id,simple:!u.locked,locked:!u.locked});
+        msg=u.locked?"Ahora puede escoger":"Versión sencilla fija";
+      }
+      else if(a==="reset"){run=team("resetPassword",{id:id});msg="Contraseña restablecida";}
       else if(a==="role"){run=team("setUserRole",{id:id,role:u.role==="admin"?"user":"admin"});msg="Rol cambiado";}
       else if(a==="active"){run=team("setUserActive",{id:id,active:!u.active});msg="Actualizado";}
       else{
@@ -4402,6 +4518,8 @@ $("#adAdd").addEventListener("click",function(){
   $("#pSub").textContent="Ellos eligen su propia contraseña con el código";
   $("#pBody").innerHTML=
     '<div class="f"><label for="nuName">Nombre</label><input id="nuName" autocomplete="off"></div>'+
+    '<div class="f"><label for="nuEmail">Correo electrónico (opcional)</label>'+
+      '<input id="nuEmail" type="email" autocapitalize="off" spellcheck="false"></div>'+
     '<div class="f"><label for="nuPhone">Teléfono (opcional)</label><input id="nuPhone" type="tel"></div>'+
     '<button class="btn btn-p" id="nuGo" style="width:100%">Crear y ver el código</button>'+
     '<div id="nuErr" style="color:var(--bad);font-size:13.5px;margin-top:10px"></div>';
@@ -4409,7 +4527,8 @@ $("#adAdd").addEventListener("click",function(){
     var b=this,name=$("#nuName").value.trim();
     if(!name){$("#nuErr").textContent="Escribe el nombre";return;}
     b.disabled=true;
-    team("createUser",{name:name,phone:$("#nuPhone").value.trim()}).then(function(r){
+    team("createUser",{name:name,phone:$("#nuPhone").value.trim(),
+      email:$("#nuEmail").value.trim()}).then(function(r){
       drawAdmin();
       showCode("Dale este código",name,
         esc(name)+" también puede abrir la app y tocar <b>Opciones → Entrar → Tengo un código</b>.",
@@ -4676,6 +4795,12 @@ function loadTeam(){
     // Somebody holding numbers works only those, the way a guest does.
     if(scope.kind==="numbers"&&terrFilter==="all"&&teamTerritories.length===1)
       terrFilter=teamTerritories[0].name;
+    /* Que version mostrar llega con `me`. Si el servidor es viejo y no lo
+       manda, la app se queda como estaba — nadie despierta con otra app. */
+    if(r.me){
+      simpleMode=!!r.me.simple;simpleLocked=!!r.me.locked;
+      applySimpleChrome();refreshSimpleRow();
+    }
     refreshChrome();refreshWorkingBtn();renderTeamCard();updateCounts();
     // Los contornos llegan pegados a los territorios: hasta aqui no se sabian.
     drawBounds();refreshCoverage();

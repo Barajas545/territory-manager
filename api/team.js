@@ -15,6 +15,7 @@ const ST = require('./_settings');
 const TL = require('./_terrlog');
 const NT = require('./_notes');
 const BD = require('./_bounds');
+const PF = require('./_prefs');
 const { makeStore } = require('./_store');
 // Session tokens are signed and verified in _auth.js, so the territory
 // endpoint validates them with exactly the code that issues them here.
@@ -32,6 +33,7 @@ const TABS = {
   terrlog: TL.TERRLOG_TAB,
   notes: NT.NOTES_TAB,
   bounds: BD.BOUNDS_TAB,
+  prefs: PF.PREFS_TAB,
   presence: {
     name: 'Presence',
     cols: ['userId','territory','lat','lng','acc','ts'],
@@ -160,6 +162,15 @@ module.exports = async (req, res) => {
       if (u.active === '0') { const e = new Error('Esta cuenta está desactivada'); e.code = 403; throw e; }
       return u;
     };
+    /* Comprobacion floja a proposito: separa la paja obvia sin pelearse con
+       los correos raros pero validos. Nadie gana con un validador estricto que
+       rechaza el correo real de un hermano. */
+    const looksLikeEmail = v => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(v || '').trim());
+    const emailTaken = (users, email, exceptId) => {
+      const e = norm(email);
+      return !!e && users.some(u => u.active !== '0' && u.id !== exceptId && norm(u.email) === e);
+    };
+
     const requireAdmin = async () => {
       const u = await requireUser();
       if (SC.norm(u.role) !== 'admin') { const e = new Error('Solo los administradores'); e.code = 403; throw e; }
@@ -186,6 +197,8 @@ module.exports = async (req, res) => {
       const name = String(body.name || '').trim();
       const pw = String(body.password || '');
       if (!name) return res.status(400).json({ error: 'Falta el nombre' });
+      if (!looksLikeEmail(body.email))
+        return res.status(400).json({ error: 'Escribe un correo válido: será tu usuario' });
       if (pw.length < 6) return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
       const { hash, salt } = hashPassword(pw);
       const rec = {
@@ -222,13 +235,20 @@ module.exports = async (req, res) => {
       const u = users.find(x => x.setupCode && x.setupCode === code && x.active !== '0');
       if (!u) return res.status(400).json({ error: 'Ese código no es válido' });
       const pw = String(body.password || '');
+      const email = String(body.email || u.email || '').trim();
+      if (!looksLikeEmail(email))
+        return res.status(400).json({ error: 'Escribe un correo válido: será tu usuario' });
+      /* Dos cuentas con el mismo correo harian que entrar dependiera de cual
+         encuentra primero la busqueda — es decir, de la suerte. */
+      if (emailTaken(users, email, u.id))
+        return res.status(400).json({ error: 'Ya hay una cuenta con ese correo' });
       if (pw.length < 6) return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
 
       const { hash, salt } = hashPassword(pw);
       const updated = Object.assign({}, u, {
         name: String(body.name || u.name || '').trim() || u.name,
         phone: String(body.phone || u.phone || '').trim(),
-        email: String(body.email || u.email || '').trim(),
+        email: email,
         passHash: hash, passSalt: salt,
         setupCode: '', mustSetup: '0', updatedAt: nowIso,
       });
@@ -238,6 +258,31 @@ module.exports = async (req, res) => {
         token: sign({ uid: u.id, exp: now + TOKEN_TTL_MS }),
         user: publicUser(updated),
       });
+    }
+
+    /* Cualquiera puede probar la version sencilla y regresar — salvo que el
+       administrador la haya dejado fija, que es justo para que no se salga de
+       ella sin querer y se quede otra vez sin poder trabajar. */
+    if (action === 'setMyMode') {
+      const me = await requireUser();
+      const rows = await PF.readPrefs(store);
+      if (PF.stateFor(rows, me.id).locked)
+        return res.status(403).json({ error: 'Un administrador dejó fija tu versión' });
+      const st = await PF.setPrefs(store, me.id, { simple: !!body.simple }, nowIso);
+      return res.json({ ok: true, simple: st.simple, locked: st.locked });
+    }
+
+    /* El administrador puede dejarsela fija a alguien. Es la pieza que hace
+       util todo esto: quien no se maneja con el telefono no va a entrar a
+       Opciones a buscar un interruptor. */
+    if (action === 'setUserMode') {
+      await requireAdmin();
+      const users = await rd(TABS.users);
+      const u = users.find(x => x.id === String(body.userId || ''));
+      if (!u) return res.status(404).json({ error: 'No existe esa persona' });
+      const st = await PF.setPrefs(store, u.id,
+        { simple: !!body.simple, locked: !!body.locked }, nowIso);
+      return res.json({ ok: true, userId: u.id, simple: st.simple, locked: st.locked });
     }
 
     if (action === 'changePassword') {
@@ -307,11 +352,13 @@ module.exports = async (req, res) => {
       await requireAdmin();
       const users = await rd(TABS.users);
       const policy = await ST.readSettings(store);
+      const prefRows = await PF.readPrefs(store);
       // The pending setup code is shown to the admin only, so they can pass it on.
       return res.json({
         ok: true,
         users: users.map(u => Object.assign(publicUser(u),
-          { setupCode: u.mustSetup === '1' ? u.setupCode : '' })),
+          { setupCode: u.mustSetup === '1' ? u.setupCode : '' },
+          PF.stateFor(prefRows, u.id))),
         policy: {
           nights: policy.nights, tz: policy.tz, options: ST.ALLOWED_NIGHTS,
           colors: policy.colors, defaultColors: ST.DEFAULT_COLORS,
@@ -326,9 +373,16 @@ module.exports = async (req, res) => {
       if (!name) return res.status(400).json({ error: 'Falta el nombre' });
       if (users.some(u => norm(u.name) === norm(name) && u.active !== '0'))
         return res.status(400).json({ error: 'Ya hay alguien con ese nombre' });
+      /* El correo aqui es opcional: casi siempre lo escribe la persona al
+         estrenar su codigo. Si el administrador lo adelanta, se revisa igual. */
+      const preEmail = String(body.email || '').trim();
+      if (preEmail && !looksLikeEmail(preEmail))
+        return res.status(400).json({ error: 'Ese correo no es válido' });
+      if (emailTaken(users, preEmail))
+        return res.status(400).json({ error: 'Ya hay una cuenta con ese correo' });
       const code = setupCode();
       const rec = {
-        id: uid(), name, phone: String(body.phone || '').trim(), email: String(body.email || '').trim(),
+        id: uid(), name, phone: String(body.phone || '').trim(), email: preEmail,
         role: body.role === 'admin' ? 'admin' : 'user',
         passHash: '', passSalt: '', setupCode: code, mustSetup: '1', active: '1',
         createdAt: nowIso, updatedAt: nowIso,
@@ -504,6 +558,7 @@ module.exports = async (req, res) => {
       const policy = await ST.readSettings(store);
       const logRows = await TL.readLog(store);
       const boundRows = await BD.readBounds(store);
+      const prefRows = await PF.readPrefs(store);
       const mine = t => isAdmin || grant.territories.has(SC.norm(t.name)) ||
         grant.packets.some(a => SC.norm(a.territory) === SC.norm(t.name));
       const display = set => terrs.filter(t => set.has(SC.norm(t.name))).map(t => t.name);
@@ -513,7 +568,9 @@ module.exports = async (req, res) => {
         .map(u => (isAdmin ? publicUser(u) : { id: u.id, name: u.name, role: 'user', active: true }));
       return res.json({
         ok: true,
-        me: publicUser(me),
+        /* Que version mostrar va pegado a `me`: es una propiedad de quien
+           usa la app, y llega junto con todo lo demas al arrancar. */
+        me: Object.assign({}, publicUser(me), PF.stateFor(prefRows, me.id)),
         colors: policy.colors,
         scope: {
           kind: grant.kind,

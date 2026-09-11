@@ -196,7 +196,8 @@
       case 'listTerritories':
         // The real endpoint returns the roster and a scope envelope.
         return json({
-          ok: true, me: USER, users: qs.get('solo') ? [USER] : [USER, MATE], scope: SCOPES[AS],
+          ok: true, me: Object.assign({}, USER, { simple: qs.get('simple') === '1', locked: qs.get('fija') === '1' }),
+          users: qs.get('solo') ? [USER] : [USER, MATE], scope: SCOPES[AS],
           colors: TM.colors,
           territories: [{ name: 'Atascadero 3', ownerId: 'u1', owner: USER, assigneeIds: ['u2'], working: TM.working, bounds: TM.bounds['Atascadero 3'] || [] },
                         { name: 'Atascadero 7', ownerId: 'u1', owner: USER, assigneeIds: [], working: TM.working, bounds: TM.bounds['Atascadero 7'] || [] }],
@@ -210,6 +211,11 @@
         TM.bounds[body.territory] = pts;
         return json({ ok: true, territory: body.territory, bounds: pts });
       }
+      case 'setMyMode':
+        TM.simple = !!body.simple;
+        return json({ ok: true, simple: TM.simple, locked: false });
+      case 'setUserMode':
+        return json({ ok: true, userId: body.userId, simple: !!body.simple, locked: !!body.locked });
       case 'listUsers':
         return json({ ok: true, users: [USER, MATE],
           policy: { nights: TM.nights || 0, tz: 'America/Los_Angeles', options: [0,1,2,6],
