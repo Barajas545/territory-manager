@@ -283,6 +283,68 @@ module.exports = async (req, res) => {
        ella sin querer y se quede otra vez sin poder trabajar. */
     /* Cambiar el idioma de la congregacion no reetiqueta ningun domicilio: solo
        cambia cual se considera "el nuestro" al mirar la lista. Nada se pierde. */
+    /* Cambiarle el nombre a un territorio. Solo el administrador: el nombre es
+       como el grupo entero se refiere a un pedazo de ciudad, y dos personas
+       renombrandolo a la vez dejarian las listas apuntando a dos sitios. */
+    if (action === 'renameTerritory') {
+      const admin = await requireAdmin();
+      const from = String(body.from || '').trim();
+      const to = String(body.to || '').trim().slice(0, 60);
+      if (!from || !to) return res.status(400).json({ error: 'Falta el nombre' });
+
+      const terrs = await rd(TABS.territories);
+      const row = terrs.find(t => SC.norm(t.name) === SC.norm(from));
+      if (!row) return res.status(404).json({ error: 'No existe ese territorio' });
+      if (SC.norm(to) === SC.norm(from) && to === row.name)
+        return res.json({ ok: true, from: row.name, to: row.name, moved: 0 });
+      /* Un nombre repetido juntaria dos territorios en silencio: los domicilios
+         de los dos caerian en el mismo, y separarlos despues seria a mano. */
+      if (terrs.some(t => t !== row && SC.norm(t.name) === SC.norm(to)))
+        return res.status(400).json({ error: 'Ya hay un territorio con ese nombre' });
+
+      const same = v => SC.norm(v) === SC.norm(from);
+      let moved = 0;
+
+      // 1. Los domicilios. Es lo que mas pesa y lo que mas duele si se queda a medias.
+      const houses = await rd(SC.HOUSES_TAB);
+      const hs = houses.filter(h => h && same(h.HouseTerritoryNumber));
+      if (hs.length) {
+        await wrs(SC.HOUSES_TAB, hs.map(h => {
+          const rec = Object.assign({}, h, { HouseTerritoryNumber: to, HouseUpdatedAt: nowIso });
+          delete rec._key;
+          return { key: h._key, obj: rec };
+        }));
+        moved += hs.length;
+      }
+
+      // 2..6. Lo demas que apunta al territorio por su nombre.
+      const cascade = [
+        [TABS.assignments, 'territory'],
+        [TABS.terrlog, 'territory'],
+        [TABS.bounds, 'territory'],
+        [TABS.presence, 'territory'],
+        [TABS.voice, 'territory'],
+      ];
+      for (const [spec, field] of cascade) {
+        let rows = [];
+        try { rows = await rd(spec); } catch (e) { rows = []; }
+        const hit = rows.filter(r => r && same(r[field]));
+        if (!hit.length) continue;
+        await wrs(spec, hit.map(r => {
+          const rec = Object.assign({}, r); rec[field] = to; delete rec._key;
+          return { key: r._key, obj: rec };
+        }));
+        moved += hit.length;
+      }
+
+      // 7. El territorio, al final: mientras no cambie, se puede repetir.
+      const trec = Object.assign({}, row, { name: to, updatedAt: nowIso });
+      delete trec._key;
+      await wr(TABS.territories, row._key, trec);
+
+      return res.json({ ok: true, from: from, to: to, moved: moved, houses: hs.length });
+    }
+
     if (action === 'setOrgLanguage') {
       const admin = await requireAdmin();
       const v = String(body.language || '').trim().slice(0, ST.MAX_LANG);

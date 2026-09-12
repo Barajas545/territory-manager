@@ -199,8 +199,8 @@
           ok: true, me: Object.assign({}, USER, { simple: qs.get('simple') === '1', locked: qs.get('fija') === '1' }),
           users: qs.get('solo') ? [USER] : [USER, MATE], scope: SCOPES[AS],
           colors: TM.colors,
-          territories: [{ name: 'Atascadero 3', ownerId: 'u1', owner: USER, assigneeIds: ['u2'], working: TM.working, bounds: TM.bounds['Atascadero 3'] || [] },
-                        { name: 'Atascadero 7', ownerId: 'u1', owner: USER, assigneeIds: [], working: TM.working, bounds: TM.bounds['Atascadero 7'] || [] }],
+          territories: [{ name: (TM.terrNames||['Atascadero 3','Atascadero 7'])[0], ownerId: 'u1', owner: USER, assigneeIds: ['u2'], working: TM.working, bounds: TM.bounds['Atascadero 3'] || [] },
+                        { name: (TM.terrNames||['Atascadero 3','Atascadero 7'])[1], ownerId: 'u1', owner: USER, assigneeIds: [], working: TM.working, bounds: TM.bounds['Atascadero 7'] || [] }],
         });
       case 'setTerritoryBounds': {
         var pts = (body.points || []).filter(function (q) {
@@ -217,6 +217,17 @@
           return json({ error: 'Ese código no es válido' }, 400);
         return json({ ok: true, name: 'Hermano Lopez', phone: '8055551234',
           email: 'hermano.lopez@ejemplo.com' });
+      case 'renameTerritory':
+        // Como el servidor: mueve el nombre en todo lo que lo menciona.
+        TM.renamed = { from: body.from, to: body.to };
+        HOUSES.forEach(function (h) {
+          if (h.HouseTerritoryNumber === body.from) h.HouseTerritoryNumber = body.to;
+        });
+        TM.packets.forEach(function (p) { if (p.territory === body.from) p.territory = body.to; });
+        if (TM.bounds[body.from]) { TM.bounds[body.to] = TM.bounds[body.from]; delete TM.bounds[body.from]; }
+        TM.terrNames = (TM.terrNames || ['Atascadero 3', 'Atascadero 7'])
+          .map(function (v) { return v === body.from ? body.to : v; });
+        return json({ ok: true, from: body.from, to: body.to, moved: 6 });
       case 'setMyMode':
         TM.simple = !!body.simple;
         return json({ ok: true, simple: TM.simple, locked: false });

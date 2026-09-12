@@ -1127,7 +1127,7 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
 
 /* ═══ CONFIG ═══ */
 var API="https://territory-manager-silk.vercel.app/api/territory";
-var APP_VERSION="2.27.0";
+var APP_VERSION="2.28.0";
 
 /* ═══════════════════════════════════════════════════════════════════════
    OFFLINE DATA LAYER
@@ -4784,6 +4784,34 @@ function terrLogRow(r){
     '</div>';
 }
 
+/* Cambiarle el nombre. El nombre es la llave que une siete listas —los
+   domicilios, las entregas, el historial, el contorno del mapa— asi que se
+   dice cuantos domicilios se mueven antes de tocar nada. El servidor lo hace
+   en cascada y en un orden que se puede terminar si algo se corta a la mitad;
+   aqui solo hay que preguntar bien y volver a leer todo despues. */
+function renameTerritory(viejo){
+  var cuantas=records.filter(function(h){
+    return (h.HouseTerritoryNumber||"Unassigned")===viejo;
+  }).length;
+  var nuevo=prompt("¿Cómo se va a llamar?\n\n"+cuantas+" domicilio(s) se mueven con él, "+
+    "junto con las entregas, el historial y el contorno del mapa.",viejo);
+  if(nuevo===null)return;
+  nuevo=String(nuevo).trim();
+  if(!nuevo||nuevo===viejo)return;
+
+  team("renameTerritory",{from:viejo,to:nuevo}).then(function(r){
+    /* Todo lo que tiene el telefono guardado menciona el nombre viejo: los
+       domicilios, la lista de territorios, lo que se este viendo. En vez de
+       parchar cada cosa, se vuelve a leer — es una operacion de una vez al
+       año y asi no queda ningun rincon con el nombre anterior. */
+    if(terrFilter===viejo)terrFilter=r.to;
+    closeSheet("#sh-pick");
+    toast("Ahora se llama "+r.to+" ✓");
+    loadTeam();
+    doSync(true);
+  }).catch(function(e){toast(e.message,true);});
+}
+
 /* One territory's card: who has it, since when, everyone before them, and the
    one action that closes it. */
 /* The roster arrives on its own request, so it may not be here yet when this
@@ -4834,6 +4862,9 @@ function openTerrCard(name){
     (mine.length
       ?'<div class="card">'+mine.map(function(r){return terrLogRow(r);}).join("")+'</div>'
       :'<div class="empty" style="padding:22px">Todavía no hay nada anotado aquí.</div>')+
+    (scope.kind==="admin"
+      ?'<button class="btn btn-s" id="tlRename" style="width:100%;margin-top:12px">'+
+        '✏️ Cambiar el nombre y número</button>':"")+
     '<button class="btn btn-s" id="tlBack" style="width:100%;margin-top:12px">Todos los territorios</button>'+
     '<div id="tlErr" style="color:var(--bad);font-size:13.5px;margin-top:10px"></div>';
 
@@ -4882,6 +4913,8 @@ function openTerrCard(name){
     });
   };
   wireHandTo();
+  var rn=$("#tlRename");
+  if(rn)rn.addEventListener("click",function(){renameTerritory(t.name);});
   $("#tlBack").addEventListener("click",drawTerrLog);
   if(!teamUsers.length&&me)
     team("listTerritories",{}).then(function(r){
