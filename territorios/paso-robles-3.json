@@ -1,0 +1,574 @@
+{
+ "territory": "Paso Robles 3",
+ "city": "Paso Robles",
+ "state": "CA",
+ "zip": "93446",
+ "source": "Hoja PR 3 Terr, fechada 6/16/26",
+ "houses": [
+  {
+   "HouseAddress": "2173 Bel Air Pl",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Español",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "2178 Bel Air Pl",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Español",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "2183 Bel Air Pl",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Español",
+   "HouseNotes": "",
+   "dnv": {
+    "reason": "No visitar",
+    "date": "2025-03-31"
+   }
+  },
+  {
+   "HouseAddress": "2192 Bel Air Pl",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Español",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "2196 Bel Air Pl",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Español",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "2197 Bel Air Pl",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Español",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "2198 Bel Air Pl",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Español",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "913 Saint Ann Dr",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Español",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "915 Saint Ann Dr",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Español",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "914 Sleepy Hollow Rd",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Español",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "905 Stoney Creek Rd",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Español",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "1129 Stoney Creek Rd",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Español",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "1131 Stoney Creek Rd",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Español",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "1225 Stoney Creek Rd #1",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Español",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "1225 Stoney Creek Rd #2",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Sin saber",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "1225 Stoney Creek Rd #3",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Sin saber",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "1225 Stoney Creek Rd #4",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Sin saber",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "1225 Stoney Creek Rd #5",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Sin saber",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "1225 Stoney Creek Rd #6",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Sin saber",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "1225 Stoney Creek Rd #7",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Sin saber",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "1225 Stoney Creek Rd #8",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Español",
+   "HouseNotes": "Vacío"
+  },
+  {
+   "HouseAddress": "1227 Stoney Creek Rd #1",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Español",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "1227 Stoney Creek Rd #2",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Español",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "1227 Stoney Creek Rd #3",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Sin saber",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "1227 Stoney Creek Rd #4",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Sin saber",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "1227 Stoney Creek Rd #5",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Sin saber",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "1227 Stoney Creek Rd #6",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Español",
+   "HouseNotes": "Expulsado"
+  },
+  {
+   "HouseAddress": "1227 Stoney Creek Rd #7",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Sin saber",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "1227 Stoney Creek Rd #8",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Español",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "1275 Stoney Creek Rd #1",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Sin saber",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "1275 Stoney Creek Rd #2",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Sin saber",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "1275 Stoney Creek Rd #3",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Sin saber",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "1275 Stoney Creek Rd #4",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Español",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "1275 Stoney Creek Rd #5",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Español",
+   "HouseNotes": "",
+   "dnv": {
+    "reason": "No visitar",
+    "date": "2026-03-07"
+   }
+  },
+  {
+   "HouseAddress": "1275 Stoney Creek Rd #6",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Sin saber",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "1275 Stoney Creek Rd #7",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Sin saber",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "1275 Stoney Creek Rd #8",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Español",
+   "HouseNotes": "Estudio de Hna. Cruz"
+  },
+  {
+   "HouseAddress": "1277 Stoney Creek Rd #1",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Sin saber",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "1277 Stoney Creek Rd #2",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Español",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "1277 Stoney Creek Rd #3",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Español",
+   "HouseNotes": "Visitar por la tarde"
+  },
+  {
+   "HouseAddress": "1277 Stoney Creek Rd #4",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Español",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "1277 Stoney Creek Rd #5",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Sin saber",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "1277 Stoney Creek Rd #6",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Español",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "1277 Stoney Creek Rd #7",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Sin saber",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "1277 Stoney Creek Rd #8",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Sin saber",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "1279 Stoney Creek Rd #1",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Sin saber",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "1279 Stoney Creek Rd #2",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Sin saber",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "1279 Stoney Creek Rd #3",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Sin saber",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "1279 Stoney Creek Rd #4",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Español",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "1279 Stoney Creek Rd #5",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Español",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "1279 Stoney Creek Rd #6",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Sin saber",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "1279 Stoney Creek Rd #7",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Sin saber",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "1279 Stoney Creek Rd #8",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Sin saber",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "1307 Stoney Creek Rd",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Español",
+   "HouseNotes": "",
+   "dnv": {
+    "reason": "Enviar ancianos",
+    "date": "2026-06-16"
+   }
+  },
+  {
+   "HouseAddress": "1332 Stoney Creek Rd",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Español",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "1339 Stoney Creek Rd",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Español",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "1407 Stoney Creek Rd",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Español",
+   "HouseNotes": "",
+   "dnv": {
+    "reason": "Enviar ancianos",
+    "date": "2026-06-16"
+   }
+  },
+  {
+   "HouseAddress": "1409 Stoney Creek Rd",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Español",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "1415 Stoney Creek Rd",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Español",
+   "HouseNotes": "Posible español"
+  },
+  {
+   "HouseAddress": "1430 Stoney Creek Rd",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Español",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "1440 Stoney Creek Rd",
+   "HouseCity": "Paso Robles",
+   "HouseState": "CA",
+   "HouseZIP": "93446",
+   "HouseTerritoryNumber": "Paso Robles 3",
+   "HouseLanguage": "Español",
+   "HouseNotes": ""
+  }
+ ]
+}

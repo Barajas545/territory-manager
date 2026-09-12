@@ -214,6 +214,11 @@ input,textarea,select{-webkit-appearance:none;appearance:none;}
 /* La nota de la direccion es lo que de verdad se necesita leer en la banqueta
    ("la traila de atras"), y estaba en el mismo gris chico que las etiquetas.
    Del tamaño que ya usa .note-box en la pantalla de detalle. */
+/* Un domicilio que no es del idioma del grupo se ve mas apagado: esta ahi
+   para el censo, no para tocarlo hoy. */
+.house.otro{opacity:.62;}
+.house-sub .lang-tag{color:var(--unit);font-weight:750;}
+.house-sub .lang-none{color:var(--text-3);font-weight:750;}
 .house-sub .h-note{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
   overflow:hidden;white-space:normal;font-size:14.5px;color:var(--text);font-weight:600;
   line-height:1.35;margin-top:3px;}
@@ -808,6 +813,7 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
           <button class="tool-btn" id="btnPick" aria-pressed="false">☑ Seleccionar para Compartir</button>
           <button class="tool-btn" id="btnWorking" aria-pressed="false" style="display:none">▶ Empezar</button>
           <button class="tool-btn" id="btnHeld" style="display:none"></button>
+          <button class="tool-btn" id="btnCensus" aria-pressed="false" style="display:none"></button>
         </div>
         <div class="chips" id="filterChips">
           <button class="chip" data-f="all" aria-pressed="true"><span class="cdot"></span>Todos <span class="cnum" id="n-all"></span></button>
@@ -1096,7 +1102,7 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
 
 /* ═══ CONFIG ═══ */
 var API="https://territory-manager-silk.vercel.app/api/territory";
-var APP_VERSION="2.24.0";
+var APP_VERSION="2.25.0";
 
 /* ═══════════════════════════════════════════════════════════════════════
    OFFLINE DATA LAYER
@@ -1469,6 +1475,49 @@ function navigateTo(h){
   if(navigator.clipboard)navigator.clipboard.writeText(q).then(listo)
     .catch(function(){prompt("Copia la dirección:",q);});
   else prompt("Copia la dirección:",q);
+}
+
+/* ── el idioma, y el censo ─────────────────────────────────────────────
+   Normalizar antes de comparar: en la hoja aparece "Espanol", "Español" y
+   "español", y las tres son lo mismo para quien toca la puerta. */
+var congLang="Español", censusOn=false;
+function normLang(v){
+  return String(v||"").trim().toLowerCase()
+    .replace(/[áàä]/g,"a").replace(/[éèë]/g,"e").replace(/[íìï]/g,"i")
+    .replace(/[óòö]/g,"o").replace(/[úùü]/g,"u").replace(/ñ/g,"n");
+}
+/* Vacio cuenta como nuestro. Los domicilios que ya existen no tienen idioma
+   escrito, y tratarlos como ajenos vaciaria el territorio de golpe. */
+function isOurLang(h){
+  var v=normLang(h&&h.HouseLanguage);
+  if(!v)return true;
+  return v===normLang(congLang);
+}
+function langTag(h){
+  var v=String((h&&h.HouseLanguage)||"").trim();
+  if(!v||isOurLang(h))return "";
+  return normLang(v)==="sin saber"
+    ? '<span class="lang-none">sin saber</span>'
+    : '<span class="lang-tag">'+esc(v)+'</span>';
+}
+// Cuantos quedan fuera de la vista de todos los dias.
+function censusHidden(){
+  return records.filter(function(h){
+    if(terrFilter===RV_TERR)return false;
+    if(terrFilter!=="all"&&(h.HouseTerritoryNumber||"Unassigned")!==terrFilter)return false;
+    return !isOurLang(h);
+  }).length;
+}
+function toggleCensus(){
+  censusOn=!censusOn;
+  $("#btnCensus").setAttribute("aria-pressed",censusOn?"true":"false");
+  renderHouses();refreshMapPins();refreshCensusBtn();
+}
+function refreshCensusBtn(){
+  var b=$("#btnCensus");if(!b)return;
+  var k=censusHidden();
+  b.style.display=(guestMode||simpleMode||!k&&!censusOn)?"none":"";
+  b.textContent=censusOn?"👥 Censo · viendo todo":"👥 Censo ("+k+")";
 }
 
 function parseGPS(v){if(!v)return null;var p=String(v).split(",").map(function(s){return parseFloat(s.trim());});
@@ -1975,6 +2024,10 @@ function generateTerritoryPDF(terrNum,houses,results){
    discrepar sobre que se esta viendo. */
 var RV_TERR="__rv__";
 function inTerrFilter(h){
+  /* El censo es otro eje: el territorio dice DONDE, el idioma dice a quien se
+     va hoy. Las revisitas propias no se filtran por idioma — si uno levanto
+     una revisita ahi, esa puerta ya es suya sin importar en que idioma. */
+  if(!censusOn&&terrFilter!==RV_TERR&&!isOurLang(h))return false;
   if(terrFilter==="all")return true;
   if(terrFilter===RV_TERR)return myRVs(h).length>0;
   return (h.HouseTerritoryNumber||"Unassigned")===terrFilter;
@@ -2010,6 +2063,7 @@ function updateCounts(){
     var el=document.getElementById("n-"+k);if(el)el.textContent=c[k];
   });
   $("#scopeCount").textContent=scoped.length;
+  refreshCensusBtn();
   // "All Territories" is only true for an admin; everyone else is looking at
   // their own, and saying otherwise over a seven-house list is a small lie.
   if(!guestMode)$("#scopeName").textContent=terrFilterLabel();
@@ -2030,7 +2084,9 @@ function houseSubtitle(h){
   var ht=heldTagFor(h.id);if(ht)bits.push(ht);
   if(isRV(h))bits.push('<span class="rv-tag">Revisita</span>');
   bits.push(esc(visitLabel(h.HouseLastVisitDate)));
-  if(!h.HouseNotes&&h.HouseLanguage)bits.push(esc(h.HouseLanguage));
+  var lt=langTag(h);
+  if(lt)bits.push(lt);
+  else if(!h.HouseNotes&&h.HouseLanguage)bits.push(esc(h.HouseLanguage));
   // A helper is told this once, plainly, at the top of their screen.
   if(pending[h.id]&&!guestMode)bits.push('<span class="pend">• sin sincronizar</span>');
   /* La nota va debajo, no dentro de la linea: es lo que de verdad se necesita
@@ -2120,7 +2176,8 @@ function rowTint(h,d){
 
 function houseRow(h,label,isUnit){
   var d=dnvState(h);
-  return '<div class="house'+(isUnit?' unit':'')+(picked[h.id]?' on':'')+rowTint(h,d)+
+  return '<div class="house'+(isUnit?' unit':'')+(picked[h.id]?' on':'')+
+      (isOurLang(h)?'':' otro')+rowTint(h,d)+
       '" data-hid="'+esc(h.id)+'">'+
     '<button class="house-main" data-act="'+(plainUI()?"cell":"detail")+'" data-id="'+esc(h.id)+'">'+
       '<span class="pick">✓</span>'+
@@ -3069,6 +3126,127 @@ function deleteSavedMap(){
   });
 }
 
+/* ── importar un territorio ────────────────────────────────────────────
+   Los archivos viven en territorios/ junto a la app, para que nadie tenga que
+   escribir 61 domicilios en un telefono. */
+function importMenu(){
+  $("#pTitle").textContent="Importar territorio";
+  $("#pSub").textContent="Buscando archivos…";
+  $("#pBody").innerHTML='<div class="empty" style="padding:24px">Cargando…</div>';
+  openSheet("#sh-pick");
+  fetch("territorios/index.json",{cache:"no-store"}).then(function(r){
+    if(!r.ok)throw new Error("no hay lista");
+    return r.json();
+  }).then(function(lista){
+    var arr=(lista&&lista.territorios)||[];
+    $("#pSub").textContent=arr.length?"Escoge cuál":"No hay ninguno preparado";
+    $("#pBody").innerHTML=arr.length
+      ? '<div class="card">'+arr.map(function(t){
+          return '<button class="row" data-imp="'+esc(t.file)+'">'+
+            '<span class="row-ico">🗂️</span><span class="row-txt">'+
+            '<span class="row-t">'+esc(t.name)+'</span>'+
+            '<span class="row-s">'+esc(t.note||"")+'</span></span>'+
+            '<span class="row-act">›</span></button>';
+        }).join("")+'</div>'
+      : '<div class="empty" style="padding:24px">Todavía no hay territorios preparados.</div>';
+    $("#pBody").querySelectorAll("[data-imp]").forEach(function(b){
+      b.addEventListener("click",function(){importPreview(b.dataset.imp);});
+    });
+  }).catch(function(){
+    $("#pSub").textContent="";
+    $("#pBody").innerHTML='<div class="empty" style="padding:24px">'+
+      'No se pudo leer la lista. Necesita internet la primera vez.</div>';
+  });
+}
+
+function importPreview(file){
+  $("#pSub").textContent="Revisando…";
+  $("#pBody").innerHTML='<div class="empty" style="padding:24px">Cargando…</div>';
+  fetch("territorios/"+file,{cache:"no-store"}).then(function(r){return r.json();})
+    .then(function(data){
+      var casas=(data&&data.houses)||[];
+      if(!casas.length)throw new Error("vacío");
+      /* Lo que YA existe se cuenta y no se vuelve a crear. Importar dos veces
+         es el accidente facil de cometer y el caro de deshacer. */
+      var hay={};
+      records.forEach(function(h){hay[normAddr(h.HouseAddress)]=1;});
+      var nuevas=casas.filter(function(c){return !hay[normAddr(c.HouseAddress)];});
+      var repes=casas.length-nuevas.length;
+      var censo=nuevas.filter(function(c){return normLang(c.HouseLanguage)==="sin saber";}).length;
+      var dnv=nuevas.filter(function(c){return c.dnv;}).length;
+
+      $("#pTitle").textContent=data.territory||"Territorio";
+      $("#pSub").textContent=casas.length+" domicilios en el archivo";
+      $("#pBody").innerHTML=
+        '<div class="lbl" style="margin-top:0">Se va a crear</div>'+
+        '<div class="card">'+
+          impRow("🏠","Domicilios nuevos",nuevas.length)+
+          impRow("👥","De esos, para el censo",censo)+
+          impRow("🚫","Con No visitar",dnv)+
+          (repes?impRow("↩️","Ya existían (no se tocan)",repes):"")+
+        '</div>'+
+        (nuevas.length
+          ?'<p style="font-size:13px;color:var(--text-2);margin:12px 0">Se guardan en '+
+            'este teléfono y suben con la siguiente sincronización.</p>'+
+           '<button class="btn btn-p" id="impGo" style="width:100%">Crear '+
+            nuevas.length+' domicilios</button>'
+          :'<p style="font-size:14px;margin-top:12px">Ya están todos. No hay nada que crear.</p>');
+
+      var go=$("#impGo");
+      if(go)go.addEventListener("click",function(){runImport(data,nuevas,go);});
+    }).catch(function(){
+      $("#pSub").textContent="";
+      $("#pBody").innerHTML='<div class="empty" style="padding:24px">'+
+        'No se pudo leer ese archivo.</div>';
+    });
+}
+function impRow(ico,txt,k){
+  return '<div class="row"><span class="row-ico">'+ico+'</span>'+
+    '<span class="row-txt"><span class="row-t">'+esc(txt)+'</span></span>'+
+    '<span class="row-act" style="font-weight:800;color:var(--text)">'+k+'</span></div>';
+}
+// Para comparar direcciones sin pelearse con espacios ni mayusculas.
+function normAddr(v){return String(v||"").trim().toLowerCase().replace(/\s+/g," ");}
+
+function runImport(data,nuevas,btn){
+  btn.disabled=true;btn.textContent="Creando…";
+  var hechos=0;
+  var uno=function(i){
+    if(i>=nuevas.length)return Promise.resolve();
+    var c=nuevas[i];
+    var rec={
+      HouseAddress:c.HouseAddress||"",
+      HouseCity:c.HouseCity||data.city||"",
+      HouseState:c.HouseState||data.state||"",
+      HouseZIP:c.HouseZIP||data.zip||"",
+      HouseTerritoryNumber:c.HouseTerritoryNumber||data.territory||"",
+      HouseLanguage:c.HouseLanguage||"",
+      HouseNotes:c.HouseNotes||"",
+    };
+    /* Un "No visitar" no es una nota: es una entrada del registro, con su
+       fecha y su razon, para que cuente en el aviso de los dos años. */
+    if(c.dnv){
+      rec.HouseVisitLog=JSON.stringify([{
+        i:entryId(), d:c.dnv.date||todayStr(),
+        t:"No visitar — "+(c.dnv.reason||""), k:"DNV", r:c.dnv.reason||"",
+      }]);
+    }
+    return localCreate(rec).then(function(){
+      hechos++;
+      if(hechos%10===0)btn.textContent="Creando… "+hechos+" de "+nuevas.length;
+      return uno(i+1);
+    });
+  };
+  uno(0).then(function(){
+    afterLocalChange();scheduleSync();
+    closeSheet("#sh-pick");
+    toast(hechos+" domicilios creados ✓ Subiendo…");
+  }).catch(function(e){
+    btn.disabled=false;btn.textContent="Reintentar";
+    toast("Se crearon "+hechos+". "+(e&&e.message||"Algo falló"),true);
+  });
+}
+
 function refreshNavRow(){
   var sub=$("#navSub"),row=$("#rowNav");
   if(!sub||!row)return;
@@ -3893,6 +4071,11 @@ function renderTeamCard(){
       '<span class="row-s" id="tmHeldSub">'+esc(heldSub())+'</span></span>'+
       '<span class="row-act">›</span></button>'+
     (me.role==="admin"?
+      '<button class="row" id="tmImport"><span class="row-ico">📥</span>'+
+        '<span class="row-txt"><span class="row-t">Importar territorio</span>'+
+        '<span class="row-s">Crear muchos domicilios de una vez</span></span>'+
+        '<span class="row-act">›</span></button>':"")+
+    (me.role==="admin"?
       '<button class="row" id="tmPeople"><span class="row-ico">\u{1F5C2}\u{FE0F}</span>'+
         '<span class="row-txt"><span class="row-t">Personas</span>'+
         '<span class="row-s">Agrega a alguien o restablece una contraseña</span></span>'+
@@ -3910,6 +4093,8 @@ function renderTeamCard(){
   $("#tmAssign").style.display=scope.canHandOut?"":"none";
   $("#tmHeld").style.display=(scope.canHandOut||heldTotal()>0)?"":"none";
   var pe=$("#tmPeople");if(pe)pe.addEventListener("click",openAdmin);
+  var imp=$("#tmImport");
+  if(imp)imp.addEventListener("click",importMenu);
   $("#tmPw").addEventListener("click",openChangePassword);
   $("#tmOut").addEventListener("click",function(){
     var n=pendingCount();
@@ -5150,6 +5335,7 @@ function loadTeam(){
   if(!me)return;
   team("listTerritories",{}).then(function(r){
     teamUsers=r.users||[];teamTerritories=r.territories||[];
+    if(r.orgLanguage)congLang=r.orgLanguage;
     if(r.colors){applyRowColors(r.colors);renderHouses();}
     /* Read defensively: against a server that predates this, the absence of a
        scope means "carry on as before" rather than "you may do nothing". */
@@ -5210,6 +5396,7 @@ function updatePickBar(){
   $("#pbAssign").style.opacity=n?"1":".5";
 }
 $("#btnPick").addEventListener("click",function(){setPicking(!picking);});
+$("#btnCensus").addEventListener("click",toggleCensus);
 $("#pbCancel").addEventListener("click",function(){setPicking(false);});
 
 /* Territory "in progress" switch. It is also the kill switch: turning it off

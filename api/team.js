@@ -281,6 +281,16 @@ module.exports = async (req, res) => {
     /* Cualquiera puede probar la version sencilla y regresar — salvo que el
        administrador la haya dejado fija, que es justo para que no se salga de
        ella sin querer y se quede otra vez sin poder trabajar. */
+    /* Cambiar el idioma de la congregacion no reetiqueta ningun domicilio: solo
+       cambia cual se considera "el nuestro" al mirar la lista. Nada se pierde. */
+    if (action === 'setOrgLanguage') {
+      const admin = await requireAdmin();
+      const v = String(body.language || '').trim().slice(0, ST.MAX_LANG);
+      if (!v) return res.status(400).json({ error: 'Escribe el idioma' });
+      await ST.writeSetting(store, 'orgLanguage', v, admin.id);
+      return res.json({ ok: true, orgLanguage: v });
+    }
+
     if (action === 'setMyMode') {
       const me = await requireUser();
       const rows = await PF.readPrefs(store);
@@ -380,6 +390,7 @@ module.exports = async (req, res) => {
         policy: {
           nights: policy.nights, tz: policy.tz, options: ST.ALLOWED_NIGHTS,
           colors: policy.colors, defaultColors: ST.DEFAULT_COLORS,
+          orgLanguage: policy.lang,
         },
       });
     }
@@ -590,6 +601,7 @@ module.exports = async (req, res) => {
            usa la app, y llega junto con todo lo demas al arrancar. */
         me: Object.assign({}, publicUser(me), PF.stateFor(prefRows, me.id)),
         colors: policy.colors,
+        orgLanguage: policy.lang,
         scope: {
           kind: grant.kind,
           territories: isAdmin ? terrs.map(t => t.name) : display(grant.territories),

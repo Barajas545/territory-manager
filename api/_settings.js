@@ -16,6 +16,10 @@ const SETTINGS_TAB = {
 
 /* What the rows are tinted with. Stored for the whole group so everybody's
    phone reads the same street the same way, and changeable by an admin. */
+/* El idioma de la congregacion. Se puede cambiar; este es solo el arranque. */
+const DEFAULT_LANG = 'Español';
+const MAX_LANG = 40;
+
 const COLOR_KEYS = ['colorAssigned', 'colorDnv', 'colorTalked'];
 const DEFAULT_COLORS = {
   colorAssigned: '#1565C0',   // somebody is holding these numbers
@@ -84,7 +88,10 @@ async function readSettings(store) {
   const tz = validTimeZone(map.timeZone) ? map.timeZone : DEFAULT_TZ;
   const colors = {};
   COLOR_KEYS.forEach(k => { colors[k] = isHexColor(map[k]) ? map[k] : DEFAULT_COLORS[k]; });
-  return { nights: nights, tz: tz, colors: colors, raw: map };
+  /* El idioma que atiende la congregacion. Los domicilios que hablan OTRO
+     idioma no desaparecen: se guardan igual y salen cuando se pide el censo. */
+  const lang = String(map.orgLanguage || '').trim() || DEFAULT_LANG;
+  return { nights: nights, tz: tz, colors: colors, lang: lang, raw: map };
 }
 
 async function writeSetting(store, key, value, who) {
@@ -105,6 +112,7 @@ async function packetExpiry(store, now) {
 }
 
 module.exports = {
+  DEFAULT_LANG, MAX_LANG,
   SETTINGS_TAB, ALLOWED_NIGHTS, DEFAULT_NIGHTS, DEFAULT_TZ, HARD_MAX_MS,
   COLOR_KEYS, DEFAULT_COLORS, isHexColor, localDay,
   validTimeZone, tzOffsetMin, endOfNight, readSettings, writeSetting, packetExpiry,
