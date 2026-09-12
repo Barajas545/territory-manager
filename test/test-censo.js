@@ -33,10 +33,21 @@ const take = name => {
   throw new Error(name + ' quedó sin cerrar');
 };
 
-const sandbox = { congLang: 'Español', esc: s => String(s) };
+/* El contexto trae lo que esas funciones leen de afuera: el idioma de la
+   congregación y la lista de los demás. Se declaran aquí igual que en la app,
+   y si allá cambiaran sin cambiar aquí, las pruebas de canonLang lo dirían. */
+const sandbox = {
+  congLang: 'Español',
+  esc: s => String(s),
+  OTROS_IDIOMAS: ['Inglés', 'Mixteco', 'Señas Americano'],
+  SIN_SABER: 'Sin saber',
+};
 vm.createContext(sandbox);
-vm.runInContext(take('normLang') + '\n' + take('isOurLang') + '\n' + take('langTag'), sandbox);
-const { normLang, isOurLang, langTag } = sandbox;
+vm.runInContext([
+  take('normLang'), take('isOurLang'), take('langTag'),
+  take('langOptions'), take('canonLang'),
+].join('\n'), sandbox);
+const { normLang, isOurLang, langTag, langOptions, canonLang } = sandbox;
 
 const casa = lang => ({ HouseLanguage: lang });
 
@@ -63,6 +74,28 @@ check('y otro idioma se marca con su nombre',
   /Inglés/.test(langTag(casa('Inglés'))), langTag(casa('Inglés')));
 check('son dos marcas distintas, no la misma',
   langTag(casa('Sin saber')) !== langTag(casa('Inglés')));
+
+// ══ las tres marcas, y que no se confundan ════════════════════════════
+check('el idioma del grupo SÍ lleva marca propia',
+  /lang-ours/.test(langTag(casa('Español'))), langTag(casa('Español')));
+check('y dice cuál es, no solo que es el nuestro',
+  /Español/.test(langTag(casa('Español'))));
+check('las tres marcas son distintas entre sí',
+  new Set([langTag(casa('Español')), langTag(casa('Inglés')), langTag(casa('Sin saber'))]).size === 3);
+
+// ══ el mismo idioma escrito de dos formas es UN idioma ════════════════
+check('"ingles" se guarda como "Inglés"', canonLang('ingles') === 'Inglés', canonLang('ingles'));
+check('"INGLÉS" también', canonLang('INGLÉS') === 'Inglés', canonLang('INGLÉS'));
+check('"señas americano" se acomoda', canonLang('señas americano') === 'Señas Americano');
+check('"espanol" cae en el idioma del grupo', canonLang('espanol') === 'Español');
+check('un idioma que no está en la lista se respeta tal cual',
+  canonLang('Zapoteco') === 'Zapoteco', canonLang('Zapoteco'));
+check('y vacío sigue vacío', canonLang('   ') === '');
+
+check('los idiomas ofrecidos empiezan por el de la congregación',
+  langOptions()[0] === 'Español', langOptions().join(','));
+check('y no repiten el del grupo más abajo',
+  langOptions().filter(v => normLang(v) === normLang('Español')).length === 1);
 
 // ══ si la congregación cambiara de idioma ══════════════════════════════
 sandbox.congLang = 'Inglés';

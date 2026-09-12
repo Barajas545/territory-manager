@@ -217,8 +217,21 @@ input,textarea,select{-webkit-appearance:none;appearance:none;}
 /* Un domicilio que no es del idioma del grupo se ve mas apagado: esta ahi
    para el censo, no para tocarlo hoy. */
 .house.otro{opacity:.62;}
-.house-sub .lang-tag{color:var(--unit);font-weight:750;}
+/* Tres marcas distintas, porque son tres cosas distintas:
+     el nuestro   — relleno y en el color del grupo; es lo que se busca
+     otro idioma  — con borde; se sabe quien vive ahi, no nos toca hoy
+     sin saber    — apagado; nadie ha tocado esa puerta todavia
+   La del grupo sale rellena a proposito: entre cincuenta puertas ajenas, esa
+   es la que el ojo tiene que encontrar sin leer. */
+.house-sub .lang-ours{display:inline-block;background:var(--brand);color:var(--brand-ink);
+  font-weight:800;font-size:11px;letter-spacing:.04em;padding:1px 7px;
+  border-radius:var(--r-full);vertical-align:1px;}
+.house-sub .lang-tag{display:inline-block;border:1.5px solid var(--unit);color:var(--unit);
+  font-weight:750;font-size:11px;padding:0 6px;border-radius:var(--r-full);vertical-align:1px;}
 .house-sub .lang-none{color:var(--text-3);font-weight:750;}
+/* Fuera del censo todo lo que se ve es del grupo, y decirlo en cada renglon
+   seria repetir lo mismo cincuenta veces. */
+body:not(.censo) .house-sub .lang-ours{display:none;}
 .house-sub .h-note{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
   overflow:hidden;white-space:normal;font-size:14.5px;color:var(--text);font-weight:600;
   line-height:1.35;margin-top:3px;}
@@ -1114,7 +1127,7 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
 
 /* ═══ CONFIG ═══ */
 var API="https://territory-manager-silk.vercel.app/api/territory";
-var APP_VERSION="2.26.0";
+var APP_VERSION="2.27.0";
 
 /* ═══════════════════════════════════════════════════════════════════════
    OFFLINE DATA LAYER
@@ -1507,10 +1520,81 @@ function isOurLang(h){
 }
 function langTag(h){
   var v=String((h&&h.HouseLanguage)||"").trim();
-  if(!v||isOurLang(h))return "";
+  // Sin idioma escrito no se inventa una marca: no se sabe, y ya.
+  if(!v)return "";
+  if(isOurLang(h))return '<span class="lang-ours">'+esc(v)+'</span>';
   return normLang(v)==="sin saber"
     ? '<span class="lang-none">sin saber</span>'
     : '<span class="lang-tag">'+esc(v)+'</span>';
+}
+
+/* Los idiomas que se ofrecen de un toque. "Otro" abre para escribir, asi que
+   nada queda fuera — pero lo comun se anota sin teclado, que es lo que hace
+   que un censo se pueda levantar a pie. */
+var OTROS_IDIOMAS=["Inglés","Mixteco","Señas Americano"];
+var SIN_SABER="Sin saber";
+function langOptions(){
+  var out=[congLang],i;
+  for(i=0;i<OTROS_IDIOMAS.length;i++){
+    if(normLang(OTROS_IDIOMAS[i])!==normLang(congLang))out.push(OTROS_IDIOMAS[i]);
+  }
+  return out;
+}
+/* Si alguien escribe "ingles" o "INGLÉS", se guarda como "Inglés". Sin esto
+   la misma puerta contaria como dos idiomas distintos en cualquier resumen. */
+function canonLang(v){
+  var t=String(v||"").trim();
+  if(!t)return "";
+  var todos=langOptions().concat([SIN_SABER]),i;
+  for(i=0;i<todos.length;i++)if(normLang(todos[i])===normLang(t))return todos[i];
+  return t;
+}
+
+function askLanguage(id){
+  var h=byId(id);if(!h)return;
+  var cur=String(h.HouseLanguage||"").trim();
+  var fila=function(v,sub){
+    var sel=normLang(v)===normLang(cur);
+    return '<button class="row" data-lang="'+esc(v)+'">'+
+      '<span class="row-txt"><span class="row-t">'+esc(v)+(sel?" · ✓":"")+'</span>'+
+      (sub?'<span class="row-s">'+esc(sub)+'</span>':'')+'</span>'+
+      '<span class="row-act">›</span></button>';
+  };
+  $("#cTitle").textContent="¿Qué idioma hablan?";
+  $("#cSub").textContent=shortLabel(h);
+  $("#cBody").innerHTML=
+    '<div class="card">'+
+      fila(congLang,"El idioma de la congregación")+
+      langOptions().slice(1).map(function(v){return fila(v);}).join("")+
+      '<button class="row" data-lang="__otro"><span class="row-txt">'+
+        '<span class="row-t">Otro…</span><span class="row-s">Escribir cuál</span></span>'+
+        '<span class="row-act">›</span></button>'+
+      fila(SIN_SABER,"Nadie ha podido saber todavía")+
+    '</div>'+
+    (cur?'<button class="btn btn-s" id="langClear" style="width:100%;margin-top:12px">'+
+      'Quitar el idioma anotado</button>':"");
+
+  var guarda=function(v){
+    saveChanges(id,{HouseLanguage:v},v?("Idioma: "+v+" ✓"):"Idioma quitado")
+      .then(function(){closeSheet("#sh-cell");});
+  };
+  $("#cBody").querySelectorAll("[data-lang]").forEach(function(b){
+    b.addEventListener("click",function(){
+      var v=b.dataset.lang;
+      if(v==="__otro"){
+        var t=prompt("¿Qué idioma hablan?",cur);
+        if(t===null)return;
+        t=canonLang(t);
+        if(!t)return;
+        guarda(t);
+        return;
+      }
+      guarda(canonLang(v));
+    });
+  });
+  var cl=$("#langClear");
+  if(cl)cl.addEventListener("click",function(){guarda("");});
+  openSheet("#sh-cell");
 }
 // Cuantos quedan fuera de la vista de todos los dias.
 function censusHidden(){
@@ -1522,6 +1606,7 @@ function censusHidden(){
 }
 function toggleCensus(){
   censusOn=!censusOn;
+  document.body.classList.toggle("censo",censusOn);
   $("#btnCensus").setAttribute("aria-pressed",censusOn?"true":"false");
   renderHouses();refreshMapPins();refreshCensusBtn();
 }
@@ -2469,7 +2554,9 @@ function openDetail(id){
     '</div>'+
     (h.HouseTerritoryNumber?'<div class="meta"><span class="mi">🗂️</span>'+esc(h.HouseTerritoryNumber)+'</div>':'')+
     (h.HouseTerritoryAssingnedTo?'<div class="meta"><span class="mi">👤</span>'+esc(h.HouseTerritoryAssingnedTo)+'</div>':'')+
-    (h.HouseLanguage?'<div class="meta"><span class="mi">🌐</span>'+esc(h.HouseLanguage)+'</div>':'')+
+    '<button class="meta" id="dLang" style="width:100%;text-align:left">'+
+      '<span class="mi">🌐</span>'+esc(h.HouseLanguage||"Idioma sin anotar")+
+      '<span style="float:right;color:var(--brand);font-weight:700">Cambiar</span></button>'+
     '<div class="meta"><span class="mi">🗺️</span>'+
       (h.HouseVerifiedOnMaps==="Yes"?'Verificada en el mapa ✓':
        h.HouseVerifiedOnMaps==="No"?'No aparece en el mapa ⚠️':'Sin revisar en el mapa')+'</div>'+
@@ -2494,6 +2581,10 @@ function openDetail(id){
       :'<div class="empty" style="padding:22px">Todavía no hay nada anotado aquí.</div>')+
     '<div style="height:8px"></div>';
 
+  $("#dLang").addEventListener("click",function(){
+    closeSheet("#sh-detail");
+    setTimeout(function(){askLanguage(h.id);},240);
+  });
   $("#dDir").addEventListener("click",function(){navigateTo(h);});
   $("#dRV").addEventListener("click",function(){openRV(h.id);});
   openSheet("#sh-detail");
@@ -4286,6 +4377,9 @@ function drawPicker(){
     '<div class="f" style="margin-top:10px"><label for="cNote">Notas y Observaciones:</label>'+
       '<textarea id="cNote" rows="2" placeholder="Escriba aquí los detalles de la visita...">'+
       esc(old?noteOf(old):"")+'</textarea></div>'+
+    (censusOn&&!plainUI()
+      ?'<button class="btn btn-s" id="cLang" style="width:100%;margin-bottom:8px">'+
+        '🌐 '+esc(h.HouseLanguage||"Anotar el idioma")+'</button>':"")+
     (old?'<button class="btn btn-s" id="cDel" style="width:100%;margin-bottom:8px">Quitar esta visita</button>':"")+
     (plainUI()?"":'<div class="cell-grid"><button class="pk danger wide" data-dnv="1">'+
       '<span class="pk-b vc k-DNV">NV</span><span class="pk-l">No visitar</span></button></div>')+
@@ -4299,6 +4393,8 @@ function drawPicker(){
       commitVisit(curCell.id,b.dataset.k);
     });
   });
+  var cl2=$("#cLang");
+  if(cl2)cl2.addEventListener("click",function(){askLanguage(curCell.id);});
   var dn=$("#cBody").querySelector("[data-dnv]");
   if(dn)dn.addEventListener("click",drawDNVSet);
   var del=$("#cDel");
