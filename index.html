@@ -236,13 +236,25 @@ input,textarea,select{-webkit-appearance:none;appearance:none;}
   -webkit-user-select:none;user-select:none;}
 .vc:active{transform:scale(.95);}
 .vc.on{border-style:solid;}
-/* Amarillo: se toco y no salio nadie, o pidieron que se vuelva. */
-.vc.k-NH,.vc.k-CB{background:var(--wait-soft);color:var(--wait);border-color:var(--wait);}
-/* Verde: salio alguien y se hablo. */
+/* El color dice QUE QUEDA PENDIENTE; la letra dice que paso. Por eso No en
+   casa, Ocupado y Vuelva comparten el amarillo: los tres significan lo mismo
+   para quien planea el dia — esa puerta sigue sin cerrarse, hay que volver.
+   Separarlos en dos colores partia un solo significado, y un renglon
+   "NC O NC V" se leia como ruido en vez de "cuatro intentos, nadie". */
+.vc.k-NH,.vc.k-CB,.vc.k-BZ{background:var(--wait-soft);color:var(--wait);border-color:var(--wait);}
+/* Verde: se hablo con alguien. Es a lo que se sale. */
 .vc.k-M,.vc.k-W,.vc.k-T{background:var(--ok-soft);color:var(--ok);border-color:var(--ok);}
-/* Ocupado se queda aparte: si salieron, pero no hubo conversacion. */
-.vc.k-BZ{background:var(--warn-soft);color:var(--warn);border-color:var(--warn);}
+/* Morado, no verde: una revisita no es solo una conversacion, es un
+   compromiso con fecha. Y es el morado que la app ya usa para revisitas en
+   todas partes, asi que se reconoce sin explicarlo. */
 .vc.k-RV{background:var(--rv-soft);color:var(--rv);border-color:var(--rv);}
+/* Rojo: la unica que grita. Nunca aparece en los cuadros de un renglon —ahi
+   el domicilio entero se pinta de rojo— pero si en el boton de anotarla, y
+   ahi caia en el gris de base, que es justo lo contrario de lo que dice. Usa
+   el mismo rojo que el grupo puede cambiar desde Opciones. */
+.vc.k-DNV{background:var(--c-dnv-soft);color:var(--c-dnv);border-color:var(--c-dnv);}
+/* Gris: cerrado, pero sin nada pendiente. No es un pare como el rojo de No
+   visitar — es que ahi ya no hay nada que planear. */
 .vc.k-NI,.vc.k-X{background:var(--surface-3);color:var(--text-2);border-color:var(--border-strong);}
 
 /* ── what a row's colour means ──
@@ -1102,7 +1114,7 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
 
 /* ═══ CONFIG ═══ */
 var API="https://territory-manager-silk.vercel.app/api/territory";
-var APP_VERSION="2.25.0";
+var APP_VERSION="2.26.0";
 
 /* ═══════════════════════════════════════════════════════════════════════
    OFFLINE DATA LAYER
