@@ -930,6 +930,12 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
         <div class="sec">
           <div class="sec-t">Aplicación</div>
           <div class="card">
+            <button class="row" id="rowNav">
+              <span class="row-ico">🚗</span>
+              <span class="row-txt"><span class="row-t">Cómo llegar</span>
+              <span class="row-s" id="navSub">Mapas del teléfono</span></span>
+              <span class="row-act">›</span>
+            </button>
             <button class="row" id="rowMapDl">
               <span class="row-ico">🗺️</span>
               <span class="row-txt"><span class="row-t">Mapa sin internet</span>
@@ -1090,7 +1096,7 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
 
 /* ═══ CONFIG ═══ */
 var API="https://territory-manager-silk.vercel.app/api/territory";
-var APP_VERSION="2.23.0";
+var APP_VERSION="2.24.0";
 
 /* ═══════════════════════════════════════════════════════════════════════
    OFFLINE DATA LAYER
@@ -1422,6 +1428,49 @@ function visitLabel(v){if(!v)return"Nunca visitada";var d=daysSince(v);
   if(d<=0)return"Visitada hoy";if(d===1)return"Ayer";if(d<365)return"hace "+d+" días";
   return fmtDate(v);}
 function fullAddr(r){return[r.HouseAddress,r.HouseCity,r.HouseState,r.HouseZIP].filter(Boolean).join(", ");}
+/* ── cómo llegar ───────────────────────────────────────────────────────
+   La direccion ESCRITA manda sobre las coordenadas. Un navegador con
+   "35.4890,-120.6700" pinta un alfiler sin calle ni numero: quien maneja no
+   puede confirmar que sea la casa, y en el carro eso se vuelve dar vueltas a
+   la manzana. Las coordenadas quedan para el domicilio que no tenga direccion
+   escrita — una traila en un lote, por ejemplo. */
+function navTarget(h){
+  var dir=fullAddr(h);
+  return dir||h.HouseGPSCoordinates||"";
+}
+var NAV_KEY="tm_nav";
+function navMode(){
+  try{return localStorage.getItem(NAV_KEY)||"maps";}catch(e){return "maps";}
+}
+function setNavMode(m){
+  try{localStorage.setItem(NAV_KEY,m);}catch(e){}
+  refreshNavRow();
+}
+
+/* Al Tesla no se le habla directo: la app del carro se registra como destino
+   para compartir, asi que se le entrega la direccion por ahi y el carro la
+   recibe. Se manda con la misma forma que Apple Maps y Google Maps —
+   descripcion y enlace — porque es la que se sabe que esa app entiende. */
+function navigateTo(h){
+  if(!h)return;
+  var q=navTarget(h);
+  if(!q){toast("Este domicilio no tiene dirección",true);return;}
+  var url="https://www.google.com/maps/dir/?api=1&destination="+encodeURIComponent(q);
+  if(navMode()!=="tesla"){window.open(url,"_blank");return;}
+
+  if(navigator.share){
+    navigator.share({title:"Ir a "+q,text:q,url:url})
+      .catch(function(){/* si se arrepiente a medio camino, no pasa nada */});
+    return;
+  }
+  /* Sin hoja de compartir (una computadora, casi siempre): se copia la
+     direccion, que es lo unico util que queda por hacer aqui. */
+  var listo=function(){toast("Dirección copiada ✓ Pégala en el carro");};
+  if(navigator.clipboard)navigator.clipboard.writeText(q).then(listo)
+    .catch(function(){prompt("Copia la dirección:",q);});
+  else prompt("Copia la dirección:",q);
+}
+
 function parseGPS(v){if(!v)return null;var p=String(v).split(",").map(function(s){return parseFloat(s.trim());});
   if(p.length===2&&!isNaN(p[0])&&!isNaN(p[1])&&Math.abs(p[0])<=90&&Math.abs(p[1])<=180)return{lat:p[0],lng:p[1]};return null;}
 function byId(id){for(var i=0;i<records.length;i++)if(records[i].id===id)return records[i];return null;}
@@ -2376,10 +2425,7 @@ function openDetail(id){
       :'<div class="empty" style="padding:22px">Todavía no hay nada anotado aquí.</div>')+
     '<div style="height:8px"></div>';
 
-  $("#dDir").addEventListener("click",function(){
-    var q=h.HouseGPSCoordinates||fullAddr(h);
-    window.open("https://www.google.com/maps/dir/?api=1&destination="+encodeURIComponent(q),"_blank");
-  });
+  $("#dDir").addEventListener("click",function(){navigateTo(h);});
   $("#dRV").addEventListener("click",function(){openRV(h.id);});
   openSheet("#sh-detail");
 }
@@ -2777,6 +2823,7 @@ function generateNotesPDF(){
 $("#rowMyRV").addEventListener("click",generateNotesPDF);
 $("#rowSimple").addEventListener("click",toggleSimple);
 $("#rowMapDl").addEventListener("click",mapDlMenu);
+$("#rowNav").addEventListener("click",navMenu);
 $("#wIn").addEventListener("click",function(){openAuth();});
 $("#wCode").addEventListener("click",function(){
   // Quien llega por aqui trae un codigo en la mano: se le abre donde escribirlo.
@@ -3020,6 +3067,46 @@ function deleteSavedMap(){
   caches.delete(MAP_CACHE).then(function(){
     refreshMapRow();toast("Mapa borrado");
   });
+}
+
+function refreshNavRow(){
+  var sub=$("#navSub"),row=$("#rowNav");
+  if(!sub||!row)return;
+  row.style.display=simpleMode?"none":"";
+  sub.textContent=navMode()==="tesla"
+    ? "Mandar la dirección al Tesla"
+    : "Mapas del teléfono";
+}
+function navMenu(){
+  $("#pTitle").textContent="Cómo llegar";
+  $("#pSub").textContent="Al tocar 🚗 en un domicilio";
+  var marca=function(m){return navMode()===m?' · ✓':'';};
+  $("#pBody").innerHTML=
+    '<div class="card">'+
+      '<button class="row" data-nav="maps"><span class="row-ico">🗺️</span>'+
+        '<span class="row-txt"><span class="row-t">Mapas del teléfono'+marca("maps")+'</span>'+
+        '<span class="row-s">Abre Google Maps</span></span>'+
+        '<span class="row-act">›</span></button>'+
+      '<button class="row" data-nav="tesla"><span class="row-ico">🚗</span>'+
+        '<span class="row-txt"><span class="row-t">Tesla'+marca("tesla")+'</span>'+
+        '<span class="row-s" style="white-space:normal">Manda la dirección al '+
+        'navegador del carro</span></span>'+
+        '<span class="row-act">›</span></button>'+
+    '</div>'+
+    (navMode()==="tesla"
+      ?'<p style="font-size:13px;color:var(--text-2);margin-top:12px;line-height:1.5">'+
+        'Al tocar 🚗 se abre la hoja de compartir: escoge <b>Tesla</b> y la '+
+        'dirección le llega al carro.<br><br>La app de Tesla tiene que estar '+
+        'abierta en segundo plano. La primera vez, si no aparece en la lista, '+
+        'desliza hasta <b>Más</b> y actívala.</p>':"");
+  $("#pBody").querySelectorAll("[data-nav]").forEach(function(b){
+    b.addEventListener("click",function(){
+      setNavMode(b.dataset.nav);
+      closeSheet("#sh-pick");
+      toast(b.dataset.nav==="tesla"?"Se mandará al Tesla ✓":"Se abrirán los mapas del teléfono ✓");
+    });
+  });
+  openSheet("#sh-pick");
 }
 
 function refreshMapRow(){
@@ -3410,7 +3497,7 @@ function showView(name){
     setTimeout(function(){if(map)map.invalidateSize();},60);
   }else{stopMeWatch();stopPresence();stopVoicePoll();}
   if(name==="rv")renderRV();
-  if(name==="more"){buildTerrSub();updateSyncUI();showStorage();refreshMapRow();}
+  if(name==="more"){buildTerrSub();updateSyncUI();showStorage();refreshMapRow();refreshNavRow();}
 }
 document.querySelectorAll(".tab").forEach(function(t){
   t.addEventListener("click",function(){showView(t.dataset.view);haptic(5);});
@@ -5954,9 +6041,7 @@ $("#routeBtn").addEventListener("click",function(){
   if(routeOn)drawRoute();else clearRoute();
 });
 $("#ncDir").addEventListener("click",function(){
-  var h=byId($("#nextCard").dataset.hid);if(!h)return;
-  var q=h.HouseGPSCoordinates||fullAddr(h);
-  window.open("https://www.google.com/maps/dir/?api=1&destination="+encodeURIComponent(q),"_blank");
+  navigateTo(byId($("#nextCard").dataset.hid));
 });
 $("#ncDone").addEventListener("click",function(){
   var h=byId($("#nextCard").dataset.hid);if(!h)return;
