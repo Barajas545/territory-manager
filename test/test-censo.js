@@ -105,6 +105,55 @@ check('y el español pasa a ser el otro', isOurLang(casa('Español')) === false)
 check('pero lo que no tiene idioma se sigue viendo', isOurLang(casa('')) === true);
 sandbox.congLang = 'Español';
 
+/* ══ TODOS los territorios preparados ══════════════════════════════════
+   El bucle recorre el indice, no una lista escrita aqui: el dia que se agregue
+   otro territorio queda revisado sin que nadie se acuerde de venir a añadirlo.
+   Estas son las cosas que valen para cualquiera. */
+const indice = JSON.parse(fs.readFileSync(path.join(ROOT, 'territorios/index.json'), 'utf8'));
+check('el índice lista al menos un territorio', indice.territorios.length > 0);
+
+indice.territorios.forEach(t => {
+  const d = JSON.parse(fs.readFileSync(path.join(ROOT, 'territorios', t.file), 'utf8'));
+  const hs = d.houses || [];
+  const et = s => t.name + ': ' + s;
+  check(et('el archivo trae domicilios'), hs.length > 0, hs.length);
+  check(et('el nombre del índice coincide con el del archivo'),
+    d.territory === t.name, d.territory);
+  check(et('ninguna dirección viene vacía'), hs.every(h => /\S/.test(h.HouseAddress)));
+  check(et('ninguna dirección se repite'),
+    new Set(hs.map(h => h.HouseAddress.toLowerCase())).size === hs.length);
+  check(et('toda dirección empieza por su número'),
+    hs.every(h => /^\d/.test(h.HouseAddress)), hs.find(h => !/^\d/.test(h.HouseAddress)));
+  check(et('todos llevan código postal de 5 dígitos'),
+    hs.every(h => /^\d{5}$/.test(h.HouseZIP)));
+  check(et('todos llevan ciudad y estado'),
+    hs.every(h => h.HouseCity && /^[A-Z]{2}$/.test(h.HouseState)));
+  check(et('todos caen en ESTE territorio'),
+    hs.every(h => h.HouseTerritoryNumber === d.territory));
+  check(et('todos llevan idioma anotado'), hs.every(h => /\S/.test(h.HouseLanguage)));
+  const conDnv = hs.filter(h => h.dnv);
+  check(et('cada No visitar trae razón y fecha bien formada'),
+    conDnv.every(h => h.dnv.reason && /^\d{4}-\d{2}-\d{2}$/.test(h.dnv.date)),
+    JSON.stringify(conDnv.map(h => h.dnv.date)));
+  check(et('ninguna fecha de No visitar viene del futuro'),
+    conDnv.every(h => h.dnv.date <= new Date().toISOString().slice(0, 10)));
+});
+
+// ══ Atascadero #A4, lo que dice su hoja ════════════════════════════════
+const a4 = JSON.parse(fs.readFileSync(path.join(ROOT, 'territorios/atascadero-a4.json'), 'utf8')).houses;
+check('A4 trae 18 domicilios', a4.length === 18, a4.length);
+check('A4: los dos No visitar con sus fechas',
+  a4.filter(h => h.dnv).map(h => h.dnv.date).sort().join(',') === '2018-07-23,2024-01-04',
+  a4.filter(h => h.dnv).map(h => h.dnv.date).sort().join(','));
+check('A4: el 9460 queda como departamento A',
+  a4.some(h => h.HouseAddress === '9460 El Parque Ave #A'));
+check('A4: la nota de la calle rural bajó a sus dos domicilios',
+  a4.filter(h => /Los Altos/.test(h.HouseAddress)).every(h => h.HouseNotes === 'Rural'));
+check('A4: el de Colorado Rd avisa que queda fuera del mapa',
+  /fuera del área marcada/i.test(a4.find(h => /Colorado/.test(h.HouseAddress)).HouseNotes));
+check('A4: todo es de Atascadero 93422',
+  a4.every(h => h.HouseCity === 'Atascadero' && h.HouseZIP === '93422'));
+
 // ══ el territorio que se va a importar ═════════════════════════════════
 const terr = JSON.parse(fs.readFileSync(path.join(ROOT, 'territorios/paso-robles-3.json'), 'utf8'));
 const casas = terr.houses;

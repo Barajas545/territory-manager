@@ -1,0 +1,179 @@
+{
+ "territory": "Atascadero #A4",
+ "city": "Atascadero",
+ "state": "CA",
+ "zip": "93422",
+ "source": "Hoja A4 1 — Atascadero #4",
+ "houses": [
+  {
+   "HouseAddress": "7255 Atascadero Ave",
+   "HouseCity": "Atascadero",
+   "HouseState": "CA",
+   "HouseZIP": "93422",
+   "HouseTerritoryNumber": "Atascadero #A4",
+   "HouseLanguage": "Español",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "7420 Atascadero Ave",
+   "HouseCity": "Atascadero",
+   "HouseState": "CA",
+   "HouseZIP": "93422",
+   "HouseTerritoryNumber": "Atascadero #A4",
+   "HouseLanguage": "Español",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "8045 Azucena Ave",
+   "HouseCity": "Atascadero",
+   "HouseState": "CA",
+   "HouseZIP": "93422",
+   "HouseTerritoryNumber": "Atascadero #A4",
+   "HouseLanguage": "Español",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "8965 Cason St",
+   "HouseCity": "Atascadero",
+   "HouseState": "CA",
+   "HouseZIP": "93422",
+   "HouseTerritoryNumber": "Atascadero #A4",
+   "HouseLanguage": "Español",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "8980 Cason St",
+   "HouseCity": "Atascadero",
+   "HouseState": "CA",
+   "HouseZIP": "93422",
+   "HouseTerritoryNumber": "Atascadero #A4",
+   "HouseLanguage": "Español",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "10820 Colorado Rd",
+   "HouseCity": "Atascadero",
+   "HouseState": "CA",
+   "HouseZIP": "93422",
+   "HouseTerritoryNumber": "Atascadero #A4",
+   "HouseLanguage": "Español",
+   "HouseNotes": "Fuera del área marcada en el mapa"
+  },
+  {
+   "HouseAddress": "8055 Coromar Ave",
+   "HouseCity": "Atascadero",
+   "HouseState": "CA",
+   "HouseZIP": "93422",
+   "HouseTerritoryNumber": "Atascadero #A4",
+   "HouseLanguage": "Español",
+   "HouseNotes": "",
+   "dnv": {
+    "reason": "Sin razón anotada",
+    "date": "2024-01-04"
+   }
+  },
+  {
+   "HouseAddress": "8396 Curbaril Ave",
+   "HouseCity": "Atascadero",
+   "HouseState": "CA",
+   "HouseZIP": "93422",
+   "HouseTerritoryNumber": "Atascadero #A4",
+   "HouseLanguage": "Español",
+   "HouseNotes": "Estudiante"
+  },
+  {
+   "HouseAddress": "8437 Curbaril Ave",
+   "HouseCity": "Atascadero",
+   "HouseState": "CA",
+   "HouseZIP": "93422",
+   "HouseTerritoryNumber": "Atascadero #A4",
+   "HouseLanguage": "Español",
+   "HouseNotes": "Solo por carta"
+  },
+  {
+   "HouseAddress": "9460 El Parque Ave #A",
+   "HouseCity": "Atascadero",
+   "HouseState": "CA",
+   "HouseZIP": "93422",
+   "HouseTerritoryNumber": "Atascadero #A4",
+   "HouseLanguage": "Español",
+   "HouseNotes": "Posible español"
+  },
+  {
+   "HouseAddress": "9465 El Parque Ave",
+   "HouseCity": "Atascadero",
+   "HouseState": "CA",
+   "HouseZIP": "93422",
+   "HouseTerritoryNumber": "Atascadero #A4",
+   "HouseLanguage": "Español",
+   "HouseNotes": "Carta"
+  },
+  {
+   "HouseAddress": "13841 Los Altos Rd",
+   "HouseCity": "Atascadero",
+   "HouseState": "CA",
+   "HouseZIP": "93422",
+   "HouseTerritoryNumber": "Atascadero #A4",
+   "HouseLanguage": "Español",
+   "HouseNotes": "Rural"
+  },
+  {
+   "HouseAddress": "13925 Los Altos Rd",
+   "HouseCity": "Atascadero",
+   "HouseState": "CA",
+   "HouseZIP": "93422",
+   "HouseTerritoryNumber": "Atascadero #A4",
+   "HouseLanguage": "Español",
+   "HouseNotes": "Rural"
+  },
+  {
+   "HouseAddress": "7850 Morro Rd",
+   "HouseCity": "Atascadero",
+   "HouseState": "CA",
+   "HouseZIP": "93422",
+   "HouseTerritoryNumber": "Atascadero #A4",
+   "HouseLanguage": "Español",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "7905 Morro Rd",
+   "HouseCity": "Atascadero",
+   "HouseState": "CA",
+   "HouseZIP": "93422",
+   "HouseTerritoryNumber": "Atascadero #A4",
+   "HouseLanguage": "Español",
+   "HouseNotes": "Atrás del restaurante Malus Kitchen"
+  },
+  {
+   "HouseAddress": "8600 Portola Rd",
+   "HouseCity": "Atascadero",
+   "HouseState": "CA",
+   "HouseZIP": "93422",
+   "HouseTerritoryNumber": "Atascadero #A4",
+   "HouseLanguage": "Español",
+   "HouseNotes": "",
+   "dnv": {
+    "reason": "Sin razón anotada",
+    "date": "2018-07-23"
+   }
+  },
+  {
+   "HouseAddress": "8550 San Andres Ave",
+   "HouseCity": "Atascadero",
+   "HouseState": "CA",
+   "HouseZIP": "93422",
+   "HouseTerritoryNumber": "Atascadero #A4",
+   "HouseLanguage": "Español",
+   "HouseNotes": ""
+  },
+  {
+   "HouseAddress": "8555 San Andres Ave",
+   "HouseCity": "Atascadero",
+   "HouseState": "CA",
+   "HouseZIP": "93422",
+   "HouseTerritoryNumber": "Atascadero #A4",
+   "HouseLanguage": "Español",
+   "HouseNotes": ""
+  }
+ ]
+}
