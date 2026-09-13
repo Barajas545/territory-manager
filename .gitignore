@@ -1,3 +1,7 @@
 # Generado: index.html con stub.js inyectado. Se arma cuando se necesita con
 #   python -c "import io;s=io.open('index.html',encoding='utf-8').read();i=s.index('<script>');io.open('test/test-held.html','w',encoding='utf-8',newline='').write(s[:i]+'<script src=\"stub.js\"></script>\n'+s[i:])"
 test/test-held.html
+
+# Copias de los territorios para el servidor de pruebas. Los buenos viven en
+# territorios/; dos copias de los mismos domicilios acaban separandose.
+test/territorios/

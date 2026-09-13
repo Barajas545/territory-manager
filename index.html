@@ -806,6 +806,75 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
   .sheet{max-width:560px;left:50%;transform:translateX(-50%) translateY(101%);}
   .sheet.open{transform:translateX(-50%) translateY(0);}
 }
+/* ══ ESCRITORIO ═══════════════════════════════════════════════════════
+   Desde 1024px la app deja de fingir que es un telefono. */
+@media (min-width:1024px){
+  /* Se suelta el ancho de telefono que pone la regla de 700px. */
+  #app{max-width:none;margin:0;box-shadow:none;
+    display:grid;grid-template-columns:212px 1fr;grid-template-rows:auto 1fr;}
+  #topbar{grid-column:1/-1;grid-row:1;}
+  #tabbar{grid-column:1;grid-row:2;}
+  #views{grid-column:2;grid-row:2;position:relative;min-width:0;}
+
+  /* Al invitado se le esconde la barra entera —no hay mapa ni opciones que
+     ofrecerle, solo la lista—, asi que aqui no se le aparta sitio. Si no,
+     queda una franja vacia a la izquierda y la lista corrida. */
+  body.guest #app{grid-template-columns:1fr;}
+  body.guest #views{grid-column:1;}
+
+  /* La barra de abajo, de lado: el raton no prefiere la parte baja, y de pie
+     la columna libera toda la altura para la lista. */
+  #tabbar{flex-direction:column;justify-content:flex-start;padding:10px 8px;
+    border-top:0;border-right:1px solid var(--border);gap:2px;}
+  .tab{flex:0 0 auto;width:100%;height:44px;flex-direction:row;
+    justify-content:flex-start;gap:11px;padding:0 12px;border-radius:var(--r-md);}
+  .tab .ti{font-size:18px;}
+  .tab .tl{font-size:14px;font-weight:700;}
+  .tab[aria-selected="true"]{background:var(--brand-soft);color:var(--brand);}
+  .tab .tbadge{position:static;margin-left:auto;}
+
+  /* La lista y el mapa, juntos en Territorio. Es la pantalla donde se
+     administra: se ve que domicilio es cual sin cambiar de pestaña ni perder
+     el hilo. La pestaña Mapa deja el mapa solo, para dibujar limites. */
+  body.split #views{display:grid;grid-template-columns:minmax(400px,34%) 1fr;}
+  body.split #view-houses,body.split #view-map{
+    position:relative;inset:auto;display:flex;min-width:0;}
+  /* El mapa no se apaga con display sino con visibility, para no reiniciar
+     Leaflet. Partida la pantalla esta a la vista aunque la pestaña sea
+     Territorio, y hay que poder arrastrarlo. */
+  body.split #view-map{visibility:visible;pointer-events:auto;}
+  body.split #view-houses{border-right:1px solid var(--border);}
+  body.split #view-rv,body.split #view-more{display:none;}
+
+  /* La lista se queda en UNA columna. Se intento repartirla en dos, primero
+     con column-count y despues con rejilla, y las dos salieron mal: las
+     columnas de CSS crecen hacia un lado dentro de algo que se desplaza, y la
+     rejilla encogia cada renglon a su min-height. Ver test-escritorio.js.
+
+     Sin pantalla partida la lista se queda centrada: un renglon de 1468 px
+     deja la direccion en una orilla y las casillas en la otra. */
+  body:not(.split) #houseList{max-width:900px;margin-inline:auto;width:100%;}
+
+  /* Con raton los renglones no necesitan tanto aire, y caben mas de un golpe. */
+  .house-main{padding-top:9px;padding-bottom:9px;}
+  .vc{height:38px;}
+  #houseList{scrollbar-width:thin;}
+
+  /* Las hojas dejan de subir desde abajo: en una pantalla ancha ese borde esta
+     lejos de donde mira el ojo. Ventanas al centro. */
+  .sheet{max-width:560px;left:50%;top:50%;bottom:auto;
+    transform:translate(-50%,-46%) scale(.97);opacity:0;
+    border-radius:var(--r-lg);max-height:82vh;}
+  .sheet.open{transform:translate(-50%,-50%) scale(1);opacity:1;}
+  .sheet .grab{display:none;}
+
+  /* El boton de agregar se queda en la columna de la lista, no encima del
+     mapa. */
+  body.split #fab{left:auto;right:auto;}
+  #fab{bottom:22px;}
+}
+
+
 @media (prefers-reduced-motion:reduce){
   *{animation-duration:.01ms!important;transition-duration:.01ms!important;}
 }
@@ -1127,7 +1196,7 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
 
 /* ═══ CONFIG ═══ */
 var API="https://territory-manager-silk.vercel.app/api/territory";
-var APP_VERSION="2.29.1";
+var APP_VERSION="2.30.0";
 
 /* ═══════════════════════════════════════════════════════════════════════
    OFFLINE DATA LAYER
@@ -3769,6 +3838,25 @@ $("#locateBtn").addEventListener("click",function(){
 });
 
 /* ═══ NAV ═══ */
+/* La pantalla partida es de escritorio y de quien administra. En un telefono
+   no cabe, y a quien solo sale a tocar puertas la lista sola le sirve mas —
+   media pantalla de mapa le quita la mitad de los domicilios de la vista. */
+function deskSplit(){
+  return window.matchMedia("(min-width:1024px)").matches&&
+    !guestMode&&!simpleMode&&scope.kind==="admin";
+}
+function applySplit(name){
+  /* Solo en Territorio. La pestaña Mapa se queda con el mapa SOLO y a todo lo
+     ancho: los limites se dibujan vertice por vertice, y ahi cada pixel de mas
+     se nota. Asi cada pestaña hace algo distinto en vez de repetirse. */
+  var on=deskSplit()&&name==="houses";
+  document.body.classList.toggle("split",on);
+  /* Leaflet mide su contenedor una sola vez: si el mapa aparece al lado sin
+     avisarle, se dibuja con el tamaño que tenia escondido y quedan los
+     mosaicos cortados. */
+  if(on){initMap();setTimeout(function(){if(map)map.invalidateSize();},60);}
+}
+
 function showView(name){
   if(simpleMode&&!guestMode&&(name==="map"||name==="rv"))name="houses";
   document.querySelectorAll(".view").forEach(function(v){v.classList.toggle("active",v.id==="view-"+name);});
@@ -3779,7 +3867,15 @@ function showView(name){
   }else{stopMeWatch();stopPresence();stopVoicePoll();}
   if(name==="rv")renderRV();
   if(name==="more"){buildTerrSub();updateSyncUI();showStorage();refreshMapRow();refreshNavRow();}
+  applySplit(name);
 }
+
+/* Al cambiar el tamaño de la ventana —o al girar una tableta— la pantalla
+   partida entra o sale sola. */
+window.addEventListener("resize",function(){
+  var v=document.querySelector(".view.active");
+  if(v)applySplit(v.id.replace("view-",""));
+});
 document.querySelectorAll(".tab").forEach(function(t){
   t.addEventListener("click",function(){showView(t.dataset.view);haptic(5);});
 });
@@ -5499,6 +5595,9 @@ function loadTeam(){
       applySimpleChrome();refreshSimpleRow();
     }
     refreshChrome();refreshWorkingBtn();renderTeamCard();updateCounts();
+    // El reparto depende de si es administrador, y eso se sabe hasta ahora.
+    var va=document.querySelector(".view.active");
+    if(va)applySplit(va.id.replace("view-",""));
     // Los contornos llegan pegados a los territorios: hasta aqui no se sabian.
     drawBounds();refreshCoverage();
   }).catch(function(){});
