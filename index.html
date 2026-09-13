@@ -468,6 +468,8 @@ body.drawing #pttWrap,body.drawing #nextCard{display:none !important;}
 #drawBar button.p{background:var(--brand);color:var(--brand-ink);}
 #drawBar button.d{color:var(--bad);}
 #drawBar button:disabled{opacity:.45;}
+/* Mientras se marca, el mismo aviso dice que ya no falta ninguna casa. */
+#coverChip.ok{background:var(--ok-soft);color:var(--ok);}
 /* El aviso de cobertura: lo unico de esta pantalla que hay que atender. */
 #coverChip{position:absolute;left:10px;bottom:14px;z-index:400;display:none;
   align-items:center;gap:7px;height:38px;padding:0 14px;border-radius:var(--r-full);
@@ -860,6 +862,16 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
   .vc{height:38px;}
   #houseList{scrollbar-width:thin;}
 
+  /* La barra de marcar deja de cruzar el mapa. Medía 1154 px —el 94% del
+     ancho— y tapaba 105 px de arriba: un vertice que cayera en esa franja no se
+     podia agarrar porque el clic se lo quedaba la barra, asi que para marcar el
+     limite norte habia que arrastrar el mapa hacia abajo primero. Y los cuatro
+     botones, repartiendose ese ancho, salian de 330 px cada uno para textos de
+     ocho letras. */
+  #drawBar{left:10px;right:auto;width:334px;}
+  #drawBar .db-row{flex-wrap:wrap;}
+  #drawBar button{flex:1 1 auto;min-width:72px;padding:0 12px;}
+
   /* Las hojas dejan de subir desde abajo: en una pantalla ancha ese borde esta
      lejos de donde mira el ojo. Ventanas al centro.
 
@@ -888,6 +900,44 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
   #fab{bottom:22px;}
 }
 
+
+/* ══ MARCAR LIMITES CON RATON ═════════════════════════════════════════
+   Esto NO va por ancho de pantalla sino por con-que-se-apunta: una tableta de
+   1024 px con dedo necesita el camino del dedo, y una ventana angosta con raton
+   merece el de raton. */
+@media (hover:hover) and (pointer:fine){
+  /* La cruz y su boton sobran: con raton se apunta al sitio. Y el boton no solo
+     sobraba — era un blanco de 168x40 en el centro EXACTO del mapa que atrapaba
+     el clic y ponia el vertice en el centro, hasta 70 px de donde se apunto. */
+  #xhair.on,#xhairAdd.on{display:none;}
+
+  /* La manita significa "haz clic" en toda la web, y aqui el clic borraba. Un
+     vertice se arrastra: eso se dice con grab. */
+  #map.drawing .leaflet-marker-icon{cursor:grab;}
+  #map.drawing .leaflet-marker-icon:active{cursor:grabbing;}
+
+  /* Los primeros :hover de la app. Sin ellos no hay manera de saber si se va a
+     agarrar el vertice o a hacer clic en el mapa vacio —que agrega un punto—
+     hasta que uno suelta el boton y ya paso. El punto de en medio crece hasta
+     el tamaño de un vertice: enseña en lo que se va a convertir. */
+  .bv-h,.bm-h{transition:transform .12s ease,background .12s ease;}
+  .bv-h:hover{transform:scale(1.25);}
+  .bm-h:hover{transform:scale(1.45);background:rgba(21,101,192,.92);}
+
+  /* El vertice elegido: el que mueven las flechas y el que quita Supr. Lleva
+     aro propio porque el primero ya es verde y habia que distinguirlos. */
+  .bv-h.sel{box-shadow:0 0 0 3px var(--brand),0 1px 5px rgba(0,0,0,.45);}
+
+  /* Las teclas escritas en la barra, para que los atajos no haya que adivinarlos. */
+  .db-s kbd{display:inline-block;padding:0 5px;border-radius:4px;
+    background:var(--surface-2);border:1px solid var(--border-strong);
+    font-family:inherit;font-size:11px;font-weight:800;color:var(--text-2);}
+}
+/* Mientras se marca un limite los pines de las casas dejan de atrapar el clic.
+   Uno apunta a la banqueta junto a la casa —que es justo donde esta el pin— y
+   en vez del vertice se abria el globo de esa casa. Vale para el telefono
+   igual: ahi el dedo se lo lleva con mas razon. */
+body.drawing .house-pin{pointer-events:none;}
 
 @media (prefers-reduced-motion:reduce){
   *{animation-duration:.01ms!important;transition-duration:.01ms!important;}
@@ -1210,7 +1260,7 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
 
 /* ═══ CONFIG ═══ */
 var API="https://territory-manager-silk.vercel.app/api/territory";
-var APP_VERSION="2.30.1";
+var APP_VERSION="2.31.0";
 
 /* ═══════════════════════════════════════════════════════════════════════
    OFFLINE DATA LAYER
@@ -3089,6 +3139,12 @@ $("#rowExport").addEventListener("click",function(){
 $("#pBody").addEventListener("click",function(e){
   var b=e.target.closest("[data-terr],[data-exp]");if(!b)return;
   if(b.dataset.terr!==undefined){
+    /* Con el dibujo abierto, cambiar de territorio lo descuadraba todo: el
+       mapa se iba a las casas del otro con la figura a medio hacer encima, la
+       barra seguia diciendo el territorio anterior, y al guardar el limite se
+       escribia en el viejo. Primero se cierra el editor —preguntando, si hay
+       algo que perder—, y si el usuario se arrepiente no se cambia nada. */
+    if(drawing&&!cancelDrawBounds())return;
     // Los pines tambien cambian con el territorio, no solo el encuadre.
     terrFilter=b.dataset.terr;closeSheet("#sh-pick");
     renderHouses();refreshMapPins();drawBounds();fitPins();refreshCoverage();
@@ -3107,7 +3163,7 @@ function pinColor(s){return{recent:"#12805C",due:"#B54708",overdue:"#B42318",nev
 function pinIcon(h){
   var c=pinColor(visitStatus(h.HouseLastVisitDate));
   var rv=isRV(h);
-  return L.divIcon({className:"",iconSize:[24,24],iconAnchor:[12,12],popupAnchor:[0,-14],
+  return L.divIcon({className:"house-pin",iconSize:[24,24],iconAnchor:[12,12],popupAnchor:[0,-14],
     html:'<div style="width:22px;height:22px;border-radius:50%;background:'+c+
       ';border:3px solid '+(rv?"#6941C6":"#fff")+';box-shadow:0 2px 8px rgba(0,0,0,.45)"></div>'});
 }
@@ -3126,9 +3182,17 @@ function initMap(){
      pedia otro. OSM desaconseja esos nombres desde hace años. */
   L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19}).addTo(map);
   L.control.zoom({position:"topright"}).addTo(map);
+  /* Un doble clic manda click, click, dblclick: esto corria dos veces y
+     dejaba dos vertices encimados, que no se ven hasta que la figura sale con
+     un pico. Vale para el dedo igual, que al tocar dos veces para acercar hace
+     lo mismo. Dos puntos a menos de 12 px y 400 ms no son a proposito nunca. */
+  var ultPtT=0, ultPtXY=null;
   map.on("click",function(e){
     // Fuera del modo de marcar, un toque en el mapa no hace nada, como antes.
     if(!drawing)return;
+    var xy=map.latLngToContainerPoint(e.latlng), t=Date.now();
+    if(ultPtXY&&t-ultPtT<400&&ultPtXY.distanceTo(xy)<12)return;
+    ultPtT=t;ultPtXY=xy;
     addBoundPoint(e.latlng.lat,e.latlng.lng);
   });
   mapReady=true;
@@ -3512,6 +3576,16 @@ function mapDlMenu(){
    cuenta las casas que no caen dentro de ningun limite. */
 var boundLayers={}, drawing=null, drawLayer=null;
 var vertexMarkers=[], midMarkers=[];
+/* El vertice elegido: el que mueven las flechas y el que quita Supr. Solo
+   existe con raton; con el dedo un toque lo quita y no hay nada que elegir. */
+var selVertex=null;
+/* Con que se apunta, no que tan ancha es la pantalla: una tableta de 1024 px
+   con dedo necesita el camino del dedo, y una ventana angosta con raton merece
+   el de raton. */
+function finePointer(){
+  return !!(window.matchMedia&&
+    window.matchMedia("(hover:hover) and (pointer:fine)").matches);
+}
 
 // Colores estables por nombre: el mismo territorio se ve igual cada vez que se
 // abre el mapa, sin guardar nada.
@@ -3574,9 +3648,18 @@ function drawBounds(){
     if(drawing&&drawing.terr===t.name)return;
     // El territorio que se esta viendo se marca; los demas quedan de contexto.
     var active=terrFilter===t.name||terrFilter==="all";
+    /* Mientras se marca, el vecino deja de ser contexto apagado y pasa a ser la
+       GUIA: rayas, mas marcado y sin relleno. Es contra esa linea que uno
+       dibuja para que no quede una astilla de calle sin cubrir entre los dos. */
+    var guia=!!drawing;
     var g=L.polygon(t.bounds,{
-      color:terrColor(t.name),weight:active?2.5:1.5,opacity:active?.9:.45,
-      fillColor:terrColor(t.name),fillOpacity:active?.08:.03,interactive:false,
+      color:terrColor(t.name),
+      weight:guia?2:(active?2.5:1.5),
+      opacity:guia?.85:(active?.9:.45),
+      dashArray:guia?"7,5":null,
+      fillColor:terrColor(t.name),
+      fillOpacity:guia?0:(active?.08:.03),
+      interactive:false,
     }).addTo(map);
     g.bindTooltip(t.name,{permanent:true,direction:"center",className:"terr-label"});
     boundLayers[t.name]=g;
@@ -3589,7 +3672,34 @@ function refreshCoverage(){
      territorios, asi que una casa que en realidad cae dentro del territorio de
      al lado le apareceria como descubierta — una alarma falsa sobre algo que
      ademas no puede arreglar. */
-  var out=(drawing||scope.kind!=="admin")?[]:housesOutside();
+  /* Mientras se marca, el aviso cuenta las casas de ESE territorio que
+     todavia no caen dentro de la figura que se tiene en la mano. Antes se
+     apagaba al entrar al modo de marcar: justo cuando hace falta, porque es el
+     numero que dice cuando el limite ya esta terminado. */
+  if(drawing){
+    chip.classList.remove("ok");
+    if(drawing.points.length<3){chip.classList.remove("on");return;}
+    var fuera=records.filter(function(h){
+      if((h.HouseTerritoryNumber||"Unassigned")!==drawing.terr)return false;
+      var g=parseGPS(h.HouseGPSCoordinates);
+      return g&&!inPoly(g.lat,g.lng,drawing.points);
+    });
+    chip.classList.add("on");
+    if(!fuera.length){
+      chip.textContent="✓ Todas las casas quedan dentro";
+      chip.classList.add("ok");chip.onclick=null;return;
+    }
+    chip.textContent="⚠ "+fuera.length+(fuera.length===1
+      ?" casa de este territorio queda fuera":" casas de este territorio quedan fuera");
+    chip.onclick=function(){
+      var pts=[];
+      fuera.forEach(function(h){var g=parseGPS(h.HouseGPSCoordinates);if(g)pts.push([g.lat,g.lng]);});
+      if(pts.length)map.fitBounds(pts,{padding:[60,60],maxZoom:17});
+    };
+    return;
+  }
+  chip.classList.remove("ok");
+  var out=(scope.kind!=="admin")?[]:housesOutside();
   if(!out.length){chip.classList.remove("on");return;}
   chip.textContent="⚠ "+out.length+(out.length===1?" casa fuera de los límites":" casas fuera de los límites");
   chip.classList.add("on");
@@ -3613,7 +3723,18 @@ function histPush(){
 function histUndo(){
   if(!drawing||!drawing.hist.length)return;
   drawing.points=drawing.hist.pop();
-  paintDraw();
+  selVertex=null;            // los indices se corren; el elegido ya no es el mismo
+  paintDraw();refreshCoverage();
+}
+
+/* Quitar un vertice, venga de donde venga: del clic derecho, de Supr, o del
+   toque en el telefono. */
+function removeVertex(i){
+  if(!drawing||i===null||i<0||i>=drawing.points.length)return;
+  histPush();
+  drawing.points.splice(i,1);
+  selVertex=null;
+  repaintSoon();
 }
 
 /* Quitar un marcador ARRASTRABLE hace que Leaflet cierre su propio arrastre, y
@@ -3663,33 +3784,57 @@ function paintVertices(){
   vertexMarkers.forEach(dropMarker);vertexMarkers=[];
   if(!drawing)return;
   var pts=drawing.points;
+  // Deshacer, Borrar o un splice pueden dejar el elegido fuera del arreglo.
+  if(selVertex!==null&&(selVertex<0||selVertex>=pts.length))selVertex=null;
   pts.forEach(function(pt,i){
     var m=L.marker(pt,{
       draggable:true,zIndexOffset:1200,keyboard:false,
-      icon:L.divIcon({className:"",html:'<div class="bv-h'+(i===0?" first":"")+'"></div>',
+      icon:L.divIcon({className:"",
+        html:'<div class="bv-h'+(i===0?" first":"")+(i===selVertex?" sel":"")+'"></div>',
         iconSize:[24,24],iconAnchor:[12,12]}),
     }).addTo(map);
-    var moved=false;
+    /* Si este gesto fue un arrastre. Antes la bandera se quedaba puesta desde
+       que terminaba el arrastre hasta que alguien hiciera clic, y ese clic se
+       lo tragaba: con raton se arrastra y se hace clic todo el rato, asi que el
+       primer clic DE VERDAD despues de mover un vertice se perdia.
+       Se reinicia al APRETAR, que siempre llega antes que cualquier clic: cada
+       presion empieza un gesto limpio, sin depender de ningun reloj. Y como
+       dragstart no se dispara hasta pasados los 3 px de tolerancia de Leaflet,
+       un tiron de un pixel sigue llegando como clic — que con raton ELIGE. */
+    var arrastrado=false;
     /* Los puntos de en medio se esconden durante el arrastre: quedarian en su
        posicion vieja, y volver a construirlos en cada cuadro es trabajo tirado. */
-    m.on("dragstart",function(){moved=false;histPush();clearMids();});
+    m.on("mousedown",function(){arrastrado=false;});
+    m.on("dragstart",function(){arrastrado=true;histPush();clearMids();});
     m.on("drag",function(e){
-      moved=true;
       var ll=e.target.getLatLng();
       drawing.points[i]=[ll.lat,ll.lng];
       paintShape();updateDrawBar();
     });
     // El vertice ya quedo donde debia; solo hay que rehacer los de en medio.
-    m.on("dragend",function(){paintShape();paintMids();updateDrawBar();});
-    /* Un toque quita el vertice. Es directo a proposito: con la pila de
-       deshacer detras, equivocarse cuesta un boton, y el camino de dos pasos
-       (seleccionar y luego confirmar) se siente pesado con el brazo estirado
-       frente a una casa. */
+    m.on("dragend",function(){
+      paintShape();paintMids();updateDrawBar();refreshCoverage();
+    });
     m.on("click",function(){
-      if(moved){moved=false;return;}
-      histPush();
-      drawing.points.splice(i,1);
-      repaintSoon();
+      // El clic con que cierra un arrastre no cuenta; cualquier otro si.
+      if(arrastrado)return;
+      /* Con raton el clic ELIGE. Leaflet no considera arrastre nada menor a
+         3 px, asi que correr un vertice dos pixeles para cuadrarlo con la
+         esquina —justo para lo que sirve un raton— llegaba aqui como clic y lo
+         borraba, sin aviso. Quitarlo es Supr o clic derecho.
+         Con el dedo se queda como estaba: un toque lo quita. Es directo a
+         proposito, porque el camino de dos pasos se siente pesado con el brazo
+         estirado frente a una casa, y la pila de deshacer esta detras. */
+      if(finePointer()){
+        selVertex=(selVertex===i?null:i);
+        repaintSoon();return;
+      }
+      removeVertex(i);
+    });
+    /* Clic derecho quita, como en cualquier editor de mapas. */
+    m.on("contextmenu",function(e){
+      if(e&&e.originalEvent&&e.originalEvent.preventDefault)e.originalEvent.preventDefault();
+      removeVertex(i);
     });
     vertexMarkers.push(m);
   });
@@ -3715,6 +3860,7 @@ function paintMids(){
         mm.on("click",function(){
           histPush();
           drawing.points.splice(i+1,0,mid);
+          selVertex=null;     // los indices de aqui en adelante se corrieron
           repaintSoon();
         });
         midMarkers.push(mm);
@@ -3723,13 +3869,48 @@ function paintMids(){
   }
 }
 
+/* Las flechas empujan el vertice elegido. El empujon se mide en PIXELES de
+   pantalla y no en grados: asi vale lo mismo acercado que alejado, que es como
+   lo espera la mano. */
+var nudgeTimer=null;
+function nudgeVertex(dx,dy){
+  if(!drawing||selVertex===null||!mapReady)return;
+  var pt=drawing.points[selVertex];
+  if(!pt)return;
+  // Una rafaga de flechas es UN paso para deshacer, no uno por tecla.
+  if(!nudgeTimer)histPush();
+  var pp=map.latLngToContainerPoint(L.latLng(pt[0],pt[1]));
+  var ll=map.containerPointToLatLng(L.point(pp.x+dx,pp.y+dy));
+  drawing.points[selVertex]=[ll.lat,ll.lng];
+  if(vertexMarkers[selVertex])vertexMarkers[selVertex].setLatLng(ll);
+  /* Los de en medio quedarian en su sitio viejo; se rehacen al terminar la
+     rafaga, igual que al soltar un arrastre. */
+  clearMids();
+  paintShape();updateDrawBar();
+  if(nudgeTimer)clearTimeout(nudgeTimer);
+  nudgeTimer=setTimeout(function(){
+    nudgeTimer=null;
+    if(drawing){paintMids();refreshCoverage();}
+  },350);
+}
+
+function tecla(t){return '<kbd>'+t+'</kbd>';}
+
 function updateDrawBar(){
   if(!drawing)return;
   var k=drawing.points.length;
   $("#dbTitle").textContent="Marcando "+drawing.terr;
-  $("#dbSub").textContent=
-    k===0?"Centra la cruz en una esquina y toca ＋. También puedes tocar el mapa."
+  /* Con raton en la mano, "Centra la cruz y toca ＋" enseña el modelo
+     equivocado: que hay que mover el mapa en vez de apuntar, y que tocar un
+     vertice es seguro cuando era justo lo que lo borraba. */
+  var fino=finePointer();
+  $("#dbSub").innerHTML=
+    k===0?(fino?"Haz clic en el mapa para poner cada esquina."
+              :"Centra la cruz en una esquina y toca ＋. También puedes tocar el mapa.")
     :k<3?"Faltan "+(3-k)+" para cerrar la figura."
+    :fino?k+" puntos · arrastra para mover · clic para elegir · "+
+        tecla("↑↓←→")+" ajustar · "+tecla("Supr")+" quitar · "+tecla("Ctrl+Z")+" deshacer · "+
+        tecla("Enter")+" guardar · "+tecla("Esc")+" salir"
     :k+" puntos · arrastra para mover · toca uno para quitarlo · toca un punto chico para insertar";
   $("#dbUndo").disabled=!drawing.hist.length;
   $("#dbSave").disabled=k>0&&k<3;
@@ -3747,7 +3928,18 @@ function addBoundPoint(lat,lng){
   if(!drawing)return;
   histPush();
   drawing.points.push([lat,lng]);
-  paintDraw();
+  selVertex=null;
+  paintDraw();refreshCoverage();
+}
+
+/* Cancelar tira el trabajo entero y con el la pila de deshacer, asi que ahora
+   pregunta. Estaba al reves: Borrar, que solo vacia los puntos y SI se puede
+   deshacer, preguntaba; Cancelar, que no tiene vuelta, no. */
+function cancelDrawBounds(){
+  if(drawing&&drawing.hist.length&&
+     !confirm("¿Salir sin guardar? Se pierde lo que cambiaste en este límite."))return false;
+  endDrawBounds();
+  return true;
 }
 
 function startDrawBounds(){
@@ -3755,6 +3947,13 @@ function startDrawBounds(){
     toast("Primero elige el territorio que vas a marcar",true);return;
   }
   drawing={terr:terrFilter,points:boundsFor(terrFilter).slice(),hist:[]};
+  selVertex=null;
+  /* El mapa NO se reencuadra aqui. Elegir el territorio ya llama fitPins, asi
+     que viene puesto; y hacerlo de todas formas le arrancaria el mapa al
+     hermano que acaba de acercarse a mano a la esquina donde esta parado. */
+  /* Un globo de casa abierto se queda encima del mapa comiendose los clics del
+     editor, y apagarle los punteros al pin no lo cierra. */
+  if(mapReady)map.closePopup();
   $("#drawBar").classList.add("on");
   $("#xhair").classList.add("on");
   $("#xhairAdd").classList.add("on");
@@ -3765,7 +3964,8 @@ function startDrawBounds(){
   paintDraw();
 }
 function endDrawBounds(){
-  drawing=null;
+  drawing=null;selVertex=null;
+  if(nudgeTimer){clearTimeout(nudgeTimer);nudgeTimer=null;}
   paintDraw();                       // sin `drawing`, esto limpia todo
   $("#drawBar").classList.remove("on");
   $("#xhair").classList.remove("on");
@@ -3825,7 +4025,7 @@ function fitPins(){
 }
 $("#fitBtn").addEventListener("click",fitPins);
 $("#boundsBtn").addEventListener("click",function(){
-  if(drawing)endDrawBounds();else startDrawBounds();
+  if(drawing)cancelDrawBounds();else startDrawBounds();
 });
 $("#dbUndo").addEventListener("click",histUndo);
 $("#xhairAdd").addEventListener("click",function(){
@@ -3839,7 +4039,51 @@ $("#dbClear").addEventListener("click",function(){
   histPush();
   drawing.points=[];paintDraw();
 });
-$("#dbCancel").addEventListener("click",endDrawBounds);
+$("#dbCancel").addEventListener("click",cancelDrawBounds);
+
+/* Los atajos del editor. Van en fase de CAPTURA a proposito: el mapa se crea
+   sin keyboard:false, asi que Leaflet le pone tabindex al contenedor y, en
+   cuanto se hace clic en el mapa (que es como se pone un punto), cada flecha
+   desplaza el mapa llamando stop(e) — preventDefault MAS stopPropagation. Un
+   manejador normal, en burbuja, no veria una sola flecha. */
+function onDrawKey(e){
+  if(!drawing)return;                     // fuera del editor no existe ni un atajo
+  if(openSheets.length)return;            // la hoja de encima manda, y Esc la cierra
+  var t=e.target,tn=t&&t.tagName;
+  // La casilla de busqueda esta a la vista en pantalla partida: ahi Ctrl+Z y
+  // Supr son del texto que se esta escribiendo, no del limite.
+  if(tn==="INPUT"||tn==="TEXTAREA"||tn==="SELECT"||(t&&t.isContentEditable))return;
+  if(e.altKey)return;
+  var k=e.key;
+  if(k==="Escape"){
+    // Primero suelta el vertice elegido; recien despues sale del modo.
+    if(selVertex!==null){selVertex=null;paintDraw();}
+    else cancelDrawBounds();
+    e.preventDefault();return;
+  }
+  if(k==="Enter"){
+    if(tn==="BUTTON")return;              // un boton con el foco se activa solo
+    if(!$("#dbSave").disabled)saveBounds();
+    e.preventDefault();return;
+  }
+  if((e.ctrlKey||e.metaKey)&&(k==="z"||k==="Z")&&!e.shiftKey){
+    histUndo();e.preventDefault();return;
+  }
+  if(e.ctrlKey||e.metaKey)return;
+  if(k==="Delete"||k==="Backspace"){
+    if(selVertex!==null)removeVertex(selVertex);
+    e.preventDefault();return;            // Retroceso no debe navegar hacia atras
+  }
+  if(k.indexOf("Arrow")===0){
+    // Sin vertice elegido las flechas siguen siendo de Leaflet: mueven el mapa.
+    if(selVertex===null)return;
+    var d=e.shiftKey?10:1;
+    nudgeVertex(k==="ArrowLeft"?-d:k==="ArrowRight"?d:0,
+                k==="ArrowUp"?-d:k==="ArrowDown"?d:0);
+    e.preventDefault();e.stopPropagation();
+  }
+}
+document.addEventListener("keydown",onDrawKey,true);
 $("#dbSave").addEventListener("click",saveBounds);
 $("#locateBtn").addEventListener("click",function(){
   if(!navigator.geolocation){toast("GPS no disponible",true);return;}
