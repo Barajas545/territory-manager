@@ -1260,7 +1260,7 @@ body.drawing .house-pin{pointer-events:none;}
 
 /* ═══ CONFIG ═══ */
 var API="https://territory-manager-silk.vercel.app/api/territory";
-var APP_VERSION="2.31.0";
+var APP_VERSION="2.31.1";
 
 /* ═══════════════════════════════════════════════════════════════════════
    OFFLINE DATA LAYER
@@ -3982,9 +3982,20 @@ function saveBounds(){
   $("#dbSave").disabled=true;
   team("setTerritoryBounds",{territory:terr,points:pts}).then(function(r){
     var t=teamTerritories.find(function(x){return x.name===terr;});
-    if(t)t.bounds=r.bounds||[];
+    /* Un territorio que se acaba de registrar no esta en la lista que el
+       navegador trajo al arrancar. Sin esto el limite se guardaba bien pero no
+       habia donde colgarlo, y el mapa quedaba sin la linea: parecia que no se
+       habia guardado. Se arma con la misma forma que manda listTerritories. */
+    if(!t){
+      t={name:terr,bounds:[],ownerId:"",owner:null,assignedOn:"",
+         assigneeIds:[],assignees:[]};
+      teamTerritories.push(t);
+    }
+    t.bounds=r.bounds||[];
     endDrawBounds();
-    toast(pts.length?"Límite guardado ✓":"Límite borrado");
+    toast(r&&r.registered
+      ?"Límite guardado ✓ · "+terr+" quedó registrado"
+      :(pts.length?"Límite guardado ✓":"Límite borrado"));
   }).catch(function(e){
     toast(e.message,true);
     $("#dbSave").disabled=false;

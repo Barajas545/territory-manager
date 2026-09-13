@@ -122,6 +122,30 @@ module.exports = async (req, res) => {
     const dl = (spec, keys) => store.remove(spec, keys);
     const wrs = (spec, entries) => store.updateMany(spec, entries);
 
+    /* Un territorio que llevan domicilios de verdad ES un territorio.
+
+       El cliente arma su selector recorriendo HouseTerritoryNumber, pero el
+       servidor valida contra la lista Territories, que hasta hoy solo nacia al
+       asignar un territorio o al repartir numeros de el. Un territorio
+       importado —18 domicilios con su nombre— no tenia fila, y marcarle el
+       limite contestaba "No existe ese territorio".
+
+       La fila se crea SIN DUEÑO: registrar un territorio no es quedarselo.
+       Devuelve true solo si de verdad la creo, para poder decirselo a quien
+       esta mirando. */
+    async function ensureTerritory(name) {
+      const terrs = await rd(TABS.territories);
+      if (terrs.some(x => SC.norm(x.name) === SC.norm(name))) return false;
+      const houses = await rd(SC.HOUSES_TAB);
+      const real = houses.some(h =>
+        h && h.HouseDeleted !== '1' && SC.norm(h.HouseTerritoryNumber || '') === SC.norm(name));
+      if (!real) return false;
+      await ap(TABS.territories, {
+        name, ownerId: '', assigneeIds: '', updatedAt: nowIso, working: '0',
+      });
+      return true;
+    }
+
     async function currentUser() {
       if (!claims || !claims.uid) return null;
       const users = await rd(TABS.users);
@@ -697,6 +721,9 @@ module.exports = async (req, res) => {
       const admin = await requireAdmin();
       const name = String(body.territory || '').trim();
       if (!name) return res.status(400).json({ error: 'Falta el territorio' });
+      /* Si lo llevan domicilios pero nunca se registro —el caso de un
+         territorio importado— se registra ahora, sin dueño. */
+      const registrado = await ensureTerritory(name);
       const terrs = await rd(TABS.territories);
       if (!terrs.some(x => SC.norm(x.name) === SC.norm(name)))
         return res.status(404).json({ error: 'No existe ese territorio' });
@@ -705,7 +732,7 @@ module.exports = async (req, res) => {
       if (clean.length && clean.length < 3)
         return res.status(400).json({ error: 'Un límite necesita al menos 3 puntos' });
       const saved = await BD.setBounds(store, name, clean, admin.id, nowIso);
-      return res.json({ ok: true, territory: name, bounds: saved });
+      return res.json({ ok: true, territory: name, bounds: saved, registered: registrado });
     }
 
     /* Only the territory's owner or an admin may change who works it. An

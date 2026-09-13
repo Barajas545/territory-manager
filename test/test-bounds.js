@@ -115,7 +115,58 @@ const boundRows = () => DB.TerritoryBounds || [];
     BD.parsePoints(boundRows()[0].points).length);
 
   r = await T(ADMIN, 'setTerritoryBounds', { territory: 'T-9', points: SQUARE });
-  check('no se puede marcar un territorio que no existe', r.status === 404, JSON.stringify(r.body));
+  check('un nombre que no lleva ningún domicilio sigue rebotando', r.status === 404,
+    JSON.stringify(r.body));
+
+  /* ══ EL TERRITORIO IMPORTADO ═════════════════════════════════════════
+     Lo que le pasó de verdad: 18 domicilios de Atascadero 4 en la lista, el
+     selector lo ofrece, se dibuja el límite entero, y al guardar sale en rojo
+     "No existe ese territorio".
+
+     La app tenía dos ideas de qué es un territorio. Para el cliente es un valor
+     que llevan los domicilios (el selector se arma recorriendo
+     HouseTerritoryNumber). Para el servidor es una fila en Territories, que
+     hasta entonces solo nacía al asignar el territorio o al repartir números de
+     él. Importar domicilios no hacía ninguna de las dos. */
+  DB.Houses.push(
+    { id: 'h-a4-1', HouseAddress: '8550 San Andres Ave', HouseTerritoryNumber: 'Atascadero 4', _key: 'h1' },
+    { id: 'h-a4-2', HouseAddress: '8555 San Andres Ave', HouseTerritoryNumber: 'Atascadero 4', _key: 'h2' });
+  check('el territorio importado NO tiene fila propia',
+    !(DB.Territories || []).some(t => t.name === 'Atascadero 4'));
+
+  r = await T(ADMIN, 'setTerritoryBounds', { territory: 'Atascadero 4', points: SQUARE });
+  check('ahora SÍ se puede guardar su límite', r.status === 200, JSON.stringify(r.body).slice(0, 80));
+  check('y la app avisa que lo registró', r.body.registered === true);
+  const a4 = (DB.Territories || []).filter(t => t.name === 'Atascadero 4');
+  check('quedó registrado, una sola vez', a4.length === 1, a4.length);
+  /* Registrar un territorio no es quedárselo. Si la fila naciera con dueño,
+     marcar un límite sería la manera de apropiarse de un territorio entero. */
+  check('y SIN dueño: queda sin reclamar, como estaba', a4[0] && a4[0].ownerId === '',
+    a4[0] && JSON.stringify(a4[0].ownerId));
+  check('ni marcado como que se está trabajando', a4[0] && a4[0].working === '0');
+  check('la fila nueva no estrena ninguna columna',
+    a4[0] && Object.keys(a4[0]).filter(k => k !== '_key').sort().join(',') ===
+      'assigneeIds,name,ownerId,updatedAt,working',
+    a4[0] && Object.keys(a4[0]).filter(k => k !== '_key').sort().join(','));
+
+  r = await T(ADMIN, 'setTerritoryBounds', { territory: 'Atascadero 4', points: SQUARE });
+  check('volver a guardar no lo registra dos veces',
+    (DB.Territories || []).filter(t => t.name === 'Atascadero 4').length === 1);
+  check('y ya no dice que lo registró', r.body.registered === false);
+
+  // Un domicilio borrado no sostiene un territorio.
+  DB.Houses.push({ id: 'h-x', HouseTerritoryNumber: 'Fantasma', HouseDeleted: '1', _key: 'hx' });
+  r = await T(ADMIN, 'setTerritoryBounds', { territory: 'Fantasma', points: SQUARE });
+  check('un territorio cuyos domicilios están borrados no se registra', r.status === 404,
+    JSON.stringify(r.body));
+
+  // Y esto sigue siendo cosa del administrador, no de cualquiera.
+  DB.Houses.push({ id: 'h-a5', HouseTerritoryNumber: 'Atascadero 5', _key: 'h5' });
+  r = await T(OWNER, 'setTerritoryBounds', { territory: 'Atascadero 5', points: SQUARE });
+  check('un publicador no puede registrar un territorio marcándole el límite',
+    r.status === 403, JSON.stringify(r.body));
+  check('y no quedó registrado',
+    !(DB.Territories || []).some(t => t.name === 'Atascadero 5'));
 
   // ══ basura adentro ═════════════════════════════════════════════════════
   const messy = [[35.490, -120.672], ['x', 'y'], [999, -120.67], [35.486, -120.668],
@@ -130,7 +181,9 @@ const boundRows = () => DB.TerritoryBounds || [];
   r = await T(ADMIN, 'setTerritoryBounds', { territory: 'T-2', points: [] });
   check('guardar cero puntos borra el contorno', r.status === 200 && r.body.bounds.length === 0,
     JSON.stringify(r.body.bounds));
-  check('pero deja el renglón, no lo elimina', boundRows().length === 2, boundRows().length);
+  check('pero deja el renglón de ESE territorio, no lo elimina',
+    boundRows().some(b => b.territory === 'T-2'),
+    boundRows().map(b => b.territory).join(','));
   r = await T(ADMIN, 'listTerritories', {});
   const t2b = (r.body.territories || []).find(t => t.name === 'T-2');
   check('y el mapa ya no lo recibe', t2b.bounds.length === 0, t2b.bounds.length);
