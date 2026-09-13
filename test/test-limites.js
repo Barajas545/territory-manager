@@ -260,7 +260,8 @@ check('cambiar de territorio con el dibujo abierto cierra el editor primero',
 // ══ el contador en vivo ════════════════════════════════════════════════
 const rc = take('refreshCoverage');
 check('mientras se marca, el aviso cuenta las casas de ESE territorio',
-  /HouseTerritoryNumber\|\|"Unassigned"\)!==drawing\.terr/.test(rc));
+  /HouseTerritoryNumber\|\|"Unassigned"\)===drawing\.terr/.test(rc),
+  (rc.match(/HouseTerritoryNumber[^;]*/) || [''])[0]);
 check('y NO usa inTerrFilter, que filtra también por idioma',
   !/inTerrFilter/.test(rc),
   'el número se movería solo al prender el censo');
