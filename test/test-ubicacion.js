@@ -264,5 +264,133 @@ r.caja.refreshCoverage();
 check('una casa fuera de los límites se sigue avisando antes que nada',
   /fuera de los límites/.test(r.chip.textContent), r.chip.textContent);
 
+/* ══ BUSCAR DONDE QUEDA UNA DIRECCION ═══════════════════════════════════
+   Las respuestas de abajo NO estan inventadas: son las que devolvio de verdad
+   el servicio al probarlo con direcciones de la hoja de Atascadero y de Paso
+   Robles. */
+const geo = {
+  normLang: v => String(v || '').trim().toLowerCase()
+    .replace(/[áàä]/g, 'a').replace(/[éèë]/g, 'e').replace(/[íìï]/g, 'i')
+    .replace(/[óòö]/g, 'o').replace(/[úùü]/g, 'u').replace(/ñ/g, 'n'),
+  parseGPS: v => {
+    if (!v) return null;
+    const p = String(v).split(',').map(x => parseFloat(x.trim()));
+    return p.length === 2 && !isNaN(p[0]) && !isNaN(p[1]) &&
+      Math.abs(p[0]) <= 90 && Math.abs(p[1]) <= 180 ? { lat: p[0], lng: p[1] } : null;
+  },
+};
+vm.createContext(geo);
+vm.runInContext([take('geoKey'), take('calleNorm'), take('geoAceptar')].join('\n'), geo);
+
+const casa = (dir, zip) => ({ HouseAddress: dir, HouseCity: 'Atascadero',
+  HouseState: 'CA', HouseZIP: zip || '93422' });
+
+// ── el edificio se busca una vez y vale para sus ocho departamentos ────
+check('el número de departamento no se le pregunta al servicio',
+  geo.geoKey({ HouseAddress: '1225 Stoney Creek Rd #4', HouseCity: 'Paso Robles',
+    HouseState: 'CA', HouseZIP: '93446' }) ===
+  geo.geoKey({ HouseAddress: '1225 Stoney Creek Rd #8', HouseCity: 'Paso Robles',
+    HouseState: 'CA', HouseZIP: '93446' }),
+  'los ocho departamentos están en el mismo sitio: una búsqueda, no ocho');
+check('dos edificios distintos NO comparten búsqueda',
+  geo.geoKey(casa('1225 Stoney Creek Rd')) !== geo.geoKey(casa('1227 Stoney Creek Rd')));
+check('una dirección sin número no se busca',
+  geo.geoKey(casa('Traila atrás de la casa')) === '',
+  'sin número no hay nada que verificar, y verificar es lo único que protege');
+
+// ── St y Street son la misma calle ────────────────────────────────────
+check('"Cason St" y "Cason Street" son la misma calle',
+  geo.calleNorm('8980 Cason St') === geo.calleNorm('Cason Street'));
+check('"San Andres Ave" y "San Andres Avenue" también',
+  geo.calleNorm('8550 San Andres Ave') === geo.calleNorm('San Andres Avenue'));
+check('"Stoney Creek Rd" y "Stoney Creek Road" también',
+  geo.calleNorm('1225 Stoney Creek Rd') === geo.calleNorm('Stoney Creek Road'));
+check('pero dos calles distintas NO se confunden',
+  geo.calleNorm('8550 San Andres Ave') !== geo.calleNorm('Cason Street'));
+check('y "El Camino Real" no pierde su nombre',
+  geo.calleNorm('7905 El Camino Real') === 'el camino real',
+  geo.calleNorm('7905 El Camino Real'));
+
+// ── la respuesta buena, tal cual la devolvió el servicio ──────────────
+const BUENA = { lat: '35.4802258', lon: '-120.6619043', addresstype: 'building',
+  address: { house_number: '8550', road: 'San Andres Avenue', city: 'Atascadero',
+    postcode: '93422' } };
+let g = geo.geoAceptar(casa('8550 San Andres Ave'), BUENA);
+check('una dirección que coincide en todo se acepta', !!g);
+check('y con las coordenadas que devolvió',
+  g && Math.abs(g.lat - 35.4802258) < 1e-6 && Math.abs(g.lng + 120.6619043) < 1e-6);
+
+/* ── EL CASO PELIGROSO ──────────────────────────────────────────────────
+   "99999 San Andres Ave": la calle existe, el número no. El servicio contesta
+   con el CENTRO DE LA CALLE — tipo "road", sin número de casa. Aceptarlo
+   dejaría la casa a cuadras de donde es. */
+const CENTRO_DE_CALLE = { lat: '35.4831', lon: '-120.6647', addresstype: 'road',
+  address: { road: 'San Andres Avenue', city: 'Atascadero', postcode: '93422' } };
+check('el CENTRO DE LA CALLE se rechaza: no trae número de casa',
+  geo.geoAceptar(casa('99999 San Andres Ave'), CENTRO_DE_CALLE) === null,
+  'es la regla que impide dejar una casa a cuadras de donde es');
+
+// ── el número que no es el nuestro ────────────────────────────────────
+check('un número distinto al nuestro se rechaza',
+  geo.geoAceptar(casa('8555 San Andres Ave'), BUENA) === null);
+
+// ── la calle que se llama igual en otro pueblo ────────────────────────
+const OTRO_PUEBLO = { lat: '35.6052', lon: '-120.6584', addresstype: 'building',
+  address: { house_number: '8550', road: 'San Andres Avenue', city: 'Paso Robles',
+    postcode: '93446' } };
+check('el mismo número y la misma calle en otro código postal se rechaza',
+  geo.geoAceptar(casa('8550 San Andres Ave'), OTRO_PUEBLO) === null,
+  'por aquí hay calles que se llaman igual en dos pueblos');
+
+// ── otra calle con nuestro número ─────────────────────────────────────
+const OTRA_CALLE = { lat: '35.4687', lon: '-120.6549', addresstype: 'building',
+  address: { house_number: '8550', road: 'Cason Street', city: 'Atascadero',
+    postcode: '93422' } };
+check('nuestro número pero en otra calle se rechaza',
+  geo.geoAceptar(casa('8550 San Andres Ave'), OTRA_CALLE) === null);
+
+// ── el pueblo que contesta ────────────────────────────────────────────
+const OTRO_PUEBLO_MISMO_CP = { lat: '35.60', lon: '-120.65', addresstype: 'building',
+  address: { house_number: '8550', road: 'San Andres Avenue', city: 'Templeton',
+    postcode: '93422' } };
+check('si contesta otro pueblo se rechaza',
+  geo.geoAceptar(casa('8550 San Andres Ave'), OTRO_PUEBLO_MISMO_CP) === null);
+const SIN_PUEBLO = { lat: '35.4600143', lon: '-120.7121562', addresstype: 'building',
+  address: { house_number: '13925', road: 'Los Altos Road', postcode: '93422' } };
+check('pero una dirección rural sin pueblo NO se rechaza por eso',
+  !!geo.geoAceptar(casa('13925 Los Altos Rd'), SIN_PUEBLO),
+  'venir sin pueblo no la hace sospechosa');
+
+// ── un edificio de departamentos: el servicio lo llama "place", no "building"
+const EDIFICIO = { lat: '35.6052983', lon: '-120.6584806', addresstype: 'place',
+  address: { house_number: '1227', road: 'Stoney Creek Road', city: 'Paso Robles',
+    postcode: '93446' } };
+check('un edificio de departamentos se acepta aunque no lo llamen "building"',
+  !!geo.geoAceptar({ HouseAddress: '1227 Stoney Creek Rd #6', HouseCity: 'Paso Robles',
+    HouseState: 'CA', HouseZIP: '93446' }, EDIFICIO),
+  'filtrar por tipo "building" habría dejado fuera los cinco edificios de Paso Robles');
+
+// ── basura y silencio ─────────────────────────────────────────────────
+check('sin respuesta, la casa se queda sin ubicar',
+  geo.geoAceptar(casa('8550 San Andres Ave'), null) === null);
+check('coordenadas que no son números se rechazan',
+  geo.geoAceptar(casa('8550 San Andres Ave'),
+    { lat: 'x', lon: 'y', address: { house_number: '8550', road: 'San Andres Avenue',
+      postcode: '93422' } }) === null);
+check('una latitud imposible se rechaza',
+  geo.geoAceptar(casa('8550 San Andres Ave'),
+    { lat: '999', lon: '-120.66', address: { house_number: '8550',
+      road: 'San Andres Avenue', postcode: '93422' } }) === null);
+
+// ── lo que ya está confirmado no se toca ──────────────────────────────
+check('solo se buscan las casas SIN coordenadas',
+  /housesUnplaced\(\)/.test(take('locateHouses')),
+  'una coordenada tomada parado frente a la casa vale más que cualquier búsqueda');
+check('se dice en voz alta que las direcciones salen a OpenStreetMap',
+  /se envían a OpenStreetMap/.test(src),
+  'es dato del grupo saliendo a un servicio de fuera: se pregunta antes');
+check('y se respeta el ritmo que pide el servicio',
+  /setTimeout\(paso,1300\)/.test(src));
+
 console.log(`\n${fails === 0 ? 'ALL ' + checks + ' CHECKS PASSED' : fails + ' of ' + checks + ' FAILED'}`);
 process.exit(fails ? 1 : 0);

@@ -1106,6 +1106,12 @@ body.drawing .house-pin{pointer-events:none;}
               <span class="row-s" id="mapDlSub">Revisando…</span></span>
               <span class="row-act">›</span>
             </button>
+            <button class="row" id="rowGeo" style="display:none">
+              <span class="row-ico">📌</span>
+              <span class="row-txt"><span class="row-t">Ubicar casas en el mapa</span>
+              <span class="row-s" id="geoSub">Revisando…</span></span>
+              <span class="row-act">›</span>
+            </button>
             <button class="row" id="rowSimple">
               <span class="row-ico">🙂</span>
               <span class="row-txt"><span class="row-t">Versión sencilla</span>
@@ -1260,7 +1266,7 @@ body.drawing .house-pin{pointer-events:none;}
 
 /* ═══ CONFIG ═══ */
 var API="https://territory-manager-silk.vercel.app/api/territory";
-var APP_VERSION="2.32.0";
+var APP_VERSION="2.33.0";
 
 /* ═══════════════════════════════════════════════════════════════════════
    OFFLINE DATA LAYER
@@ -3116,6 +3122,7 @@ function generateNotesPDF(){
 $("#rowMyRV").addEventListener("click",generateNotesPDF);
 $("#rowSimple").addEventListener("click",toggleSimple);
 $("#rowMapDl").addEventListener("click",mapDlMenu);
+$("#rowGeo").addEventListener("click",locateHouses);
 $("#rowNav").addEventListener("click",navMenu);
 $("#wIn").addEventListener("click",function(){openAuth();});
 $("#wCode").addEventListener("click",function(){
@@ -3734,6 +3741,151 @@ function refreshCoverage(){
   };
 }
 
+/* ── ubicar casas por su direccion ─────────────────────────────────────
+   Un territorio capturado desde una hoja de papel trae direcciones pero
+   ninguna coordenada: en el mapa no sale ni un alfiler, no se puede descargar
+   el mapa para trabajar sin internet, y el aviso no puede decir si las casas
+   quedan dentro del limite. Se buscan en OpenStreetMap —el mismo proyecto que
+   regala los mosaicos que la app ya usa— y se guarda lo que coincide. */
+var geoRun=null;
+
+/* Lo que se le pregunta al servicio. El "#4" de un departamento se queda
+   fuera: los ocho departamentos de un edificio estan en el mismo sitio, asi
+   que se busca el edificio UNA vez y la respuesta vale para los ocho — y de
+   paso, un servicio de direcciones no sabe de numeros de departamento. */
+function geoKey(h){
+  var dir=String(h.HouseAddress||"").split("#")[0].trim();
+  if(!dir||!/^\d/.test(dir))return "";
+  return [dir,h.HouseCity||"",h.HouseState||"",h.HouseZIP||""].join("|");
+}
+
+/* El nombre de la calle sin el numero y sin el Ave/St/Rd que cada quien
+   abrevia distinto: "Cason St" y "Cason Street" son la misma calle. */
+function calleNorm(s){
+  /* Fuera el "#6" del departamento antes de nada: si se queda, el nombre de la
+     calle no coincide nunca y se rechazarian TODOS los departamentos. */
+  return normLang(String(s||"").split("#")[0])
+    .replace(/^\d+[a-z]?\s*/,"")
+    .replace(/[^a-z0-9 ]/g," ")
+    .replace(/\b(ave|avenue|st|street|rd|road|dr|drive|ln|lane|ct|court|pl|place|way|blvd|boulevard|cir|circle|ter|terrace|hwy|highway)\b/g," ")
+    .replace(/\s+/g," ").trim();
+}
+
+/* Las tres reglas. Probadas contra el servicio de verdad, no supuestas. */
+function geoAceptar(h,r){
+  if(!r)return null;
+  var a=r.address||{};
+  var g=parseGPS(r.lat+", "+r.lon);
+  if(!g)return null;
+  /* 1. EL NUMERO. La regla que de verdad importa: una calle real con un numero
+     que no existe contesta con el CENTRO DE LA CALLE —tipo "road", sin numero
+     de casa—, y aceptarlo pondria la casa a cuadras de donde es. */
+  var num=(String(h.HouseAddress||"").match(/^\s*(\d+[A-Za-z]?)/)||[])[1]||"";
+  if(!num||normLang(a.house_number)!==normLang(num))return null;
+  // 2. El codigo postal: atrapa la calle que se llama igual en otro pueblo.
+  if(String(a.postcode||"").slice(0,5)!==String(h.HouseZIP||"").slice(0,5))return null;
+  // 3. El nombre de la calle, ya sin el tipo de via.
+  var nuestra=calleNorm(h.HouseAddress), suya=calleNorm(a.road);
+  if(nuestra&&suya&&nuestra!==suya)return null;
+  /* 4. El pueblo, cuando lo dice. Solo rechaza si CONTESTA otro pueblo: una
+     direccion rural puede venir sin pueblo y eso no la hace sospechosa. */
+  var pueblo=a.city||a.town||a.village||"";
+  if(pueblo&&h.HouseCity&&normLang(pueblo)!==normLang(h.HouseCity))return null;
+  /* Lo que NO se exige: que el punto caiga dentro del limite marcado. La propia
+     hoja de Atascadero 4 trae "10820 Colorado Rd — fuera del area marcada en el
+     mapa": hay casas que de verdad quedan fuera, y esa regla las rechazaria. */
+  return g;
+}
+
+function geoBuscar(h){
+  var dir=String(h.HouseAddress||"").split("#")[0].trim();
+  var u="https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1"+
+    "&limit=1&countrycodes=us"+
+    "&street="+encodeURIComponent(dir)+
+    "&city="+encodeURIComponent(h.HouseCity||"")+
+    "&state="+encodeURIComponent(h.HouseState||"")+
+    "&postalcode="+encodeURIComponent(h.HouseZIP||"");
+  return fetch(u,{headers:{Accept:"application/json"}})
+    .then(function(r){return r.ok?r.json():[];})
+    .then(function(j){return geoAceptar(h,j&&j[0]);})
+    .catch(function(){return null;});   // sin señal o servicio caido: se deja sin ubicar
+}
+
+function refreshGeoRow(){
+  var row=$("#rowGeo"),sub=$("#geoSub");
+  if(!row||!sub)return;
+  row.style.display=(scope.kind==="admin"&&!guestMode&&!simpleMode)?"":"none";
+  if(geoRun)return;                       // el progreso manda mientras corre
+  var sin=housesUnplaced();
+  sub.textContent=sin.length
+    ? sin.length+(sin.length===1?" casa no está":" casas no están")+" en el mapa · toca para buscarlas"
+    : "Todas las casas de "+terrFilterLabel()+" ya están en el mapa";
+}
+
+function locateHouses(){
+  if(geoRun){
+    if(confirm("¿Parar la búsqueda?"))geoRun.cancel=true;
+    return;
+  }
+  var sin=housesUnplaced().filter(function(h){return geoKey(h);});
+  if(!sin.length){toast("No hay direcciones que buscar");return;}
+  if(!navigator.onLine){toast("Esto necesita internet",true);return;}
+
+  // Un edificio se busca una sola vez y vale para todos sus departamentos.
+  var grupos={},orden=[];
+  sin.forEach(function(h){
+    var k=geoKey(h);
+    if(!grupos[k]){grupos[k]=[];orden.push(k);}
+    grupos[k].push(h);
+  });
+
+  if(!confirm("¿Buscar dónde quedan "+sin.length+" casa(s) de "+terrFilterLabel()+"?\n\n"+
+    "Son "+orden.length+" búsqueda(s), como "+Math.ceil(orden.length*1.3)+" segundos.\n\n"+
+    "Las direcciones se envían a OpenStreetMap para preguntar dónde quedan. "+
+    "Solo se guarda la respuesta que coincide en número, calle y código postal; "+
+    "la que no coincide deja la casa sin ubicar.\n\n"+
+    "No se tocan las casas que ya tienen ubicación."))return;
+
+  geoRun={cancel:false};
+  var i=0,puestas=0,fallidas=0;
+  var sub=$("#geoSub");
+  var pinta=function(){
+    if(sub)sub.textContent="Buscando… "+i+" de "+orden.length+" · "+puestas+" ubicadas";
+  };
+  pinta();
+
+  var paso=function(){
+    if(geoRun.cancel||i>=orden.length){
+      var cancelada=geoRun.cancel;
+      geoRun=null;
+      afterLocalChange();
+      if(puestas)scheduleSync();
+      fitPins();refreshCoverage();refreshGeoRow();
+      toast(cancelada
+        ?"Búsqueda detenida · "+puestas+" ubicadas"
+        :puestas+" casa(s) ubicadas"+(fallidas?" · "+fallidas+" sin encontrar":""));
+      return;
+    }
+    var casas=grupos[orden[i]];
+    geoBuscar(casas[0]).then(function(g){
+      i++;
+      if(g){
+        var txt=g.lat.toFixed(6)+", "+g.lng.toFixed(6);
+        casas.forEach(function(h){localUpdate(h.id,{HouseGPSCoordinates:txt});});
+        puestas+=casas.length;
+      }else{
+        fallidas+=casas.length;
+      }
+      pinta();
+      /* Una pausa entre peticiones. El servicio lo regala OpenStreetMap y pide
+         que no se le pegue mas de una vez por segundo; ademas esto se corre una
+         sola vez por territorio, sentado frente a la computadora. */
+      setTimeout(paso,1300);
+    });
+  };
+  paso();
+}
+
 /* ── marcar un limite ── */
 /* Deshacer guarda estados completos, no "quita el ultimo". Ahora que un toque
    sobre un vertice lo borra, cualquier movimiento en falso tiene que poder
@@ -4182,7 +4334,7 @@ function showView(name){
     setTimeout(function(){if(map)map.invalidateSize();},60);
   }else{stopMeWatch();stopPresence();stopVoicePoll();}
   if(name==="rv")renderRV();
-  if(name==="more"){buildTerrSub();updateSyncUI();showStorage();refreshMapRow();refreshNavRow();}
+  if(name==="more"){buildTerrSub();updateSyncUI();showStorage();refreshMapRow();refreshNavRow();refreshGeoRow();}
   applySplit(name);
 }
 
