@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Atascadero #A4, tal como esta en la hoja.
+"""Atascadero 4, tal como esta en la hoja (que viene rotulada "A4 1").
 
    Lo que dice la hoja y como queda aqui:
      "(8055 NO Visitar 1/4/24)"   -> No visitar, con su fecha
@@ -20,7 +20,7 @@ import io
 import json
 
 CIUDAD, ESTADO, ZIP = "Atascadero", "CA", "93422"
-TERR = "Atascadero #A4"
+TERR = "Atascadero 4"
 
 casas = []
 

@@ -139,7 +139,7 @@ indice.territorios.forEach(t => {
     conDnv.every(h => h.dnv.date <= new Date().toISOString().slice(0, 10)));
 });
 
-// ══ Atascadero #A4, lo que dice su hoja ════════════════════════════════
+// ══ Atascadero 4, lo que dice su hoja ═════════════════════════════════
 const a4 = JSON.parse(fs.readFileSync(path.join(ROOT, 'territorios/atascadero-a4.json'), 'utf8')).houses;
 check('A4 trae 18 domicilios', a4.length === 18, a4.length);
 check('A4: los dos No visitar con sus fechas',
