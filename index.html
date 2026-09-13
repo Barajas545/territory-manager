@@ -861,11 +861,25 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
   #houseList{scrollbar-width:thin;}
 
   /* Las hojas dejan de subir desde abajo: en una pantalla ancha ese borde esta
-     lejos de donde mira el ojo. Ventanas al centro. */
+     lejos de donde mira el ojo. Ventanas al centro.
+
+     Y CERRADA tiene que dejar de existir para el raton. En el telefono se iba
+     101% hacia abajo, fuera de la pantalla; aqui se queda en el centro con
+     opacidad 0, y una cosa con opacidad 0 sigue recibiendo clics. Eran nueve
+     hojas apiladas en medio de la pantalla tragandose todo: en el mapa el clic
+     para poner un vertice "no hacia nada", y el centro de la lista estaba
+     muerto igual. Los punteros se apagan de golpe —una hoja que se cierra
+     tampoco debe atrapar nada— y la visibilidad espera a que acabe la
+     animacion, para no cortar el desvanecido y para que el teclado no llegue
+     con Tab a los campos de una hoja cerrada. */
   .sheet{max-width:560px;left:50%;top:50%;bottom:auto;
     transform:translate(-50%,-46%) scale(.97);opacity:0;
+    visibility:hidden;pointer-events:none;
+    transition:transform .34s var(--sheet-ease),opacity .22s ease,visibility 0s linear .34s;
     border-radius:var(--r-lg);max-height:82vh;}
-  .sheet.open{transform:translate(-50%,-50%) scale(1);opacity:1;}
+  .sheet.open{transform:translate(-50%,-50%) scale(1);opacity:1;
+    visibility:visible;pointer-events:auto;
+    transition:transform .34s var(--sheet-ease),opacity .22s ease;}
   .sheet .grab{display:none;}
 
   /* El boton de agregar se queda en la columna de la lista, no encima del
@@ -1196,7 +1210,7 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
 
 /* ═══ CONFIG ═══ */
 var API="https://territory-manager-silk.vercel.app/api/territory";
-var APP_VERSION="2.30.0";
+var APP_VERSION="2.30.1";
 
 /* ═══════════════════════════════════════════════════════════════════════
    OFFLINE DATA LAYER

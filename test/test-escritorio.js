@@ -104,6 +104,21 @@ check('y abren en el centro exacto',
   /\.sheet\.open\{transform:translate\(-50%,-50%\)/.test(esc));
 check('sin la barrita de arrastrar',
   /\.sheet\s+\.grab\{display:none/.test(esc));
+/* Una hoja CERRADA aqui se queda en el centro con opacidad 0, y eso sigue
+   recibiendo clics. Eran nueve apiladas tragandose todo lo del medio: el clic
+   para poner un vertice en el mapa "no hacia nada". No lo vio ninguna prueba
+   porque todas pulsaban con .click(), que se salta quien esta encima. */
+check('una hoja cerrada NO atrapa clics',
+  /\.sheet\{[^}]*pointer-events:none/.test(esc),
+  (esc.match(/\.sheet\{[^}]*/) || [''])[0].slice(0, 90));
+check('ni se la alcanza con el teclado',
+  /\.sheet\{[^}]*visibility:hidden/.test(esc));
+check('y al abrirla vuelve a recibirlos',
+  /\.sheet\.open\{[^}]*pointer-events:auto/.test(esc));
+check('y vuelve a ser visible',
+  /\.sheet\.open\{[^}]*visibility:visible/.test(esc));
+check('el telefono no necesita nada de eso: la hoja cerrada se va de la pantalla',
+  /transform:translateY\(101%\)/.test(src));
 
 // ══ EL TELÉFONO NO SE TOCA ═════════════════════════════════════════════
 check('la hoja de teléfono sigue subiendo desde abajo',
