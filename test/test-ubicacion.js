@@ -389,6 +389,25 @@ check('solo se buscan las casas SIN coordenadas',
 check('se dice en voz alta que las direcciones salen a OpenStreetMap',
   /se envían a OpenStreetMap/.test(src),
   'es dato del grupo saliendo a un servicio de fuera: se pregunta antes');
+/* No es lo mismo "no encontre esa direccion" que "el servicio dejo de
+   contestar". Confundirlas le pegaria 43 veces mas a un servicio regalado, y
+   dejaria marcadas como "sin encontrar" casas que ni se llegaron a buscar. */
+check('un fallo del servicio se distingue de una direccion no encontrada',
+  /sirvio:false/.test(take('geoBuscar')) && /sirvio:true/.test(take('geoBuscar')));
+check('y una respuesta con error HTTP cuenta como fallo del servicio',
+  /if\(!r\.ok\)throw/.test(take('geoBuscar')),
+  'un 429 llega como respuesta, no como excepcion');
+check('cuando el servicio no contesta, la busqueda se para en seco',
+  /if\(!res\.sirvio\)\{[\s\S]{0,200}geoRun=null/.test(take('locateHouses')));
+check('y lo ya encontrado se guarda antes de parar',
+  /if\(!res\.sirvio\)\{[\s\S]{0,260}scheduleSync\(\)/.test(take('locateHouses')),
+  'al reintentar sigue donde se quedo: solo se buscan las que siguen sin ubicacion');
+
+// ── el credito que pide la licencia ───────────────────────────────────
+check('el mapa da credito a OpenStreetMap',
+  /L\.control\.attribution/.test(src) && /openstreetmap\.org\/copyright/.test(src),
+  'los mosaicos ya lo pedian, y ahora ademas se usan sus datos de direcciones');
+
 check('y se respeta el ritmo que pide el servicio',
   /setTimeout\(paso,1300\)/.test(src));
 
