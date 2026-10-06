@@ -413,10 +413,23 @@ module.exports = async (req, res) => {
 
     if (action === 'updateMe') {
       const u = await requireUser();
+      const email = String(body.email !== undefined ? body.email : u.email).trim();
+      /* El correo vacio se permite: quien no lo ponga sigue entrando con su
+         nombre, que es como entran todas las cuentas viejas. Pero si lo pone,
+         tiene que ser un correo y tiene que ser SUYO — dos cuentas con el mismo
+         dejarian el inicio de sesion a la suerte de cual encuentre primero el
+         servidor, y la segunda persona no podria entrar nunca. */
+      if (email && !looksLikeEmail(email))
+        return res.status(400).json({ error: 'Escribe un correo válido' });
+      if (email) {
+        const users = await rd(TABS.users);
+        if (emailTaken(users, email, u.id))
+          return res.status(400).json({ error: 'Ese correo ya es de otra cuenta' });
+      }
       const updated = Object.assign({}, u, {
         name: String(body.name || u.name).trim() || u.name,
         phone: String(body.phone !== undefined ? body.phone : u.phone).trim(),
-        email: String(body.email !== undefined ? body.email : u.email).trim(),
+        email: email,
         updatedAt: nowIso,
       });
       await wr(TABS.users, u._key, updated);

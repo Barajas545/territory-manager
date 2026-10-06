@@ -98,6 +98,49 @@ const tok = uid => sign({ uid, exp: now + 3600e3 });
   check('y con su teléfono', r.status === 200 && !!r.body.token, r.status);
   r = await T('', 'login', { login: 'ada@ejemplo.com', password: 'no-es' });
   check('con la contraseña mala no entra', r.status === 401, r.status);
+  r = await T('', 'login', { login: '  ADA@Ejemplo.COM  ', password: 'secreto1' });
+  check('da igual cómo se escriban mayúsculas y espacios',
+    r.status === 200 && !!r.body.token, r.status);
+
+  /* ══ LO QUE DEJÓ AL ADMINISTRADOR FUERA ════════════════════════════════
+     El servidor siempre aceptó el nombre —las dos comprobaciones de arriba lo
+     dicen— pero la pantalla dejó de mencionarlo cuando el correo pasó a ser el
+     usuario. Las cuentas creadas antes de ese cambio no tienen correo, así que
+     la pantalla les pedía algo que su cuenta no tiene, y el error hablaba de un
+     nombre que la pantalla ya no nombraba. El fallo vivía en el texto, y es ahí
+     donde se amarra. */
+  const html = require('fs').readFileSync(require('path').join(ROOT, 'index.html'), 'utf8');
+  check('la casilla de entrar dice que el nombre también sirve',
+    /Correo electrónico o tu nombre/.test(html),
+    (html.match(/<label for="auLogin">[^<]*/) || [''])[0]);
+  check('y no es type="email", que pelea con quien escribe su nombre',
+    !/id="auLogin" type="email"/.test(html));
+
+  // ══ ponerle el correo a una cuenta vieja ═══════════════════════════════
+  const VIEJO = tok(DB.Users.find(u => u.name === 'Hermano Antiguo').id);
+  r = await T(VIEJO, 'updateMe', { email: 'no-es-correo' });
+  check('un correo mal escrito se rechaza al guardarlo', r.status === 400,
+    JSON.stringify(r.body));
+  r = await T(VIEJO, 'updateMe', { email: 'ada@ejemplo.com' });
+  check('y uno que ya es de otra cuenta también', r.status === 400,
+    'dos cuentas con el mismo correo dejarían el inicio de sesión a la suerte');
+  r = await T(VIEJO, 'updateMe', { email: 'antiguo@ejemplo.com' });
+  check('el suyo propio sí se guarda', r.status === 200, JSON.stringify(r.body).slice(0, 60));
+  r = await T('', 'login', { login: 'antiguo@ejemplo.com', password: 'secreto2' });
+  check('y desde entonces entra con su correo', r.status === 200 && !!r.body.token, r.status);
+  r = await T('', 'login', { login: 'Hermano Antiguo', password: 'secreto2' });
+  check('sin dejar de entrar con su nombre', r.status === 200 && !!r.body.token, r.status);
+  r = await T(VIEJO, 'updateMe', { email: '' });
+  check('y puede quitárselo: se vuelve a entrar solo con el nombre',
+    r.status === 200 && !DB.Users.find(u => u.name === 'Hermano Antiguo').email,
+    JSON.stringify(r.body).slice(0, 50));
+  check('guardar el correo no estrena ninguna columna en Users',
+    Object.keys(DB.Users[0]).filter(k => k !== '_key').sort().join(',') ===
+      'active,createdAt,email,id,mustSetup,name,passHash,passSalt,phone,role,setupCode,updatedAt',
+    Object.keys(DB.Users[0]).filter(k => k !== '_key').sort().join(','));
+  check('hay por fin dónde ponerle el correo a una cuenta',
+    /team\("updateMe",\{email:/.test(html),
+    'updateMe existía en el servidor desde hace tiempo y nadie lo llamaba');
 
   // ══ el correo al crear una cuenta ══════════════════════════════════════
   r = await T(ADMIN, 'createUser', { name: 'Nuevo Uno', email: 'no-es-correo' });

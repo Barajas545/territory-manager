@@ -1268,7 +1268,7 @@ body.drawing .house-pin{pointer-events:none;}
 
 /* ═══ CONFIG ═══ */
 var API="https://territory-manager-silk.vercel.app/api/territory";
-var APP_VERSION="2.33.1";
+var APP_VERSION="2.34.0";
 
 /* ═══════════════════════════════════════════════════════════════════════
    OFFLINE DATA LAYER
@@ -4775,6 +4775,11 @@ function renderTeamCard(){
         '<span class="row-txt"><span class="row-t">Personas</span>'+
         '<span class="row-s">Agrega a alguien o restablece una contraseña</span></span>'+
         '<span class="row-act">›</span></button>':"")+
+    '<button class="row" id="tmMail"><span class="row-ico">\u{2709}\u{FE0F}</span>'+
+      '<span class="row-txt"><span class="row-t">Mi correo electrónico</span>'+
+      '<span class="row-s">'+(me&&me.email?esc(me.email)
+        :"Sin correo — por ahora entras con tu nombre")+'</span></span>'+
+      '<span class="row-act">›</span></button>'+
     '<button class="row" id="tmPw"><span class="row-ico">\u{1F511}</span>'+
       '<span class="row-txt"><span class="row-t">Cambiar mi contraseña</span></span>'+
       '<span class="row-act">›</span></button>'+
@@ -4791,6 +4796,7 @@ function renderTeamCard(){
   var imp=$("#tmImport");
   if(imp)imp.addEventListener("click",importMenu);
   $("#tmPw").addEventListener("click",openChangePassword);
+  var mm=$("#tmMail");if(mm)mm.addEventListener("click",openMyEmail);
   $("#tmOut").addEventListener("click",function(){
     var n=pendingCount();
     var warn=n
@@ -4812,7 +4818,7 @@ function drawAuth(mode){
   $("#auTitle").textContent=mode==="first"?"Crear la primera cuenta":mode==="code"?"Usar un código":"Iniciar sesión";
   $("#auSub").textContent=mode==="first"
     ?"Esta será la cuenta de administrador que agrega a los demás"
-    :mode==="code"?"Tu correo será tu usuario para entrar":"Entra con tu correo electrónico";
+    :mode==="code"?"Tu correo será tu usuario para entrar":"Entra con tu correo electrónico o tu nombre";
 
   var seg=teamHasUsers
     ? '<div class="seg"><button data-am="in" aria-selected="'+(mode==="in")+'">Entrar</button>'+
@@ -4840,9 +4846,14 @@ function drawAuth(mode){
       '<div class="f"><label for="auPw">Escoge una contraseña</label><input id="auPw" type="password" autocomplete="new-password"></div>'+
       '<button class="btn btn-p" id="auGo" style="width:100%">Crear mi cuenta</button>';
   }else{
-    form='<div class="f"><label for="auLogin">Correo electrónico</label>'+
-      '<input id="auLogin" type="email" autocomplete="username" autocapitalize="off" '+
-      'spellcheck="false" placeholder="tucorreo@ejemplo.com"></div>'+
+    /* "o tu nombre" no es un adorno: el servidor siempre acepto el nombre y el
+       telefono, y las cuentas creadas antes de que el correo fuera el usuario
+       no tienen correo guardado. Decir solo "correo" las dejaba fuera.
+       Tampoco type="email": en el telefono pelea con quien escribe su nombre.
+       inputmode deja el teclado comodo sin estorbar. */
+    form='<div class="f"><label for="auLogin">Correo electrónico o tu nombre</label>'+
+      '<input id="auLogin" type="text" inputmode="email" autocomplete="username" '+
+      'autocapitalize="off" spellcheck="false" placeholder="tucorreo@ejemplo.com"></div>'+
       '<div class="f"><label for="auPw">Contraseña</label><input id="auPw" type="password" autocomplete="current-password"></div>'+
       '<button class="btn btn-p" id="auGo" style="width:100%">Iniciar sesión</button>';
   }
@@ -4880,7 +4891,7 @@ function drawAuth(mode){
     }else{
       act="login";
       payload={login:$("#auLogin").value.trim(),password:pw};
-      if(!payload.login){err.textContent="Escribe tu correo electrónico";return;}
+      if(!payload.login){err.textContent="Escribe tu correo electrónico o tu nombre";return;}
     }
     if(act!=="login"&&pw.length<6){err.textContent="La contraseña debe tener al menos 6 caracteres";return;}
     btn.disabled=true;btn.textContent="Espera…";
@@ -4903,6 +4914,34 @@ function drawAuth(mode){
       btn.disabled=false;btn.textContent=label;
     });
   });
+}
+
+/* Ponerle el correo a una cuenta. Hacia falta de verdad: las cuentas creadas
+   antes de que el correo fuera el usuario no lo tienen, y sin esto no habia
+   ninguna manera de que lo llegaran a tener. */
+function openMyEmail(){
+  $("#pTitle").textContent="Mi correo electrónico";
+  $("#pSub").textContent="Es con lo que entras a la app";
+  $("#pBody").innerHTML=
+    '<div class="f"><label for="meMail">Correo electrónico</label>'+
+    '<input id="meMail" type="text" inputmode="email" autocapitalize="off" spellcheck="false" '+
+    'placeholder="tucorreo@ejemplo.com" value="'+esc((me&&me.email)||"")+'"></div>'+
+    '<div class="hint">Tu nombre sigue sirviendo para entrar, aunque pongas un correo.</div>'+
+    '<button class="btn btn-p" id="meGo" style="width:100%">Guardar</button>'+
+    '<div id="meErr" style="color:var(--bad);font-size:13.5px;margin-top:10px"></div>';
+  $("#meGo").addEventListener("click",function(){
+    var b=this,v=$("#meMail").value.trim();
+    $("#meErr").textContent="";
+    if(v&&!looksLikeEmail(v)){$("#meErr").textContent="Escribe un correo válido";return;}
+    b.disabled=true;
+    team("updateMe",{email:v}).then(function(r){
+      if(r&&r.user)me=r.user;
+      closeSheet("#sh-pick");
+      renderTeamCard();
+      toast(v?"Correo guardado ✓":"Correo quitado");
+    }).catch(function(e){$("#meErr").textContent=e.message;b.disabled=false;});
+  });
+  openSheet("#sh-pick");
 }
 
 function openChangePassword(){
