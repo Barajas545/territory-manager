@@ -485,6 +485,8 @@ body.drawing #pttWrap,body.drawing #nextCard{display:none !important;}
   pointer-events:none;-webkit-touch-callout:none;user-select:none;}
 .tc-map polygon{fill:rgba(21,101,192,.13);stroke:#1565C0;stroke-width:2.4;stroke-linejoin:round;}
 .tc-map circle{stroke:#fff;stroke-width:1.3;}
+/* --c-dnv llega con los colores del servidor; sin señal al abrir, el rojo. */
+.tc-map circle.tc-dnv{fill:var(--c-dnv,#B42318);}
 .tc-nomap{display:flex;align-items:center;justify-content:center;
   font-size:13px;color:var(--text-3);}
 .tc-body{padding:11px 14px 13px;}
@@ -1304,7 +1306,7 @@ body.drawing .house-pin{pointer-events:none;}
 
 /* ═══ CONFIG ═══ */
 var API="https://territory-manager-silk.vercel.app/api/territory";
-var APP_VERSION="2.36.0";
+var APP_VERSION="2.37.0";
 
 /* ═══════════════════════════════════════════════════════════════════════
    OFFLINE DATA LAYER
@@ -2984,6 +2986,12 @@ function doSync(manual){
     if(r.busy){clearTimeout(syncTimer);syncTimer=setTimeout(function(){doSync(manual);},1500);return;}
     if(r.ok){
       records=buildRecords();
+      /* Un territorio que ya no esta —se lo quitaron, lo renombraron en otro
+         telefono, o el recordado dejo de ser suyo— dejaba la lista vacia sin
+         decir por que. Se vuelve a "Todos". */
+      if(terrFilter!=="all"&&terrFilter!==RV_TERR&&!guestMode&&!drawing&&!terrMap()[terrFilter]){
+        terrFilter="all";forgetTerr();
+      }
       renderHouses();renderRV();refreshMapPins();buildTerrSub();
       maybeEntryPick();
       if(r.conflicts&&r.conflicts.length){
@@ -3101,16 +3109,20 @@ function miniFrame(pts,W,H,pad){
 
 /* Lo que una tarjeta necesita saber de un territorio. "polys" es una lista de
    contornos porque la tarjeta de "Todos" los lleva todos. */
-function terrCardData(key,label,houses,polys,ocultas){
+function terrCardData(key,label,houses,polys,ocultas,todas){
   var pts=[],sin=0,nunca=0,atras=0;
   houses.forEach(function(h){
-    var s=visitStatus(h.HouseLastVisitDate);
+    var s=visitStatus(h.HouseLastVisitDate), dnv=dnvState(h).on;
     /* Una puerta No visitar no esta pendiente: contarla como "nunca visitada"
-       invitaba a ir justo ahi. */
-    if(!dnvState(h).on){if(s==="never")nunca++;else if(s==="overdue")atras++;}
+       invitaba a ir justo ahi. En el mapita va de su propio color. */
+    if(!dnv){if(s==="never")nunca++;else if(s==="overdue")atras++;}
     var g=parseGPS(h.HouseGPSCoordinates);
-    if(g)pts.push({lat:g.lat,lng:g.lng,s:s});else sin++;
+    if(g)pts.push({lat:g.lat,lng:g.lng,s:dnv?"dnv":s});
   });
+  /* "Sin ubicacion" cuenta TODAS las casas, las del censo incluidas, como el
+     boton de ubicar: si no, la tarjeta de Paso Robles decia un numero y el
+     boton otro. */
+  (todas||houses).forEach(function(h){if(!parseGPS(h.HouseGPSCoordinates))sin++;});
   var t=teamTerritories.find(function(x){return x.name===key;})||{};
   // Un vertice que no es un par de numeros no entra: [null,null] seria (0,0).
   var esPunto=function(q){return Array.isArray(q)&&typeof q[0]==="number"&&typeof q[1]==="number";};
@@ -3157,8 +3169,9 @@ function miniMapHTML(d){
     }).join("")+
     d.polys.map(function(b){return '<polygon points="'+b.map(punto).join(" ")+'"/>';}).join("")+
     d.pts.map(function(q){
-      var p=f.px(q.lat,q.lng);
-      return '<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="3.6" fill="'+pinColor(q.s)+'"/>';
+      var p=f.px(q.lat,q.lng), xy='cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="3.6"';
+      // La No visitar, del mismo color que en la lista.
+      return q.s==="dnv"?'<circle class="tc-dnv" '+xy+'/>':'<circle '+xy+' fill="'+pinColor(q.s)+'"/>';
     }).join("")+
   '</svg>';
 }
@@ -3180,7 +3193,10 @@ function terrCardHTML(d){
   if(d.sin)tags.push('<span class="tc-tag">'+d.sin+' sin ubicación</span>');
   // Las del censo no salen en la lista con el censo apagado: se dicen aparte.
   if(d.ocultas)tags.push('<span class="tc-tag">+'+d.ocultas+' del censo</span>');
-  return '<button class="tcard'+(terrFilter===d.key?" on":"")+'" data-terr="'+esc(d.key)+'">'+
+  var sel=terrFilter===d.key;
+  // Que la escogida lo diga tambien al lector de pantalla, no solo con el color.
+  return '<button class="tcard'+(sel?" on":"")+'"'+(sel?' aria-current="true"':'')+
+    ' data-terr="'+esc(d.key)+'">'+
     miniMapHTML(d)+
     '<span class="tc-body">'+
       '<span class="tc-name">'+esc(d.label)+'</span>'+
@@ -3215,12 +3231,12 @@ function openTerrPicker(titulo){
       var v=m[t].filter(seVe);
       return terrCardHTML(terrCardData(t,t==="Unassigned"?"Sin territorio":t,v,
         [(teamTerritories.find(function(x){return x.name===t;})||{}).bounds],
-        m[t].length-v.length));
+        m[t].length-v.length,m[t]));
     }).join("")+
     /* No scopeLabel(): a quien tiene un solo territorio le devuelve el nombre
        de ese territorio, y saldrian dos tarjetas que se llaman igual. */
     terrCardHTML(terrCardData("all",scope.kind==="admin"?"Todos los territorios"
-      :"Todos mis territorios",vistas,todas,records.length-vistas.length))+
+      :"Todos mis territorios",vistas,todas,records.length-vistas.length,records))+
     (rvN?pickerRow("Mis Revisitas",rvN+(rvN===1?" casa":" casas"),
       'data-terr="'+RV_TERR+'"'):"")+
   '</div>'+
@@ -3241,13 +3257,69 @@ function openTerrPicker(titulo){
    tarjetas saldrian en cero. Por eso se pregunta desde los dos sitios, y la
    primera vez que se puede decidir, se decide para toda la apertura. */
 var entryPickDone=false;
-function maybeEntryPick(){
+
+/* ── recordar el ultimo territorio, dentro de la misma salida ────────────
+   El telefono cierra la app en segundo plano cuando quiere, y cada vez que se
+   volvia a abrir empezaba en "Todos" y ofrecia otra vez las tarjetas: a media
+   calle, eso es buscar el territorio cada vez que se desbloquea el telefono.
+
+   Se guarda en el TELEFONO y no en SharePoint: UserPrefs tiene columnas fijas,
+   y agregarle una rompe todas las escrituras de cuentas. */
+var TERR_KEY="tm_terr";
+/* Tres horas SIN USAR la app es otra salida. La hora se refresca cada vez que
+   la app se va a segundo plano, asi que quien escogio a las 9 y trabaja hasta
+   las 2 sigue igual a las 2 y media; y la semana siguiente no abre en el
+   territorio de la semana pasada. */
+var TERR_GAP=3*3600e3;
+function terrMemo(){
+  try{
+    var m=JSON.parse(localStorage.getItem(TERR_KEY)||"null");
+    return m&&typeof m.t==="string"&&typeof m.at==="number"?m:null;
+  }catch(e){return null;}
+}
+function terrMemoFresh(){var m=terrMemo();return m&&Date.now()-m.at<TERR_GAP?m:null;}
+function forgetTerr(){try{localStorage.removeItem(TERR_KEY);}catch(e){}}
+function rememberTerr(){
+  /* El invitado tiene su territorio de su paquete: nada que recordar. Y
+     "Mis Revisitas" no se guarda: sin sesion confirmada, myRVs devuelve las
+     revisitas de TODOS, y al abrir se verian las de otros por un momento. */
+  if(guestMode||!authToken)return;
+  var t=terrFilter===RV_TERR?"all":terrFilter;
+  var u=me?me.id:((terrMemo()||{}).u||"");
+  try{localStorage.setItem(TERR_KEY,JSON.stringify({t:t,at:Date.now(),u:u}));}catch(e){}
+}
+// Al irse a segundo plano se refresca la hora, si hay algo recordado.
+function touchTerrMemo(){if(terrMemo())rememberTerr();}
+
+/* Al abrir: si hay un territorio de ESTA salida, se vuelve a el sin preguntar.
+   Corre antes del primer pintado y sin red, con las casas guardadas en el
+   telefono: en el campo muchas veces no hay señal, y asi la lista abre ya en
+   el territorio, sin parpadear por "Todos".
+
+   Mira guestMode Y el enlace ?g=: un invitado que vuelve ya tiene guestMode
+   cuando corre esto, pero uno que llega por enlace todavia no, porque eso es
+   asincrono. */
+function restoreTerrMemo(){
+  if(guestMode||guestCodeFromUrl()||!authToken)return;
+  var m=terrMemo();
+  if(!m)return;
+  if(Date.now()-m.at>=TERR_GAP){forgetTerr();return;}   // otra salida: se pregunta como siempre
+  if(m.t!=="all"&&!terrMap()[m.t]){forgetTerr();return;} // ya no esta en este telefono
+  terrFilter=m.t;
+  entryPickDone=true;                                    // ya escogio en esta salida
+}
+
+/* "nuevaSalida": volver a la app despues de horas en segundo plano, sin que el
+   telefono la cerrara. Ahi el territorio de antes sigue puesto, y aun asi es
+   momento de preguntar. */
+function maybeEntryPick(nuevaSalida){
   if(entryPickDone)return;
   if(!scope.at||!records.length)return;          // todavia no se sabe lo suficiente
   entryPickDone=true;
   if(guestMode||simpleMode||needsAuth||!me)return;
   if(scope.kind==="numbers")return;
-  if(terrFilter!=="all")return;                   // ya escogio
+  if(nuevaSalida!==true&&terrFilter!=="all")return;   // ya escogio
+  if(terrMemoFresh())return;                      // escogio en esta misma salida
   if(openSheets.length)return;                    // esta haciendo otra cosa
   if(Object.keys(terrMap()).filter(function(t){return t!=="Unassigned";}).length<2)return;
   openTerrPicker("¿Qué territorio vas a trabajar?");
@@ -3372,6 +3444,7 @@ $("#pBody").addEventListener("click",function(e){
     if(drawing&&!cancelDrawBounds())return;
     // Los pines tambien cambian con el territorio, no solo el encuadre.
     terrFilter=b.dataset.terr;closeSheet("#sh-pick");
+    rememberTerr();
     renderHouses();refreshMapPins();drawBounds();fitPins();refreshCoverage();
     stopPresence();updatePttVisibility();loadHeld();
     if(routeOn)drawRoute();
@@ -4895,6 +4968,11 @@ function setSession(tok,user){
      La cola NO se borra —eso lo hace "Devolver los numeros", no esto—: lo que
      ya estaba anotado en este telefono se sube con la cuenta de quien entro. */
   if(tok&&guestMode)endGuestChrome();
+  /* La memoria del territorio es de quien lo escogio: si entra otra persona en
+     este telefono, no hereda el territorio de la anterior. (signOut llama con
+     user null: por eso se mira que haya user.) */
+  var mm=terrMemo();
+  if(user&&mm&&mm.u&&mm.u!==user.id)forgetTerr();
   authToken=tok||"";me=user||null;
   try{tok?localStorage.setItem("tm_token",tok):localStorage.removeItem("tm_token");}catch(e){}
   renderTeamCard();
@@ -4911,6 +4989,13 @@ function signOut(silent){
   /* Los territorios y las personas tambien: si no, las tarjetas enseñarian los
      dueños de la cuenta anterior hasta que contestara el servidor. */
   teamTerritories=[];teamUsers=[];
+  /* Y lo que se decidio para esa cuenta: el territorio —escogido y recordado—,
+     el alcance y la decision de ofrecer las tarjetas. Si no, quien salia y
+     volvia a entrar sin recargar ya no veia las tarjetas, y la siguiente
+     persona heredaba el territorio de la anterior. */
+  forgetTerr();terrFilter="all";entryPickDone=false;
+  scope={kind:"unknown",territories:[],owned:[],canCreate:true,canDelete:true,
+    canHandOut:true,empty:false,reason:"",at:0};
   Promise.all([idb.clear(S_MIRROR),idb.clear(S_PENDING)]).catch(function(){});
   renderHouses();renderRV();updateSyncUI();refreshWorkingBtn();refreshHeldBtn();refreshChrome();
   if(mapReady)refreshMapPins();
@@ -5691,6 +5776,10 @@ function renameTerritory(viejo){
        parchar cada cosa, se vuelve a leer — es una operacion de una vez al
        año y asi no queda ningun rincon con el nombre anterior. */
     if(terrFilter===viejo)terrFilter=r.to;
+    /* Lo recordado tambien: si no, el siguiente arranque buscaria un nombre que
+       ya no existe. */
+    var mm=terrMemo();
+    if(mm&&mm.t===viejo){mm.t=r.to;try{localStorage.setItem(TERR_KEY,JSON.stringify(mm));}catch(e){}}
     closeSheet("#sh-pick");
     toast("Ahora se llama "+r.to+" ✓");
     loadTeam();
@@ -7307,6 +7396,8 @@ function boot(){
 
   loadLocal().then(function(){
     records=buildRecords();
+    // El territorio de esta salida, antes de pintar nada y sin esperar la red.
+    restoreTerrMemo();
     renderHouses();renderRV();buildTerrSub();updateSyncUI();
     restoreDrafts();
     // Ask to keep our data off the eviction list. Best-effort; ignore refusal.
@@ -7450,8 +7541,16 @@ function restoreDrafts(){
   openSheet("#sh-pick");
 }
 window.addEventListener("pagehide",stashDrafts);
+window.addEventListener("pagehide",touchTerrMemo);
 document.addEventListener("visibilitychange",function(){
-  if(document.visibilityState==="hidden")stashDrafts();
+  if(document.visibilityState==="hidden"){stashDrafts();touchTerrMemo();return;}
+  /* Volver despues de horas en segundo plano sin que el telefono cerrara la
+     app tambien es otra salida. Se lee la hora ANTES de cualquier otra cosa:
+     touchTerrMemo solo corre al irse, asi que aqui todavia dice cuando se fue. */
+  var m=terrMemo();
+  if(m&&Date.now()-m.at>=TERR_GAP){
+    forgetTerr();entryPickDone=false;maybeEntryPick(true);
+  }
 });
 
 boot();

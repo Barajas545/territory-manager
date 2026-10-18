@@ -217,6 +217,27 @@ check('el service worker sigue sin guardar respuestas opacas',
   /res\.type !== 'opaque'/.test(sw),
   'no puede ver si una opaca es un mosaico o una página de error');
 
+/* "Sin ubicación" cuenta TODAS las casas, las del censo incluidas, como el
+   botón de ubicar. Antes la tarjeta de Paso Robles decía un número y el botón
+   otro. */
+const conCenso = datos.terrCardData('PR3', 'PR3', [casa('', '')], [], 2,
+  [casa('', ''), casa('', ''), casa('', ''), casa('35.6, -120.66', '')]);
+check('"sin ubicación" cuenta también las del censo, como el botón de ubicar',
+  conCenso.sin === 3, conCenso.sin);
+check('pero el mapita solo pinta las que enseña la lista',
+  conCenso.pts.length === 0, conCenso.pts.length);
+
+/* La No visitar va en el mapita de su propio color, no como "nunca visitada". */
+const conDnv = datos.terrCardData('A4', 'A4',
+  [Object.assign(casa('35.47, -120.66', ''), { dnv: true }), casa('35.471, -120.661', '')], []);
+check('una puerta No visitar se marca como tal en el mapita',
+  conDnv.pts.some(q => q.s === 'dnv') && conDnv.pts.some(q => q.s === 'never'));
+html = dib.miniMapHTML({ polys: [], pts: conDnv.pts });
+check('y se pinta con la clase de No visitar, no con el gris de "nunca"',
+  /<circle class="tc-dnv"/.test(html));
+check('con el rojo de respaldo si los colores del servidor no han llegado',
+  /circle\.tc-dnv\{fill:var\(--c-dnv,#B42318\)/.test(src));
+
 // Cerrar sesión no deja los territorios de la cuenta anterior.
 check('cerrar sesión vacía los territorios y las personas',
   /teamTerritories=\[\];teamUsers=\[\];/.test(take('signOut')),
@@ -256,6 +277,8 @@ check('la tarjeta lleva data-terr: la escoge el mismo manejador de siempre',
   'así hereda la pregunta de no perder un límite a medio dibujar');
 check('la que se está viendo va marcada', / on"/.test(ver('admin', d, 'A4')));
 check('y las demás no', !/ on"/.test(ver('admin', d, 'otro')));
+check('marcada también para el lector de pantalla, no solo con el color',
+  /aria-current="true"/.test(ver('admin', d, 'A4')) && !/aria-current/.test(ver('admin', d, 'otro')));
 
 // ══ cuándo se ofrecen solas al entrar ══════════════════════════════════
 const decide = cambios => {
@@ -267,6 +290,8 @@ const decide = cambios => {
     terrFilter: 'all', openSheets: [],
     terrMap() { const m = {}; c.records.forEach(h => { m[h.HouseTerritoryNumber] = 1; }); return m; },
     openTerrPicker(t) { abiertas.push(t); },
+    // Sin memoria de esta salida: el caso de siempre. Lo recordado se prueba en test-recordar.js.
+    terrMemoFresh: () => null,
   }, cambios);
   vm.createContext(c);
   vm.runInContext(take('maybeEntryPick'), c);
@@ -297,7 +322,7 @@ check('una vez decidido, no vuelve a salir en toda la apertura',
   !decide({ entryPickDone: true }).abrio);
 check('se pregunta desde los dos sitios: al saber quién es y al tener las casas',
   /drawBounds\(\);refreshCoverage\(\);\s*maybeEntryPick\(\);/.test(src) &&
-  /records=buildRecords\(\);\s*renderHouses\(\);renderRV\(\);refreshMapPins\(\);buildTerrSub\(\);\s*maybeEntryPick\(\);/.test(src));
+  /records=buildRecords\(\);[\s\S]{0,500}?renderHouses\(\);renderRV\(\);refreshMapPins\(\);buildTerrSub\(\);\s*maybeEntryPick\(\);/.test(src));
 
 // ══ el botón de arriba y la hoja ═══════════════════════════════════════
 /* openTerrPicker es manejador de clic de #scopeBtn: le llega el evento como
