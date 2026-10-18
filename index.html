@@ -1273,7 +1273,7 @@ body.drawing .house-pin{pointer-events:none;}
 
 /* ═══ CONFIG ═══ */
 var API="https://territory-manager-silk.vercel.app/api/territory";
-var APP_VERSION="2.35.0";
+var APP_VERSION="2.35.1";
 
 /* ═══════════════════════════════════════════════════════════════════════
    OFFLINE DATA LAYER
@@ -3795,15 +3795,24 @@ function geoAceptar(h,r){
      de casa—, y aceptarlo pondria la casa a cuadras de donde es. */
   var num=(String(h.HouseAddress||"").match(/^\s*(\d+[A-Za-z]?)/)||[])[1]||"";
   if(!num||normLang(a.house_number)!==normLang(num))return null;
-  // 2. El codigo postal: atrapa la calle que se llama igual en otro pueblo.
-  if(String(a.postcode||"").slice(0,5)!==String(h.HouseZIP||"").slice(0,5))return null;
   // 3. El nombre de la calle, ya sin el tipo de via.
   var nuestra=calleNorm(h.HouseAddress), suya=calleNorm(a.road);
   if(nuestra&&suya&&nuestra!==suya)return null;
   /* 4. El pueblo, cuando lo dice. Solo rechaza si CONTESTA otro pueblo: una
      direccion rural puede venir sin pueblo y eso no la hace sospechosa. */
   var pueblo=a.city||a.town||a.village||"";
-  if(pueblo&&h.HouseCity&&normLang(pueblo)!==normLang(h.HouseCity))return null;
+  var mismoPueblo=!!(pueblo&&h.HouseCity&&normLang(pueblo)===normLang(h.HouseCity));
+  if(pueblo&&h.HouseCity&&!mismoPueblo)return null;
+  /* 2. El codigo postal. Si coincide, basta. Si no coincide se perdona SOLO
+     cuando el servicio dice positivamente que es el mismo pueblo: hay pueblos
+     con dos codigos —Atascadero tiene 93422 y 93423— y el de la hoja no
+     siempre es el bueno. Probado: cinco casas de Atascadero 4 con edificio,
+     numero y calle exactos salian rechazadas porque el servicio decia 93423 y
+     la hoja 93422, que ademas puse yo para todo el territorio al capturarla.
+     Lo que esta regla protegia —la calle igual en OTRO pueblo— lo atrapa la
+     regla del pueblo de arriba. Y callado y con otro codigo, se rechaza. */
+  var cpBien=String(a.postcode||"").slice(0,5)===String(h.HouseZIP||"").slice(0,5);
+  if(!cpBien&&!mismoPueblo)return null;
   /* Lo que NO se exige: que el punto caiga dentro del limite marcado. La propia
      hoja de Atascadero 4 trae "10820 Colorado Rd — fuera del area marcada en el
      mapa": hay casas que de verdad quedan fuera, y esa regla las rechazaria. */

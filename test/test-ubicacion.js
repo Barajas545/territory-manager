@@ -342,6 +342,30 @@ check('el mismo número y la misma calle en otro código postal se rechaza',
   geo.geoAceptar(casa('8550 San Andres Ave'), OTRO_PUEBLO) === null,
   'por aquí hay calles que se llaman igual en dos pueblos');
 
+/* ── un pueblo con DOS códigos postales ─────────────────────────────────
+   Respuesta REAL del servicio para 7420 Atascadero Ave: edificio exacto,
+   número exacto, calle exacta, Atascadero... y 93423. La hoja decía 93422,
+   que además se puso igual para todo el territorio al capturarla. Con la regla
+   estricta, cinco casas buenas de Atascadero 4 se quedaban sin ubicar. */
+const ATASCADERO_93423 = { lat: '35.4778546', lon: '-120.6660432', addresstype: 'building',
+  address: { house_number: '7420', road: 'Atascadero Avenue', city: 'Atascadero',
+    postcode: '93423' } };
+check('mismo pueblo con otro código postal SÍ se acepta',
+  !!geo.geoAceptar(casa('7420 Atascadero Ave'), ATASCADERO_93423),
+  'Atascadero tiene 93422 y 93423; el de la hoja no siempre es el bueno');
+const CALLADO_OTRO_CP = { lat: '35.4778', lon: '-120.6660', addresstype: 'building',
+  address: { house_number: '7420', road: 'Atascadero Avenue', postcode: '93401' } };
+check('pero otro código postal SIN decir pueblo se rechaza',
+  geo.geoAceptar(casa('7420 Atascadero Ave'), CALLADO_OTRO_CP) === null,
+  'callado y distinto es demasiado poco para fiarse');
+
+/* Respuesta REAL para 7850 Morro Rd: el centro de OTRA calle, "Old Morro
+   Road", sin número. Dos reglas la atrapan a la vez. */
+const OLD_MORRO = { lat: '35.4472115', lon: '-120.7045496', addresstype: 'road',
+  address: { road: 'Old Morro Road', city: 'Atascadero', postcode: '93422' } };
+check('la respuesta real de Morro Rd —el centro de "Old Morro Road"— se rechaza',
+  geo.geoAceptar(casa('7850 Morro Rd'), OLD_MORRO) === null);
+
 // ── otra calle con nuestro número ─────────────────────────────────────
 const OTRA_CALLE = { lat: '35.4687', lon: '-120.6549', addresstype: 'building',
   address: { house_number: '8550', road: 'Cason Street', city: 'Atascadero',
