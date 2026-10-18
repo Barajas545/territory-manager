@@ -138,6 +138,45 @@ const tok = uid => sign({ uid, exp: now + 3600e3 });
     Object.keys(DB.Users[0]).filter(k => k !== '_key').sort().join(',') ===
       'active,createdAt,email,id,mustSetup,name,passHash,passSalt,phone,role,setupCode,updatedAt',
     Object.keys(DB.Users[0]).filter(k => k !== '_key').sort().join(','));
+  /* ══ EL MODO INVITADO TENÍA QUE TENER SALIDA ══════════════════════════
+     Un token de invitado caducado dejaba el navegador pegado: signOut no borra
+     el modo invitado, así que al recargar restoreGuest lo volvía a poner con
+     el mismo token muerto. Y la cabecera solo ofrecía "Crear cuenta" — nada
+     que dijera iniciar sesión, que es lo que necesita quien YA tiene cuenta. */
+  check('la cabecera de invitado ofrece INICIAR SESIÓN',
+    /id="ghSignIn"/.test(html),
+    'sin esto, quien ya tiene cuenta no tiene puerta');
+  check('y sigue ofreciendo crear una', /id="ghAccount"/.test(html));
+  check('el botón abre la hoja de entrar, no la de códigos',
+    /ghSignIn[\s\S]{0,200}drawAuth\("in"\)/.test(html));
+
+  /* Entrar con cuenta propia tiene que TERMINAR el modo invitado. Si la llave
+     tm_guest se queda, al recargar restoreGuest vuelve a entrar en modo
+     invitado y encima pisa el token bueno con el muerto: la sesión recién
+     iniciada se evaporaba en la siguiente recarga. */
+  check('entrar con una cuenta termina el modo invitado',
+    /function setSession\(tok,user\)\{[\s\S]{0,600}if\(tok&&guestMode\)endGuestChrome\(\)/.test(html));
+  check('y eso borra las llaves de invitado del almacén',
+    /function endGuestChrome\(\)\{[\s\S]{0,400}removeItem\("tm_guest"\)/.test(html));
+  /* Pero NO la cola: que alguien inicie sesión no es razón para tirar visitas
+     que ya estaban escritas en el teléfono. Eso lo hace "Devolver los
+     números", que para eso pregunta antes. */
+  const endChrome = (html.match(/function endGuestChrome\(\)\{[\s\S]*?\n\}/) || [''])[0];
+  check('entrar NO tira lo que quedó anotado sin enviar',
+    !/pending=\{\}/.test(endChrome) && !/S_PENDING/.test(endChrome),
+    'devolver los números sí lo tira, y por eso pregunta antes');
+  const leave = (html.match(/function leaveGuest\(\)\{[\s\S]*?\n\}/) || [''])[0];
+  check('y devolver los números sí la vacía',
+    /pending=\{\}/.test(leave) && /S_PENDING/.test(leave));
+
+  /* El letrero decía el error del API —"Esta no es una sesión de invitado"—
+     como si fuera una razón, y prometía trabajo pendiente que no existía. */
+  check('un token muerto se explica con una frase de persona',
+    /e\.status===401[\s\S]{0,400}guestEnded="Esta sesión de invitado ya terminó\."/.test(html));
+  check('y lo de "sigue aquí" solo sale si de verdad hay algo sin enviar',
+    /guestEnded\?'<div class="gh-msg gh-over">'\+esc\(guestEnded\)\+\s*\n?\s*\(pendingCount\(\)\?/.test(html),
+    (html.match(/gh-msg gh-over[^\n]*/) || [''])[0]);
+
   check('hay por fin dónde ponerle el correo a una cuenta',
     /team\("updateMe",\{email:/.test(html),
     'updateMe existía en el servidor desde hace tiempo y nadie lo llamaba');

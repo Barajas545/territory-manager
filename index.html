@@ -553,8 +553,13 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
   gap:10px;margin-bottom:11px;}
 #guestHead .gh-badge{font-size:12px;font-weight:800;letter-spacing:.1em;
   color:var(--text-3);}
+#guestHead .gh-btns{display:flex;gap:8px;flex:0 0 auto;}
 #guestHead .gh-acct{height:34px;padding:0 13px;border-radius:var(--r-full);
   background:var(--brand);color:var(--brand-ink);font-size:13px;font-weight:750;flex:0 0 auto;}
+/* La de iniciar sesion mas discreta: la mayoria de quien llega aqui no tiene
+   cuenta, pero quien la tiene necesita verla. */
+#guestHead .gh-in{background:transparent;color:var(--text);
+  border:1px solid var(--border-strong);}
 #guestHead .gh-top{display:flex;align-items:center;gap:11px;}
 #guestHead .gh-txt{flex:1;min-width:0;}
 #guestHead .gh-from{display:block;font-size:16px;font-weight:750;line-height:1.2;}
@@ -1268,7 +1273,7 @@ body.drawing .house-pin{pointer-events:none;}
 
 /* ═══ CONFIG ═══ */
 var API="https://territory-manager-silk.vercel.app/api/territory";
-var APP_VERSION="2.34.0";
+var APP_VERSION="2.35.0";
 
 /* ═══════════════════════════════════════════════════════════════════════
    OFFLINE DATA LAYER
@@ -4643,6 +4648,13 @@ function team(action,payload){
 }
 
 function setSession(tok,user){
+  /* Entrar con cuenta propia termina el modo invitado. Sin esto, al recargar
+     restoreGuest() corre antes que nada, vuelve a poner el modo invitado y
+     pisa el token bueno con el de invitado: la sesion recien iniciada se
+     evaporaba en la siguiente recarga.
+     La cola NO se borra —eso lo hace "Devolver los numeros", no esto—: lo que
+     ya estaba anotado en este telefono se sube con la cuenta de quien entro. */
+  if(tok&&guestMode)endGuestChrome();
   authToken=tok||"";me=user||null;
   try{tok?localStorage.setItem("tm_token",tok):localStorage.removeItem("tm_token");}catch(e){}
   renderTeamCard();
@@ -6827,9 +6839,16 @@ function drawGuestHead(){
   head.innerHTML=
     /* Says plainly which kind of user this is, and offers the way out of it.
        Somebody helping for an afternoon may not know an account is possible. */
+    /* Dos puertas, no una. Antes solo estaba "Crear cuenta", y esa hoja ofrece
+       "Ya tengo un codigo" — nada que diga iniciar sesion. Quien YA tiene
+       cuenta se quedaba atorado aqui: la unica salida visible decia "Devolver
+       los numeros", que suena a perder el trabajo. */
     '<div class="gh-bar">'+
       '<span class="gh-badge">INVITADO</span>'+
-      '<button class="gh-acct" id="ghAccount">Crear cuenta</button>'+
+      '<span class="gh-btns">'+
+        '<button class="gh-acct gh-in" id="ghSignIn">Iniciar sesión</button>'+
+        '<button class="gh-acct" id="ghAccount">Crear cuenta</button>'+
+      '</span>'+
     '</div>'+
     '<div class="gh-top">'+
       '<span class="who">'+esc(initials(from))+'</span>'+
@@ -6841,8 +6860,11 @@ function drawGuestHead(){
       '</span>'+
     '</div>'+
     (msg?'<div class="gh-msg">'+esc(msg)+'</div>':"")+
+    /* Lo de "sigue aqui" solo cuando de verdad queda algo sin enviar: decirlo
+       con la cola vacia hace creer que hay trabajo esperando que no existe. */
     (guestEnded?'<div class="gh-msg gh-over">'+esc(guestEnded)+
-      ' Lo que escribiste sigue aquí — mándalo cuando tengas señal.</div>':"")+
+      (pendingCount()?' Lo que escribiste sigue aquí — mándalo cuando tengas señal.':"")+
+      '</div>':"")+
     /* The sync pill lives in a bar this screen does not have, so say it here.
        Somebody who has walked a street with no signal needs to know their
        afternoon is still on the phone waiting, not lost. */
@@ -6853,6 +6875,9 @@ function drawGuestHead(){
       :"")+
     '<button class="gh-back" id="ghBack">Devolver los números</button>';
   $("#ghAccount").addEventListener("click",showHowToJoin);
+  $("#ghSignIn").addEventListener("click",function(){
+    teamHasUsers=true;openSheet("#sh-auth");drawAuth("in");
+  });
   $("#ghBack").addEventListener("click",function(){
     var n=pendingCount();
     if(confirm(n?("Tienes "+n+" visita"+(n===1?"":"s")+" sin enviar.\n\nSe van a perder. ¿Devolver los números de todos modos?")
@@ -6884,6 +6909,11 @@ function restoreGuest(){
     if(netOffline(e)){
       // No signal. Everything they have is on this phone and stays there.
       guestEnded="";
+    }else if(e.status===401){
+      /* El token de invitado ya no vale: esta sesion no va a poder sincronizar
+         nunca mas. El mensaje del API —"Esta no es una sesion de invitado"— es
+         una respuesta de servidor, no una razon, y se enseñaba tal cual. */
+      guestEnded="Esta sesión de invitado ya terminó.";
     }else{
       // The server answered, and the answer was no. Say so and leave the work
       // on the phone rather than deleting it under them.
@@ -6893,16 +6923,26 @@ function restoreGuest(){
   });
   return true;
 }
-function leaveGuest(){
-  guestMode=false;guestInfo=null;authToken="";
+/* Quitarle al telefono la ropa de invitado, sin tocar lo que haya anotado.
+   Lo usan los dos caminos de salir: entrar con una cuenta, y devolver los
+   numeros — pero solo el segundo tira la cola. */
+function endGuestChrome(){
+  guestMode=false;guestInfo=null;guestEnded="";
   try{localStorage.removeItem("tm_guest");localStorage.removeItem("tm_guest_info");}catch(e){}
-  mirror={};pending={};records=[];needsAuth=true;
-  Promise.all([idb.clear(S_MIRROR),idb.clear(S_PENDING)]).catch(function(){});
   var b=document.getElementById("guestBanner");if(b)b.remove();
   var gh=document.getElementById("guestHead");if(gh)gh.remove();
   document.body.classList.remove("guest");
   $("#fab").style.display="";$("#btnPick").style.display="";
-  heldClear();working=false;myPackets=[];
+  myPackets=[];
+  refreshWorkingBtn();refreshHeldBtn();refreshChrome();
+}
+
+function leaveGuest(){
+  endGuestChrome();
+  authToken="";
+  mirror={};pending={};records=[];needsAuth=true;
+  Promise.all([idb.clear(S_MIRROR),idb.clear(S_PENDING)]).catch(function(){});
+  heldClear();working=false;
   scope={kind:"unknown",territories:[],owned:[],canCreate:true,canDelete:true,
     canHandOut:true,empty:false,reason:"",at:0};
   refreshWorkingBtn();refreshHeldBtn();refreshChrome();

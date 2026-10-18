@@ -117,7 +117,7 @@
     role: AS === 'admin' ? 'admin' : 'user', active: true };
   var MATE = { id: 'u2', name: 'Ilmy Barajas', phone: '6504687853', role: 'user', active: true };
   try { localStorage.setItem('tm_token', 'stub-token'); } catch (e) {}
-  if (sc === 'guest') {
+  if (sc === 'guest' || sc === 'guestdead') {
     try {
       localStorage.setItem('tm_guest', 'stub-guest');
       localStorage.setItem('tm_guest_info', JSON.stringify({
@@ -151,7 +151,7 @@
     if (url.indexOf('/api/territory') !== -1) {
       if (TM.failHouses) return deadNetwork();
       var scoped = function () {
-        if (sc === 'guest') return HOUSES.filter(function (h) { return ['h5', 'h6'].indexOf(h.id) !== -1; });
+        if (sc === 'guest' || sc === 'guestdead') return HOUSES.filter(function (h) { return ['h5', 'h6'].indexOf(h.id) !== -1; });
         if (AS === 'numbers') return HOUSES.slice(0, 7);
         if (AS === 'none') return [];
         return HOUSES;
@@ -193,6 +193,11 @@
     switch (body.action) {
       case 'status':
         return json({ ok: true, hasUsers: true, me: sc === 'signedout' ? null : USER });
+      /* Entrar con cuenta propia. Hace falta para probar el camino que saca a
+         alguien del modo invitado: sin esto, setSession nunca corria y no se
+         veia si la llave tm_guest se queda pegada. */
+      case 'login':
+        return json({ ok: true, token: 'stub-token-real', user: USER });
       case 'listTerritories':
         // The real endpoint returns the roster and a scope envelope.
         return json({
@@ -312,6 +317,12 @@
         TM.working = !!body.working;
         return json({ ok: true, working: TM.working });
       case 'guestStatus':
+        /* El token de invitado caducado: el servidor contesta 401 y el mensaje
+           que manda es una respuesta de API, no una razon que le sirva a
+           nadie. Es el caso en que el navegador se quedaba atorado en modo
+           invitado para siempre. */
+        if (sc === 'guestdead')
+          return json({ error: 'Esta no es una sesion de invitado' }, 401);
         return json({ ok: true, territory: 'Atascadero 3', houseIds: ['h5', 'h6'], expiresAt: endOfToday,
           from: 'Cristobal Barajas', fromPhone: '6506305839',
           message: 'Start at the top of the street. The dog at 7860 barks but is friendly.' });
