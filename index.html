@@ -470,6 +470,33 @@ body.drawing #pttWrap,body.drawing #nextCard{display:none !important;}
 #drawBar button.p{background:var(--brand);color:var(--brand-ink);}
 #drawBar button.d{color:var(--bad);}
 #drawBar button:disabled{opacity:.45;}
+/* ── tarjetas de territorio ──────────────────────────────────────────── */
+.tcards{display:grid;grid-template-columns:1fr;gap:12px;}
+.tcard{display:block;width:100%;padding:0;overflow:hidden;text-align:left;
+  background:var(--surface);color:var(--text);border:1px solid var(--border);
+  border-radius:var(--r-lg);box-shadow:var(--shadow-1);}
+/* El que se esta viendo ahora, para que se sepa de donde se viene. */
+.tcard.on{border-color:var(--brand);box-shadow:0 0 0 2px var(--brand);}
+/* El fondo liso es lo que queda si un mosaico no carga: sin señal el
+   contorno y las casas siguen diciendo donde queda y que falta. */
+/* El mapa no recibe toques: dentro del boton, un toque largo abria "guardar
+   imagen" en el telefono y en escritorio se arrastraba la imagen. */
+.tc-map{display:block;width:100%;aspect-ratio:2/1;background:var(--surface-2);
+  pointer-events:none;-webkit-touch-callout:none;user-select:none;}
+.tc-map polygon{fill:rgba(21,101,192,.13);stroke:#1565C0;stroke-width:2.4;stroke-linejoin:round;}
+.tc-map circle{stroke:#fff;stroke-width:1.3;}
+.tc-nomap{display:flex;align-items:center;justify-content:center;
+  font-size:13px;color:var(--text-3);}
+.tc-body{padding:11px 14px 13px;}
+.tc-name{display:block;font-size:17px;font-weight:800;letter-spacing:-.01em;line-height:1.2;}
+.tc-meta{display:block;font-size:13px;color:var(--text-2);margin-top:3px;}
+.tc-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+.tc-tag{font-size:11.5px;font-weight:750;padding:3px 8px;border-radius:var(--r-full);
+  background:var(--surface-2);color:var(--text-2);}
+.tc-tag.warn{background:var(--warn-soft);color:var(--warn);}
+.tc-tag.bad{background:var(--bad-soft);color:var(--bad);}
+.tc-tag.ok{background:var(--ok-soft);color:var(--ok);}
+.tc-osm{font-size:11px;color:var(--text-3);text-align:center;margin-top:12px;}
 /* Mientras se marca, el mismo aviso dice que ya no falta ninguna casa. */
 #coverChip.ok{background:var(--ok-soft);color:var(--ok);}
 /* El aviso de cobertura: lo unico de esta pantalla que hay que atender. */
@@ -900,6 +927,10 @@ body.guest .house{padding-top:10px;padding-bottom:10px;}
     visibility:visible;pointer-events:auto;
     transition:transform .34s var(--sheet-ease),opacity .22s ease;}
   .sheet .grab{display:none;}
+  /* Las tarjetas de territorio necesitan mas que 560 px: en rejilla se ven
+     tres o cuatro de un vistazo, que es como se escoge entre varios. */
+  .sheet.wide{max-width:960px;width:calc(100vw - 300px);}
+  .sheet.wide .tcards{grid-template-columns:repeat(auto-fill,minmax(250px,1fr));}
 
   /* El boton de agregar se queda en la columna de la lista, no encima del
      mapa. */
@@ -1273,7 +1304,7 @@ body.drawing .house-pin{pointer-events:none;}
 
 /* ═══ CONFIG ═══ */
 var API="https://territory-manager-silk.vercel.app/api/territory";
-var APP_VERSION="2.35.1";
+var APP_VERSION="2.36.0";
 
 /* ═══════════════════════════════════════════════════════════════════════
    OFFLINE DATA LAYER
@@ -2644,6 +2675,8 @@ function openSheet(sel){
 function closeSheet(sel){
   var s=$(sel);if(!s)return;
   s.classList.remove("open");s.style.transform="";
+  // La hoja de escoger es la misma que usan otras pantallas: que no se queden anchas.
+  if(sel==="#sh-pick")s.classList.remove("wide");
   // A closed composer is no longer owned, so its leftover text is never
   // re-offered as a recovered draft.
   if(sel==="#sh-rv")delete draftOwner.rvNew;
@@ -2952,6 +2985,7 @@ function doSync(manual){
     if(r.ok){
       records=buildRecords();
       renderHouses();renderRV();refreshMapPins();buildTerrSub();
+      maybeEntryPick();
       if(r.conflicts&&r.conflicts.length){
         toast(r.conflicts.length+" casa(s) también cambiaron en otro teléfono — revisa las notas");
       }else if(manual){
@@ -3028,18 +3062,195 @@ function pickerRow(label,sub,attr){
     '<span class="row-txt"><span class="row-t">'+esc(label)+'</span>'+
     (sub?'<span class="row-s">'+esc(sub)+'</span>':'')+'</span><span class="row-act">›</span></button>';
 }
-function openTerrPicker(){
-  var m=terrMap(),keys=Object.keys(m).sort();
-  $("#pTitle").textContent="Territorios";
-  $("#pSub").textContent=records.length+" casas en total";
+/* ── tarjetas de territorio ───────────────────────────────────────────── */
+
+/* Web Mercator en pixeles de mundo, SIN redondear. tileX/tileY dicen que
+   mosaico; esto dice en que pixel de ese mosaico, que es lo que hace falta
+   para poner un punto encima de una imagen. */
+function worldX(lng,z){return (lng+180)/360*256*Math.pow(2,z);}
+function worldY(lat,z){
+  var r=lat*Math.PI/180;
+  return (1-Math.log(Math.tan(r)+1/Math.cos(r))/Math.PI)/2*256*Math.pow(2,z);
+}
+
+/* El encuadre de una caja de W x H sobre unos puntos [lat,lng]: el zoom mas
+   cercano en que caben, que mosaicos la cubren y donde va cada uno. Probado con
+   las coordenadas reales: Paso Robles 3 cabe a zoom 15 y Atascadero 4 —6.7 km
+   de punta a punta— a zoom 12, los dos con 4 mosaicos. */
+function miniFrame(pts,W,H,pad){
+  var la0=90,la1=-90,lo0=180,lo1=-180;
+  pts.forEach(function(q){
+    if(q[0]<la0)la0=q[0];if(q[0]>la1)la1=q[0];
+    if(q[1]<lo0)lo0=q[1];if(q[1]>lo1)lo1=q[1];
+  });
+  /* Tope 17: un territorio de una sola casa se acercaria hasta las tejas, y
+     eso no dice donde queda. Piso 9: mas lejos ya no se distingue nada. */
+  var z=17;
+  for(;z>9;z--){
+    if(worldX(lo1,z)-worldX(lo0,z)<=W-2*pad&&worldY(la0,z)-worldY(la1,z)<=H-2*pad)break;
+  }
+  var cx=(worldX(lo0,z)+worldX(lo1,z))/2, cy=(worldY(la1,z)+worldY(la0,z))/2;
+  var left=cx-W/2, top=cy-H/2, tiles=[], n=Math.pow(2,z);
+  for(var tx=Math.floor(left/256);tx<=Math.floor((left+W-1)/256);tx++)
+    for(var ty=Math.floor(top/256);ty<=Math.floor((top+H-1)/256);ty++)
+      if(ty>=0&&ty<n)tiles.push({x:((tx%n)+n)%n,y:ty,
+        l:Math.round(tx*256-left),t:Math.round(ty*256-top)});
+  return {z:z,tiles:tiles,
+    px:function(la,lo){return [worldX(lo,z)-left,worldY(la,z)-top];}};
+}
+
+/* Lo que una tarjeta necesita saber de un territorio. "polys" es una lista de
+   contornos porque la tarjeta de "Todos" los lleva todos. */
+function terrCardData(key,label,houses,polys,ocultas){
+  var pts=[],sin=0,nunca=0,atras=0;
+  houses.forEach(function(h){
+    var s=visitStatus(h.HouseLastVisitDate);
+    /* Una puerta No visitar no esta pendiente: contarla como "nunca visitada"
+       invitaba a ir justo ahi. */
+    if(!dnvState(h).on){if(s==="never")nunca++;else if(s==="overdue")atras++;}
+    var g=parseGPS(h.HouseGPSCoordinates);
+    if(g)pts.push({lat:g.lat,lng:g.lng,s:s});else sin++;
+  });
+  var t=teamTerritories.find(function(x){return x.name===key;})||{};
+  // Un vertice que no es un par de numeros no entra: [null,null] seria (0,0).
+  var esPunto=function(q){return Array.isArray(q)&&typeof q[0]==="number"&&typeof q[1]==="number";};
+  return {key:key,label:label,houses:houses.length,nunca:nunca,atras:atras,sin:sin,
+    ocultas:ocultas||0,
+    pts:pts,polys:(polys||[]).filter(function(b){return Array.isArray(b);})
+      .map(function(b){return b.filter(esPunto);})
+      .filter(function(b){return b.length>2;}),
+    owner:t.owner||null,assignedOn:t.assignedOn||"",assignees:t.assignees||[],
+    real:!!t.name};
+}
+
+/* El mapa pequeño: un solo SVG con los mosaicos como <image> y el contorno y
+   las casas encima, en el mismo sistema de coordenadas. Asi se escala con la
+   tarjeta sin medir nada. Las casas van del color de su ultima visita: se ve
+   de un vistazo que parte del territorio falta por trabajar. */
+var MINI_W=320, MINI_H=160;
+/* Para ENCUADRAR se ignoran las casas que quedan a mas de ~20 km de la mitad
+   de las demas. Una coordenada absurda —"0, 0" de un dedo que se resbalo, o
+   una casa puesta en el pueblo equivocado— alejaba el encuadre hasta enseñar
+   el oceano, y el territorio quedaba hecho un punto. */
+function sinLejanas(pts){
+  if(pts.length<3)return pts;
+  var mid=function(arr){var a=arr.slice().sort(function(x,y){return x-y;});return a[Math.floor(a.length/2)];};
+  var la=mid(pts.map(function(q){return q.lat;})), lo=mid(pts.map(function(q){return q.lng;}));
+  return pts.filter(function(q){return Math.abs(q.lat-la)<=0.2&&Math.abs(q.lng-lo)<=0.2;});
+}
+function miniMapHTML(d){
+  var todos=[];
+  d.polys.forEach(function(b){b.forEach(function(q){todos.push(q);});});
+  sinLejanas(d.pts).forEach(function(q){todos.push([q.lat,q.lng]);});
+  if(!todos.length)return '<div class="tc-map tc-nomap">Sin ubicación en el mapa todavía</div>';
+  var f=miniFrame(todos,MINI_W,MINI_H,12);
+  var punto=function(q){var p=f.px(q[0],q[1]);return p[0].toFixed(1)+","+p[1].toFixed(1);};
+  return '<svg class="tc-map" viewBox="0 0 '+MINI_W+' '+MINI_H+'" '+
+      'preserveAspectRatio="xMidYMid slice" aria-hidden="true">'+
+    /* crossorigin: sin el, la respuesta llega opaca y el service worker no la
+       guarda, asi que sin señal no saldria. 257 y no 256: al escalar la tarjeta
+       al ancho del telefono, sin un pixel de traslape se ven rayitas del fondo
+       entre mosaico y mosaico. */
+    f.tiles.map(function(t){
+      return '<image href="'+tileUrl(f.z,t.x,t.y)+'" crossorigin="anonymous" x="'+t.l+'" y="'+t.t+
+        '" width="257" height="257"/>';
+    }).join("")+
+    d.polys.map(function(b){return '<polygon points="'+b.map(punto).join(" ")+'"/>';}).join("")+
+    d.pts.map(function(q){
+      var p=f.px(q.lat,q.lng);
+      return '<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="3.6" fill="'+pinColor(q.s)+'"/>';
+    }).join("")+
+  '</svg>';
+}
+
+function terrCardHTML(d){
+  var meta=[d.houses+(d.houses===1?" casa":" casas")];
+  if(d.nunca)meta.push(d.nunca+" nunca visitada"+(d.nunca===1?"":"s"));
+  if(d.atras)meta.push(d.atras+" atrasada"+(d.atras===1?"":"s"));
+  var tags=[];
+  /* Quien lo tiene le importa a quien reparte; a un publicador no le dice
+     nada que no sepa, y en "Todos" no aplica. */
+  if(scope.kind==="admin"&&d.real){
+    tags.push(d.owner
+      ?'<span class="tc-tag">'+esc(d.owner.name)+
+        (d.assignedOn?" · desde "+esc(fmtDate(d.assignedOn)):"")+'</span>'
+      :'<span class="tc-tag ok">Libre</span>');
+    if(!d.polys.length)tags.push('<span class="tc-tag warn">Sin límite</span>');
+  }
+  if(d.sin)tags.push('<span class="tc-tag">'+d.sin+' sin ubicación</span>');
+  // Las del censo no salen en la lista con el censo apagado: se dicen aparte.
+  if(d.ocultas)tags.push('<span class="tc-tag">+'+d.ocultas+' del censo</span>');
+  return '<button class="tcard'+(terrFilter===d.key?" on":"")+'" data-terr="'+esc(d.key)+'">'+
+    miniMapHTML(d)+
+    '<span class="tc-body">'+
+      '<span class="tc-name">'+esc(d.label)+'</span>'+
+      '<span class="tc-meta">'+meta.join(" · ")+'</span>'+
+      (tags.length?'<span class="tc-tags">'+tags.join("")+'</span>':"")+
+    '</span>'+
+  '</button>';
+}
+
+function openTerrPicker(titulo){
+  var m=terrMap();
+  /* "Unassigned" al final: son casas que nadie ha puesto en un territorio, no
+     un territorio que se trabaje. */
+  var keys=Object.keys(m).sort(function(a,b){
+    if(a==="Unassigned")return 1;if(b==="Unassigned")return -1;
+    return a.localeCompare(b,"es",{numeric:true});
+  });
+  /* La tarjeta cuenta lo mismo que va a enseñar la lista. Con el censo apagado
+     la lista esconde las casas que no son del idioma de la congregacion, y una
+     tarjeta que dijera "61 casas" de un territorio que al tocarlo enseña 36
+     estaria mintiendo. Las escondidas se dicen aparte. */
+  var seVe=function(h){return censusOn||isOurLang(h);};
+  var vistas=records.filter(seVe);
+  $("#pTitle").textContent=typeof titulo==="string"?titulo:"Territorios";
+  $("#pSub").textContent=vistas.length+" casas en total";
   /* Solo aparece si hay alguna: una opcion vacia no enseña nada y estorba
      arriba de los territorios de verdad. */
   var rvN=guestMode?0:records.filter(function(h){return myRVs(h).length>0;}).length;
-  $("#pBody").innerHTML=pickerRow("Todos los territorios",records.length+" casas",'data-terr="all"')+
+  var todas=teamTerritories.map(function(t){return t.bounds;});
+  $("#pBody").innerHTML='<div class="tcards">'+
+    keys.map(function(t){
+      var v=m[t].filter(seVe);
+      return terrCardHTML(terrCardData(t,t==="Unassigned"?"Sin territorio":t,v,
+        [(teamTerritories.find(function(x){return x.name===t;})||{}).bounds],
+        m[t].length-v.length));
+    }).join("")+
+    /* No scopeLabel(): a quien tiene un solo territorio le devuelve el nombre
+       de ese territorio, y saldrian dos tarjetas que se llaman igual. */
+    terrCardHTML(terrCardData("all",scope.kind==="admin"?"Todos los territorios"
+      :"Todos mis territorios",vistas,todas,records.length-vistas.length))+
     (rvN?pickerRow("Mis Revisitas",rvN+(rvN===1?" casa":" casas"),
       'data-terr="'+RV_TERR+'"'):"")+
-    keys.map(function(t){return pickerRow(t,m[t].length+" casas",'data-terr="'+esc(t)+'"');}).join("");
+  '</div>'+
+  // Los mapitas tambien son de OpenStreetMap: el credito va aqui igual.
+  '<div class="tc-osm">Mapas © OpenStreetMap</div>';
+  $("#sh-pick").classList.add("wide");
   openSheet("#sh-pick");
+}
+
+/* AL ENTRAR: las tarjetas se ofrecen solas, una vez por apertura, a quien de
+   verdad tiene que escoger. No al invitado (trae sus numeros), no a la version
+   sencilla (para quien batalla con el telefono, una pantalla mas es un
+   estorbo), no a quien solo tiene numeros sueltos ni a quien tiene un solo
+   territorio — ahi no hay nada que escoger.
+
+   Espera a saber quien es (loadTeam) Y a tener las casas: en un telefono
+   recien estrenado las casas llegan despues que los territorios, y las
+   tarjetas saldrian en cero. Por eso se pregunta desde los dos sitios, y la
+   primera vez que se puede decidir, se decide para toda la apertura. */
+var entryPickDone=false;
+function maybeEntryPick(){
+  if(entryPickDone)return;
+  if(!scope.at||!records.length)return;          // todavia no se sabe lo suficiente
+  entryPickDone=true;
+  if(guestMode||simpleMode||needsAuth||!me)return;
+  if(scope.kind==="numbers")return;
+  if(terrFilter!=="all")return;                   // ya escogio
+  if(openSheets.length)return;                    // esta haciendo otra cosa
+  if(Object.keys(terrMap()).filter(function(t){return t!=="Unassigned";}).length<2)return;
+  openTerrPicker("¿Qué territorio vas a trabajar?");
 }
 $("#scopeBtn").addEventListener("click",openTerrPicker);
 $("#rowTerr").addEventListener("click",openTerrPicker);
@@ -3200,7 +3411,13 @@ function initMap(){
   /* Sin las tres letras (a./b./c.): repartian cada pedazo al azar entre tres
      servidores, asi que un mapa guardado desde uno fallaba cuando Leaflet
      pedia otro. OSM desaconseja esos nombres desde hace años. */
-  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19}).addTo(map);
+  /* crossOrigin: sin el, cada mosaico llega opaco aunque OpenStreetMap mande
+     access-control-allow-origin, y el service worker no guarda respuestas
+     opacas —no puede ver si son un mosaico o una pagina de error—. Asi la cache
+     de "lo que ya se ha visto" nunca guardo nada, y sin señal solo salia lo
+     descargado a proposito. Es seguro: la descarga usa mode:"cors", asi que lo
+     guardado no es opaco y una peticion cors lo puede usar. */
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,crossOrigin:true}).addTo(map);
   L.control.zoom({position:"topright"}).addTo(map);
   /* Un doble clic manda click, click, dblclick: esto corria dos veces y
      dejaba dos vertices encimados, que no se ven hasta que la figura sale con
@@ -3846,7 +4063,7 @@ function refreshGeoRow(){
   if(!row||!sub)return;
   row.style.display=(scope.kind==="admin"&&!guestMode&&!simpleMode)?"":"none";
   if(geoRun)return;                       // el progreso manda mientras corre
-  var sin=housesUnplaced();
+  var sin=housesToLocate();
   sub.textContent=sin.length
     ? sin.length+(sin.length===1?" casa no está":" casas no están")+" en el mapa · toca para buscarlas"
     : "Todas las casas de "+terrFilterLabel()+" ya están en el mapa";
@@ -3857,7 +4074,7 @@ function locateHouses(){
     if(confirm("¿Parar la búsqueda?"))geoRun.cancel=true;
     return;
   }
-  var sin=housesUnplaced().filter(function(h){return geoKey(h);});
+  var sin=housesToLocate().filter(function(h){return geoKey(h);});
   if(!sin.length){toast("No hay direcciones que buscar");return;}
   if(!navigator.onLine){toast("Esto necesita internet",true);return;}
 
@@ -4275,6 +4492,20 @@ function housesUnplaced(){
     return !parseGPS(h.HouseGPSCoordinates);
   });
 }
+
+/* Las que hay que BUSCAR. No es lo mismo que housesUnplaced: aquella pasa por
+   inTerrFilter, que con el censo apagado esconde las casas que no son del
+   idioma de la congregacion. Eso esta bien para la lista —es a quien se va
+   hoy—, pero ubicar es completar datos, no una vista. En Paso Robles 3 son 25
+   de 61 casas, y el censo existe justo para ir a esas puertas. */
+function housesToLocate(){
+  return records.filter(function(h){
+    if(parseGPS(h.HouseGPSCoordinates))return false;
+    if(terrFilter==="all")return true;
+    if(terrFilter===RV_TERR)return myRVs(h).length>0;
+    return (h.HouseTerritoryNumber||"Unassigned")===terrFilter;
+  });
+}
 $("#fitBtn").addEventListener("click",fitPins);
 $("#boundsBtn").addEventListener("click",function(){
   if(drawing)cancelDrawBounds();else startDrawBounds();
@@ -4677,6 +4908,9 @@ function signOut(silent){
   // A roster of volunteers' names and house counts is exactly the residue
   // signing out exists to remove.
   heldClear();working=false;
+  /* Los territorios y las personas tambien: si no, las tarjetas enseñarian los
+     dueños de la cuenta anterior hasta que contestara el servidor. */
+  teamTerritories=[];teamUsers=[];
   Promise.all([idb.clear(S_MIRROR),idb.clear(S_PENDING)]).catch(function(){});
   renderHouses();renderRV();updateSyncUI();refreshWorkingBtn();refreshHeldBtn();refreshChrome();
   if(mapReady)refreshMapPins();
@@ -6156,6 +6390,7 @@ function loadTeam(){
     if(va)applySplit(va.id.replace("view-",""));
     // Los contornos llegan pegados a los territorios: hasta aqui no se sabian.
     drawBounds();refreshCoverage();
+    maybeEntryPick();
   }).catch(function(){});
 }
 

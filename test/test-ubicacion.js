@@ -407,9 +407,39 @@ check('una latitud imposible se rechaza',
       road: 'San Andres Avenue', postcode: '93422' } }) === null);
 
 // ── lo que ya está confirmado no se toca ──────────────────────────────
+/* ── qué casas se buscan ─────────────────────────────────────────────
+   No las que enseña la lista: inTerrFilter esconde las que no son del idioma
+   de la congregación mientras el censo está apagado, y en Paso Robles 3 son 25
+   de 61. Con esa lista el botón habría ubicado 52 casas y no 77. Ubicar es
+   completar datos, no una vista. */
+const loc = {
+  RV_TERR: '__rv__', terrFilter: 'Paso Robles 3', censusOn: false, congLang: 'Español',
+  myRVs: () => [], normLang: geo.normLang, parseGPS: geo.parseGPS,
+  records: [
+    { HouseTerritoryNumber: 'Paso Robles 3', HouseLanguage: 'Español', HouseGPSCoordinates: '' },
+    { HouseTerritoryNumber: 'Paso Robles 3', HouseLanguage: 'Sin saber', HouseGPSCoordinates: '' },
+    { HouseTerritoryNumber: 'Paso Robles 3', HouseLanguage: 'Inglés', HouseGPSCoordinates: '' },
+    { HouseTerritoryNumber: 'Paso Robles 3', HouseLanguage: 'Español', HouseGPSCoordinates: '35.6, -120.66' },
+    { HouseTerritoryNumber: 'Atascadero 4', HouseLanguage: 'Español', HouseGPSCoordinates: '' },
+  ],
+};
+vm.createContext(loc);
+vm.runInContext(['isOurLang', 'inTerrFilter', 'housesUnplaced', 'housesToLocate'].map(take).join('\n'), loc);
+check('la lista, con el censo apagado, solo ve las de nuestro idioma',
+  loc.housesUnplaced().length === 1, loc.housesUnplaced().length);
+check('pero el botón busca TAMBIÉN las del censo y las de otro idioma',
+  loc.housesToLocate().length === 3, loc.housesToLocate().length);
 check('solo se buscan las casas SIN coordenadas',
-  /housesUnplaced\(\)/.test(take('locateHouses')),
+  loc.housesToLocate().every(h => !h.HouseGPSCoordinates),
   'una coordenada tomada parado frente a la casa vale más que cualquier búsqueda');
+check('y solo las del territorio escogido',
+  loc.housesToLocate().every(h => h.HouseTerritoryNumber === 'Paso Robles 3'));
+loc.terrFilter = 'all';
+check('con todos los territorios, todas las que faltan', loc.housesToLocate().length === 4,
+  loc.housesToLocate().length);
+check('el botón usa la lista de buscar, no la de ver',
+  /housesToLocate\(\)/.test(take('locateHouses')) && !/housesUnplaced\(\)/.test(take('locateHouses')));
+
 check('se dice en voz alta que las direcciones salen a OpenStreetMap',
   /se envían a OpenStreetMap/.test(src),
   'es dato del grupo saliendo a un servicio de fuera: se pregunta antes');
